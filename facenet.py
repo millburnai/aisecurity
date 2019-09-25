@@ -1,20 +1,26 @@
-import keras
-from time import time
-import numpy as np
+
+"""
+
+"facenet.py"
+
+Facial recognition with FaceNet in Keras.
+
+Paper: https://arxiv.org/pdf/1503.03832.pdf
+
+"""
+
 import os
-import matplotlib.pyplot as plt
-import cv2
-from mtcnn.mtcnn import MTCNN
-from imageio import imread
-from skimage.transform import resize
-from scipy.spatial import distance
+from time import time
 import functools
 
-# CONSTANTS
-HOME = os.getenv("HOME")
-CASCADE_PATH = HOME + "/PycharmProjects/ai-security/models/haarcascade_frontalface_alt.xml"
-IMAGE_DIR_BASEPATH = HOME + "/PycharmProjects/ai-security/images/"
-NAMES = os.listdir(IMAGE_DIR_BASEPATH)
+import matplotlib.pyplot as plt
+import keras
+from keras import backend as K
+import numpy as np
+from scipy.spatial import distance
+from skimage.transform import resize
+from imageio import imread
+from mtcnn.mtcnn import MTCNN
 
 # DECORATORS
 def timer(message = "Time elapsed"):
@@ -36,33 +42,41 @@ class FaceNet(object):
   # HYPERPARAMETERS
   ALPHA = 1.0
 
+  # INITS
   @timer(message="Model load time")
   def __init__(self, filepath):
     self.k_model = keras.models.load_model(filepath)
     self.data = None # must be filled in by user
 
-  def calc_dist(self, img_a, img_b):
-    assert self.data, "data must be provided"
-    return distance.euclidean(self.data[img_a]["emb"], self.data[img_b]["emb"])
+  def set_data(self, data):
+    self.data = data
 
-  def calc_dist_plot(self, img_a, img_b):
+  # GENERIC L2 DISTANCE
+  def l2_dist(self, img_a, img_b):
+    return distance.euclidean(self.data[img_a]["embedding"], self.data[img_b]["embedding"])
+
+  # COMPARE TWO SPECIFIC IMAGES
+  def compare(self, img_a, img_b, verbose = True):
     assert self.data, "data must be provided"
 
-    dist = self.calc_dist(img_a, img_b)
+    dist = self.l2_dist(img_a, img_b)
     is_same = dist <= FaceNet.ALPHA
 
-    print("L2 normalized distance: {} -> {} and {} are the same person: {}".format(dist, img_a, img_b, is_same))
+    if verbose:
+      print("L2 normalized distance: {} -> {} and {} are the same person: {}".format(dist, img_a, img_b, is_same))
 
-    plt.subplot(1, 2, 1)
-    plt.imshow(imread(self.data[img_a]["image_filepath"]))
-    plt.axis("off")
+      plt.subplot(1, 2, 1)
+      plt.imshow(imread(self.data[img_a]["img"]))
+      plt.axis("off")
 
-    plt.subplot(1, 2, 2)
-    plt.imshow(imread(self.data[img_b]["image_filepath"]))
-    plt.axis("off")
+      plt.subplot(1, 2, 2)
+      plt.imshow(imread(self.data[img_b]["img"]))
+      plt.axis("off")
 
-    plt.suptitle("Same person: {}\n L2 distance: {}".format(is_same, dist))
-    plt.show()
+      plt.suptitle("Same person: {}\n L2 distance: {}".format(is_same, dist))
+      plt.show()
+
+    return int(is_same), dist
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
@@ -80,78 +94,74 @@ class Preprocessing(object):
       size = x.size
     else:
       raise ValueError("x must have either 3 or 4 dimensions")
-  
-    mean = np.mean(x, axis=axis, keepdims=True)
-    std = np.std(x, axis=axis, keepdims=True)
-    std_adj = np.maximum(std, 1.0 / np.sqrt(size))
-    y = (x - mean) / std_adj
-    return y
+
+    std_adj = np.maximum(np.std(x, axis=axis, keepdims=True), 1.0 / np.sqrt(size))
+    whitened = (x - np.mean(x, axis=axis, keepdims=True)) / std_adj
+    return whitened
 
   @staticmethod
-  def l2_normalize(x, axis=-1, epsilon=1e-10):
-    return x / np.sqrt(np.maximum(np.sum(np.square(x), axis=axis, keepdims=True), epsilon))
-
-  @staticmethod
-  def load_and_align_images(filepaths, margin):
-    # cascade = cv2.CascadeClassifier(CASCADE_PATH)
+  def align_imgs(filepaths, margin):
     detector = MTCNN()
 
-    aligned_images = []
-    for filepath in filepaths:
-      img = imread(filepath)
-      # faces = cascade.detectMultiScale(img, scaleFactor=1.1, minNeighbors=3)
+    def align_img(path):
+      img = imread(path)
       faces = detector.detect_faces(img)[0]["box"]
+      assert len(faces) != 0, "face was not found in {}".format(path)
 
-      if len(faces) == 0:
-        raise ValueError("face was not found in {}".format(filepath))
+      x, y, width, height = faces
+      cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
+      resized = resize(cropped, (Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE), mode="reflect")
+      return resized
   
-      x, y, w, h = faces
-      cropped = img[y - margin // 2:y + h + margin // 2, x - margin // 2:x + w + margin // 2, :]
-      aligned = resize(cropped, (Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE), mode="reflect")
-      aligned_images.append(aligned)
-  
-    return np.array(aligned_images)
+    return np.array([align_img(path) for path in filepaths])
 
   @staticmethod
-  def calc_embs(facenet, filepaths, margin=10, batch_size=1):
-    aligned_images = Preprocessing.prewhiten(Preprocessing.load_and_align_images(filepaths, margin))
-    pd = []
-    for start in range(0, len(aligned_images), batch_size):
-      pd.append(facenet.k_model.predict_on_batch(aligned_images[start:start + batch_size]))
+  def embed(facenet, filepaths, margin = 10, batch_size = 1):
+    aligned_imgs = Preprocessing.prewhiten(Preprocessing.align_imgs(filepaths, margin))
+    raw_embeddings = facenet.k_model.predict(aligned_imgs, batch_size=batch_size)
 
-    return Preprocessing.l2_normalize(np.concatenate(pd))
+    l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
+    normalized_embeddings = l2_normalize(raw_embeddings)
+
+    return normalized_embeddings
 
   @staticmethod
-  @timer(message="Data Preprocessinging time")
-  def custom_load(facenet):
+  @timer(message="Data preprocessing time")
+  def load(facenet, img_dir, people):
     data = {}
-    for name in NAMES:
-      image_dirpath = IMAGE_DIR_BASEPATH + name
-      image_filepaths = [os.path.join(image_dirpath, f) for f in os.listdir(image_dirpath)]
-      embs = Preprocessing.calc_embs(facenet, image_filepaths)
-      for i in range(len(image_filepaths)):
-        data["{}{}".format(name, i)] = {"image_filepath": image_filepaths[i], "emb": embs[i]}
+    for person in people:
+      person_dir = img_dir + person
+      img_paths = [os.path.join(person_dir, f) for f in os.listdir(person_dir) if not f.endswith(".DS_Store")]
+      embeddings = Preprocessing.embed(facenet, img_paths)
+      for index, path in enumerate(img_paths):
+        data["{}{}".format(person, index)] = {"img": path, "embedding": embeddings[index]}
     return data
 
 if __name__ == "__main__":
-  facenet = FaceNet(HOME + "/PycharmProjects/ai-security/models/facenet_keras.h5")
-  facenet.data = Preprocessing.custom_load(facenet)
+  # PATHS
+  HOME = os.getenv("HOME")
+  img_dir = HOME + "/PycharmProjects/ai-security/images/"
+  people = ["liam", "abhi", "ryan"] # [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store")]
 
+  # NETWORK INIT
+  facenet = FaceNet(HOME + "/PycharmProjects/ai-security/models/facenet_keras.h5")
+  facenet.set_data(Preprocessing.load(facenet, img_dir, people))
+
+  # TESTING
   start = time()
 
-  # facenet.calc_dist_plot("trump0", "trump1")
-  # facenet.calc_dist_plot("trump1", "obama1")
-  # facenet.calc_dist_plot("obama0", "obama1")
-  #
-  # facenet.calc_dist_plot("moon_jae_in0", "moon_jae_in1")
-  # facenet.calc_dist_plot("andrew_ng1", "moon_jae_in0")
-  # facenet.calc_dist_plot("andrew_ng0", "andrew_ng1")
+  my_imgs = []
+  for person in os.listdir(img_dir):
+    images = [f for f in os.listdir(img_dir + person + f) if not f.endswith(".DS_Store")]
+    for index in range(len(images)):
+      my_imgs.append("{}{}".format(person, index))
 
-  facenet.calc_dist_plot("ryan0", "ryan2")
-  facenet.calc_dist_plot("ryan1", "ryan2")
-  facenet.calc_dist_plot("ryan1", "ryan0")
+  count = 0
+  for img_a in my_imgs:
+    for img_b in my_imgs:
+      if not np.array_equal(img_a, img_b):
+        np.array([*facenet.compare(img_a, img_b), 1])
+        count += 1
+  print(count)
 
-  facenet.calc_dist_plot("ryan1", "andrew_ng1")
-  facenet.calc_dist_plot("ryan0", "andrew_ng0")
-
-  print("Average time per comparison: {}s".format(round((time() - start) / 3, 3)))
+  print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
