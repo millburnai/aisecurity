@@ -8,15 +8,16 @@ from imageio import imread
 from skimage.transform import resize
 from scipy.spatial import distance
 
+HOME = os.getenv("HOME")
 ALPHA = 1.0
 
 start = time()
-facenet = keras.models.load_model("/home/ryan/Downloads/facenet_keras.h5")
+facenet = keras.models.load_model(HOME + "/PycharmProjects/ai-security/models/facenet_keras.h5")
 print("Time: {}s".format(round(time() - start, 3)))
 
-cascade_path = "/home/ryan/Downloads/haarcascade_frontalface_alt2.xml"
-image_dir_basepath = '/home/ryan/Downloads/'
-names = ['trump', 'obama', 'moon_jae_in', 'andrew_ng']
+cascade_path = HOME + "/PycharmProjects/ai-security/models/haarcascade_frontalface_alt2.xml"
+image_dir_basepath = HOME + "/PycharmProjects/ai-security/images/"
+names = ["trump", "obama", "moon_jae_in", "andrew_ng"]
 image_size = 160
 
 def prewhiten(x):
@@ -44,10 +45,17 @@ def load_and_align_images(filepaths, margin):
 
   aligned_images = []
   for filepath in filepaths:
+    if filepath.endswith(".DS_STORE"):
+      print(filepath)
+      continue
+
     img = imread(filepath)
     faces = cascade.detectMultiScale(img,
                                      scaleFactor=1.1,
                                      minNeighbors=3)
+    if len(faces) == 0:
+      raise ValueError("face was not found in {}".format(filepath))
+
     (x, y, w, h) = faces[0]
     cropped = img[y - margin // 2:y + h + margin // 2,
               x - margin // 2:x + w + margin // 2, :]
@@ -65,19 +73,10 @@ def calc_embs(filepaths, margin=10, batch_size=1):
 
   return embs
 
-data = {}
-for name in names:
-    image_dirpath = image_dir_basepath + name
-    image_filepaths = [os.path.join(image_dirpath, f) for f in os.listdir(image_dirpath)]
-    embs = calc_embs(image_filepaths)
-    for i in range(len(image_filepaths)):
-        data['{}{}'.format(name, i)] = {'image_filepath' : image_filepaths[i],
-                                        'emb' : embs[i]}
-
-def calc_dist(img_name0, img_name1):
+def calc_dist(data, img_name0, img_name1):
     return distance.euclidean(data[img_name0]['emb'], data[img_name1]['emb'])
 
-def calc_dist_plot(img_name0, img_name1):
+def calc_dist_plot(data, img_name0, img_name1):
     dist = calc_dist(img_name0, img_name1)
     print("L2 normalized distance: {0} -> {1} and {2} are the same person: {3}".format(dist, img_name0, img_name1,
                                                                                        dist <= ALPHA))
@@ -93,10 +92,18 @@ def calc_dist_plot(img_name0, img_name1):
     plt.show()
 
 if __name__ == "__main__":
-  calc_dist_plot('trump0', 'trump1')
-  calc_dist_plot('trump1', 'obama1')
-  calc_dist_plot('obama0', 'obama1')
+  data = {}
+  for name in names:
+    image_dirpath = image_dir_basepath + name
+    image_filepaths = [os.path.join(image_dirpath, f) for f in os.listdir(image_dirpath)]
+    embs = calc_embs(image_filepaths)
+    for i in range(len(image_filepaths)):
+      data['{}{}'.format(name, i)] = {'image_filepath': image_filepaths[i], 'emb': embs[i]}
 
-  calc_dist_plot('moon_jae_in0', 'moon_jae_in1')
-  calc_dist_plot('andrew_ng1', 'moon_jae_in0')
-  calc_dist_plot('andrew_ng0', 'andrew_ng1')
+  calc_dist_plot(data, 'trump0', 'trump1')
+  calc_dist_plot(data, 'trump1', 'obama1')
+  calc_dist_plot(data, 'obama0', 'obama1')
+
+  calc_dist_plot(data, 'moon_jae_in0', 'moon_jae_in1')
+  calc_dist_plot(data, 'andrew_ng1', 'moon_jae_in0')
+  calc_dist_plot(data, 'andrew_ng0', 'andrew_ng1')
