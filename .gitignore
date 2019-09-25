@@ -1,3 +1,4 @@
 # Pycharm files
 *.pyc
 .idea/
+.DS_STORE
