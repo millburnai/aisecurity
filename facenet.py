@@ -16,7 +16,7 @@ print("Time: {}s".format(round(time() - start, 3)))
 
 cascade_path = "/home/ryan/Downloads/haarcascade_frontalface_alt2.xml"
 image_dir_basepath = '/home/ryan/Downloads/'
-names = ['trump', 'obama']
+names = ['trump', 'obama', 'moon_jae_in', 'andrew_ng']
 image_size = 160
 
 def prewhiten(x):
@@ -83,8 +83,12 @@ def calc_dist_plot(img_name0, img_name1):
                                                                                        dist <= ALPHA))
     plt.subplot(1, 2, 1)
     plt.imshow(imread(data[img_name0]['image_filepath']))
+    plt.axis("off")
+
     plt.subplot(1, 2, 2)
     plt.imshow(imread(data[img_name1]['image_filepath']))
+    plt.axis("off")
+
     plt.suptitle("Same person: {}".format(dist <= ALPHA))
     plt.show()
 
@@ -92,3 +96,7 @@ if __name__ == "__main__":
   calc_dist_plot('trump0', 'trump1')
   calc_dist_plot('trump1', 'obama1')
   calc_dist_plot('obama0', 'obama1')
+
+  calc_dist_plot('moon_jae_in0', 'moon_jae_in1')
+  calc_dist_plot('andrew_ng1', 'moon_jae_in0')
+  calc_dist_plot('andrew_ng0', 'andrew_ng1')
