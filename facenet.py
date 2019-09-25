@@ -141,7 +141,7 @@ if __name__ == "__main__":
   # PATHS
   HOME = os.getenv("HOME")
   img_dir = HOME + "/PycharmProjects/ai-security/images/"
-  people = ["liam", "abhi", "ryan"] # [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store")]
+  people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store")]
 
   # NETWORK INIT
   facenet = FaceNet(HOME + "/PycharmProjects/ai-security/models/facenet_keras.h5")
@@ -151,17 +151,15 @@ if __name__ == "__main__":
   start = time()
 
   my_imgs = []
-  for person in os.listdir(img_dir):
-    images = [f for f in os.listdir(img_dir + person + f) if not f.endswith(".DS_Store")]
-    for index in range(len(images)):
+  for person in people:
+    for index in range(len([f for f in os.listdir(img_dir + person) if not f.endswith(".DS_Store")])):
       my_imgs.append("{}{}".format(person, index))
 
   count = 0
   for img_a in my_imgs:
     for img_b in my_imgs:
       if not np.array_equal(img_a, img_b):
-        np.array([*facenet.compare(img_a, img_b), 1])
+        facenet.compare(img_a, img_b)
         count += 1
-  print(count)
 
   print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
