@@ -53,7 +53,15 @@ class FaceNet(object):
 
   # GENERIC L2 DISTANCE
   def l2_dist(self, img_a, img_b):
-    return distance.euclidean(self.data[img_a]["embedding"], self.data[img_b]["embedding"])
+    try:
+      return distance.euclidean(self.data[img_a]["embedding"], self.data[img_b]["embedding"])
+    except KeyError:
+      print(self.data[img_b]["embedding"].shape)
+      print(self.predict([img_a]).shape)
+      return distance.euclidean(self.predict([img_a]), self.data[img_b]["embedding"])
+
+  def predict(self, filepaths, batch_size = 1):
+    return Preprocessing.embed(self, filepaths, batch_size = batch_size)
 
   # COMPARE TWO SPECIFIC IMAGES
   def compare(self, img_a, img_b, verbose = True):
@@ -63,20 +71,57 @@ class FaceNet(object):
     is_same = dist <= FaceNet.ALPHA
 
     if verbose:
-      print("L2 normalized distance: {} -> {} and {} are the same person: {}".format(dist, img_a, img_b, is_same))
-
-      plt.subplot(1, 2, 1)
-      plt.imshow(imread(self.data[img_a]["img"]))
-      plt.axis("off")
-
-      plt.subplot(1, 2, 2)
-      plt.imshow(imread(self.data[img_b]["img"]))
-      plt.axis("off")
-
-      plt.suptitle("Same person: {}\n L2 distance: {}".format(is_same, dist))
-      plt.show()
+      print("L2 distance: {} -> {} and {} are the same person: {}".format(dist, img_a, img_b, is_same))
+      self.disp_imgs(img_a, img_b, title = "Same person: {}\n L2 distance: {}".format(is_same, dist))
 
     return int(is_same), dist
+
+  # FACIAL RECOGNITION
+  @timer(message="Verification time")
+  def recognize(self, img, verbose = True):
+    assert self.data, "data must be provided"
+
+    def find_val(dict_, key_):
+      for key, val in dict_:
+        if val == key_:
+          return val
+        return -1
+
+    avgs = {}
+    for person in self.data:
+      if person[:-1] in avgs:
+        avgs[person[:-1]] = [self.l2_dist(img, person)]
+      else:
+        avgs[person[:-1]].append(self.l2_dist(img, person))
+    avgs = dict((key, np.average(vals)) for key, vals in avgs.items())
+
+    best_match = find_val(avgs, min(avgs.values()))
+
+    if verbose:
+      if best_match <= FaceNet.ALPHA:
+        print("Your image is a picture of {}. L2 distance of {}".format(best_match, avgs[best_match]))
+      else:
+        print("Your image is not in the database. The best match is {} with an L2 distance of ".format(
+          best_match, avgs[best_match]))
+      self.disp_imgs(img, self.data[best_match]["path"], title = "Best match: {}\nL2 distance: {}".format(
+        best_match, avgs[best_match]))
+
+    return int(best_match <= FaceNet.ALPHA), best_match, avgs[best_match]
+
+  # DISPLAYING
+  def disp_imgs(self, img_a, img_b, title = None):
+    plt.subplot(1, 2, 1)
+    plt.imshow(imread(self.data[img_a]["path"]))
+    plt.axis("off")
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(imread(self.data[img_b]["path"]))
+    plt.axis("off")
+
+    if title is not None:
+      plt.suptitle(title)
+
+    plt.show()
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
@@ -134,7 +179,7 @@ class Preprocessing(object):
       img_paths = [os.path.join(person_dir, f) for f in os.listdir(person_dir) if not f.endswith(".DS_Store")]
       embeddings = Preprocessing.embed(facenet, img_paths)
       for index, path in enumerate(img_paths):
-        data["{}{}".format(person, index)] = {"img": path, "embedding": embeddings[index]}
+        data["{}{}".format(person, index)] = {"path": path, "embedding": embeddings[index]}
     return data
 
 if __name__ == "__main__":
@@ -147,19 +192,26 @@ if __name__ == "__main__":
   facenet = FaceNet(HOME + "/PycharmProjects/ai-security/models/facenet_keras.h5")
   facenet.set_data(Preprocessing.load(facenet, img_dir, people))
 
+  # UNIT TESTS
+  def compare_test():
+    start = time()
+
+    my_imgs = []
+    for person in people:
+      for index in range(len([f for f in os.listdir(img_dir + person) if not f.endswith(".DS_Store")])):
+        my_imgs.append("{}{}".format(person, index))
+
+    count = 0
+    for img_a in my_imgs:
+      for img_b in my_imgs:
+        if not np.array_equal(img_a, img_b):
+          facenet.compare(img_a, img_b)
+          count += 1
+
+    print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
+
+  def verify_test():
+    facenet.recognize("/Users/ryan/Desktop/me.jpg")
+
   # TESTING
-  start = time()
-
-  my_imgs = []
-  for person in people:
-    for index in range(len([f for f in os.listdir(img_dir + person) if not f.endswith(".DS_Store")])):
-      my_imgs.append("{}{}".format(person, index))
-
-  count = 0
-  for img_a in my_imgs:
-    for img_b in my_imgs:
-      if not np.array_equal(img_a, img_b):
-        facenet.compare(img_a, img_b)
-        count += 1
-
-  print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
+  verify_test()
