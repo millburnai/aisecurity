@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 import keras
 from keras import backend as K
 import numpy as np
-from scipy.spatial import distance
 from skimage.transform import resize
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
@@ -68,9 +67,9 @@ class FaceNet(object):
   # GENERIC L2 DISTANCE
   def l2_dist(self, img_a, img_b):
     try:
-      return distance.euclidean(self.data[img_a]["embedding"], self.data[img_b]["embedding"])
+      return np.linalg.norm(self.data[img_a]["embedding"] - self.data[img_b]["embedding"])
     except TypeError:
-      return distance.euclidean(img_a, self.data[img_b]["embedding"]) # assumes img_a is a precomputed embedding
+      return np.linalg.norm(img_a - self.data[img_b]["embedding"]) # assumes img_a is a precomputed embedding
 
   def predict(self, filepaths, batch_size = 1):
     return Preprocessing.embed(self, filepaths, batch_size = batch_size)
@@ -100,12 +99,16 @@ class FaceNet(object):
           minimum = (key, val)
       return minimum[0]
 
+    # TODO: speed up recognize by replacing complete search of dataset with k-NN classifier
+    #       (preferably in keras)
+
     embedding = self.predict([img])
     avgs = {}
     for person in self.data:
       if person[:-1] not in avgs:
         avgs[person[:-1]] = self.l2_dist(embedding, person)
     best_match = find_min_key(avgs)
+    print(best_match, avgs)
 
     if verbose:
       if avgs[best_match] <= FaceNet.ALPHA:
@@ -163,10 +166,13 @@ class Preprocessing(object):
   @staticmethod
   def align_imgs(filepaths, margin):
     detector = MTCNN()
+    # TODO: get faster MTCNN (takes more time to feed-forward than it does through FaceNet!)
 
     def align_img(path):
       img = imread(path)
+      start = time()
       faces = detector.detect_faces(img)[0]["box"]
+      print(time()-start)
       assert len(faces) != 0, "face was not found in {}".format(path)
 
       x, y, width, height = faces
@@ -229,7 +235,7 @@ if __name__ == "__main__":
     print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
 
   def verify_test():
-    facenet.recognize(HOME + "/PycharmProjects/ai-security/me.jpg")
+    facenet.recognize(HOME + "/PycharmProjects/ai-security/kevvv.jpg")
 
   # TESTING
   verify_test()
