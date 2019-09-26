@@ -69,10 +69,10 @@ class FaceNet(object):
   def l2_dist(self, img_a, img_b):
     try:
       return distance.euclidean(self.data[img_a]["embedding"], self.data[img_b]["embedding"])
-    except KeyError:
-      return distance.euclidean(self.predict([img_a]), self.data[img_b]["embedding"])
+    except TypeError:
+      return distance.euclidean(img_a, self.data[img_b]["embedding"]) # assumes img_a is a precomputed embedding
 
-  def predict(self, filepaths, batch_size = 2):
+  def predict(self, filepaths, batch_size = 1):
     return Preprocessing.embed(self, filepaths, batch_size = batch_size)
 
   # COMPARE TWO SPECIFIC IMAGES
@@ -100,14 +100,11 @@ class FaceNet(object):
           minimum = (key, val)
       return minimum[0]
 
+    embedding = self.predict([img])
     avgs = {}
     for person in self.data:
-      if person[:-1] in avgs:
-        avgs[person[:-1]].append(self.l2_dist(img, person))
-      else:
-        avgs[person[:-1]] = [self.l2_dist(img, person)]
-    avgs = dict((key, sum(vals) / len(vals)) for key, vals in avgs.items())
-
+      if person[:-1] not in avgs:
+        avgs[person[:-1]] = self.l2_dist(embedding, person)
     best_match = find_min_key(avgs)
 
     if verbose:
@@ -180,7 +177,7 @@ class Preprocessing(object):
     return np.array([align_img(path) for path in filepaths])
 
   @staticmethod
-  def embed(facenet, filepaths, margin = 10, batch_size = 2):
+  def embed(facenet, filepaths, margin = 10, batch_size = 1):
     aligned_imgs = Preprocessing.whiten(Preprocessing.align_imgs(filepaths, margin))
     raw_embeddings = facenet.k_model.predict(aligned_imgs, batch_size=batch_size)
 
