@@ -22,6 +22,20 @@ from skimage.transform import resize
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
+# ERROR HANDLING
+def suppress_tf_warnings():
+  import os
+  os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+  import warnings
+  warnings.simplefilter(action = "ignore", category = FutureWarning)
+
+  import tensorflow as tf
+  try:
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+  except AttributeError:
+    tf.logging.set_verbosity(tf.logging.ERROR)
+
 # DECORATORS
 def timer(message = "Time elapsed"):
 
@@ -56,11 +70,9 @@ class FaceNet(object):
     try:
       return distance.euclidean(self.data[img_a]["embedding"], self.data[img_b]["embedding"])
     except KeyError:
-      print(self.data[img_b]["embedding"].shape)
-      print(self.predict([img_a]).shape)
       return distance.euclidean(self.predict([img_a]), self.data[img_b]["embedding"])
 
-  def predict(self, filepaths, batch_size = 1):
+  def predict(self, filepaths, batch_size = 2):
     return Preprocessing.embed(self, filepaths, batch_size = batch_size)
 
   # COMPARE TWO SPECIFIC IMAGES
@@ -77,45 +89,52 @@ class FaceNet(object):
     return int(is_same), dist
 
   # FACIAL RECOGNITION
-  @timer(message="Verification time")
+  @timer(message="Recognition time")
   def recognize(self, img, verbose = True):
     assert self.data, "data must be provided"
 
-    def find_val(dict_, key_):
-      for key, val in dict_:
-        if val == key_:
-          return val
-        return -1
+    def find_min_key(dict_):
+      minimum = (None, np.float("inf"))
+      for key, val in dict_.items():
+        if val < minimum[1]:
+          minimum = (key, val)
+      return minimum[0]
 
     avgs = {}
     for person in self.data:
       if person[:-1] in avgs:
-        avgs[person[:-1]] = [self.l2_dist(img, person)]
-      else:
         avgs[person[:-1]].append(self.l2_dist(img, person))
-    avgs = dict((key, np.average(vals)) for key, vals in avgs.items())
+      else:
+        avgs[person[:-1]] = [self.l2_dist(img, person)]
+    avgs = dict((key, sum(vals) / len(vals)) for key, vals in avgs.items())
 
-    best_match = find_val(avgs, min(avgs.values()))
+    best_match = find_min_key(avgs)
 
     if verbose:
-      if best_match <= FaceNet.ALPHA:
-        print("Your image is a picture of {}. L2 distance of {}".format(best_match, avgs[best_match]))
+      if avgs[best_match] <= FaceNet.ALPHA:
+        print("Your image is a picture of \"{}\": L2 distance of {}".format(best_match, avgs[best_match]))
       else:
-        print("Your image is not in the database. The best match is {} with an L2 distance of ".format(
+        print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
           best_match, avgs[best_match]))
-      self.disp_imgs(img, self.data[best_match]["path"], title = "Best match: {}\nL2 distance: {}".format(
+      self.disp_imgs(img, "{}0".format(best_match), title="Best match: {}\nL2 distance: {}".format(
         best_match, avgs[best_match]))
 
-    return int(best_match <= FaceNet.ALPHA), best_match, avgs[best_match]
+    return int(avgs[best_match] <= FaceNet.ALPHA), best_match, avgs[best_match]
 
   # DISPLAYING
   def disp_imgs(self, img_a, img_b, title = None):
     plt.subplot(1, 2, 1)
-    plt.imshow(imread(self.data[img_a]["path"]))
+    try:
+      plt.imshow(imread(self.data[img_a]["path"]))
+    except KeyError:
+      plt.imshow(imread(img_a))
     plt.axis("off")
 
     plt.subplot(1, 2, 2)
-    plt.imshow(imread(self.data[img_b]["path"]))
+    try:
+      plt.imshow(imread(self.data[img_b]["path"]))
+    except KeyError:
+      plt.imshow(imread(img_b))
     plt.axis("off")
 
     if title is not None:
@@ -130,7 +149,7 @@ class Preprocessing(object):
   IMG_SIZE = 160
 
   @staticmethod
-  def prewhiten(x):
+  def whiten(x):
     if x.ndim == 4:
       axis = (1, 2, 3)
       size = x[0].size
@@ -161,8 +180,8 @@ class Preprocessing(object):
     return np.array([align_img(path) for path in filepaths])
 
   @staticmethod
-  def embed(facenet, filepaths, margin = 10, batch_size = 1):
-    aligned_imgs = Preprocessing.prewhiten(Preprocessing.align_imgs(filepaths, margin))
+  def embed(facenet, filepaths, margin = 10, batch_size = 2):
+    aligned_imgs = Preprocessing.whiten(Preprocessing.align_imgs(filepaths, margin))
     raw_embeddings = facenet.k_model.predict(aligned_imgs, batch_size=batch_size)
 
     l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
@@ -183,6 +202,8 @@ class Preprocessing(object):
     return data
 
 if __name__ == "__main__":
+  suppress_tf_warnings()
+
   # PATHS
   HOME = os.getenv("HOME")
   img_dir = HOME + "/PycharmProjects/ai-security/images/"
@@ -211,7 +232,7 @@ if __name__ == "__main__":
     print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
 
   def verify_test():
-    facenet.recognize("/Users/ryan/Desktop/me.jpg")
+    facenet.recognize(HOME + "/PycharmProjects/ai-security/me.jpg")
 
   # TESTING
   verify_test()
