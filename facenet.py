@@ -10,7 +10,6 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 """
 
 import os
-import argparse
 from time import time
 import functools
 
@@ -140,7 +139,7 @@ class FaceNet(object):
     return self._recognize(img, verbose=True, faces=None)
 
   # REAL TIME RECOGNITION (DEMO)
-  def real_time_recognize(self, width=500, height=500):
+  def real_time_recognize(self, width=750, height=750):
     if self.k_nn is None:
       self._set_knn()
 
@@ -159,7 +158,13 @@ class FaceNet(object):
           faces = person["box"]
           x, y, height, width = faces
 
-          is_recognized, best_match, l2_dist = self._recognize(frame, verbose=False, faces=faces)
+          try:
+            is_recognized, best_match, l2_dist = self._recognize(frame, verbose=False, faces=faces)
+          except ValueError:
+            # TODO: find way to circumnavigate this error-- image is empty
+            print("Empty image")
+            continue
+
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognize else red
 
           cv2.rectangle(frame, (x, y), (x + height, y + width), color, thickness=2)
