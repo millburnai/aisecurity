@@ -61,9 +61,24 @@ class FaceNet(object):
   def __init__(self, filepath):
     self.k_model = keras.models.load_model(filepath)
     self.data = None # must be filled in by user
+    self.k_nn = None # instantiated in functions
 
+  # MUTATORS AND RETRIEVERS
   def set_data(self, data):
     self.data = data
+
+  def _set_knn(self):
+    # TODO: speed up recognize by replacing complete search of dataset with k-NN classifier
+    pass
+    # normalize_embeds = lambda embed_dict: np.array([embed_dict[person]["embedding"] for person in embed_dict])
+    #
+    # k_nn = keras.layers.Dense(name="k-nn", units=self.k_model.output_size, use_bias=False)
+    # k_nn.set_weights(normalize_embeds(self.data))
+    #
+    # self.k_nn = keras.Model(input=[k_nn.input], output=k_nn.output)
+
+  def get_facenet(self):
+    return self.k_model
 
   # GENERIC L2 DISTANCE
   def l2_dist(self, img_a, img_b):
@@ -73,7 +88,7 @@ class FaceNet(object):
       return np.linalg.norm(img_a - self.data[img_b]["embedding"]) # assumes img_a is a precomputed embedding
 
   def predict(self, filepaths, batch_size=1, faces=None):
-    return Preprocessing.embed(self, filepaths, batch_size = batch_size, faces=faces)
+    return Preprocessing.embed(self.k_model, filepaths, batch_size = batch_size, faces=faces)
 
   # COMPARE TWO SPECIFIC IMAGES
   def compare(self, img_a, img_b, verbose=True):
@@ -88,9 +103,9 @@ class FaceNet(object):
 
     return int(is_same), dist
 
-  # FACIAL RECOGNITION
+  # FACIAL RECOGNITION HELPER
   @timer(message="Recognition time")
-  def recognize(self, img, verbose=True, faces=None):
+  def _recognize(self, img, verbose=True, faces=None):
     assert self.data, "data must be provided"
 
     def find_min_key(dict_):
@@ -99,9 +114,6 @@ class FaceNet(object):
         if val < minimum[1]:
           minimum = (key, val)
       return minimum[0]
-
-    # TODO: speed up recognize by replacing complete search of dataset with k-NN classifier
-    #       (preferably in keras)
 
     embedding = self.predict([img], faces=faces)
     avgs = {}
@@ -121,8 +133,15 @@ class FaceNet(object):
 
     return int(avgs[best_match] <= FaceNet.ALPHA), best_match, avgs[best_match]
 
+  # FACIAL RECOGNITION
+  def recognize(self, img):
+    return self._recognize(img, verbose=True, faces=None)
+
   # REAL TIME RECOGNITION (DEMO)
   def realtime_recognize(self):
+    if self.k_nn is None:
+      self._set_knn()
+
     detector = MTCNN()
     cap = cv2.VideoCapture(0)
 
@@ -132,18 +151,18 @@ class FaceNet(object):
 
       if result:
         for person in result:
-          faces = person['box']
+          faces = person["box"]
           x, y, height, width = faces
 
-          is_recognized, best_match, l2_dist = self.recognize(frame, verbose=False, faces=faces)
+          is_recognized, best_match, l2_dist = self._recognize(frame, verbose=False, faces=faces)
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognize else red
 
           cv2.rectangle(frame, (x, y), (x + height, y + width), color, thickness=2)
           cv2.putText(frame, best_match, org=(x, y), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.75, color=color)
 
-      cv2.imshow('frame', frame)
+      cv2.imshow("frame", frame)
 
-      if cv1.waitKey(1) & 0xFF == ord("q"):
+      if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
     cap.release()
@@ -204,8 +223,9 @@ class Preprocessing(object):
                    #       as images
 
       if not faces:
-        faces = detector.detect_faces(img)[0]["box"]
-        assert len(faces) != 0, "face was not found in {}".format(path)
+        found = detector.detect_faces(img)
+        assert len(found) != 0, "face was not found in {}".format(path)
+        faces = found[0]["box"]
 
       x, y, width, height = faces
       cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
@@ -217,7 +237,7 @@ class Preprocessing(object):
   @staticmethod
   def embed(facenet, filepaths, margin=15, batch_size=1, faces=None):
     aligned_imgs = Preprocessing.whiten(Preprocessing.align_imgs(filepaths, margin, faces=faces))
-    raw_embeddings = facenet.k_model.predict(aligned_imgs, batch_size=batch_size)
+    raw_embeddings = facenet.predict(aligned_imgs, batch_size=batch_size)
 
     l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
     normalized_embeddings = l2_normalize(raw_embeddings)
@@ -246,7 +266,7 @@ if __name__ == "__main__":
 
   # NETWORK INIT
   facenet = FaceNet(HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
-  facenet.set_data(Preprocessing.load(facenet, img_dir, people))
+  facenet.set_data(Preprocessing.load(facenet.get_facenet(), img_dir, people))
 
   # UNIT TESTS
   def compare_test():
