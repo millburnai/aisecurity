@@ -8,7 +8,7 @@ Facial recognition with FaceNet in Keras.
 Paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
-
+import asyncio
 import os
 from time import time
 import functools
@@ -170,7 +170,7 @@ class FaceNet(object):
     return self._recognize(img, verbose=True, faces=None)
 
   # REAL TIME RECOGNITION (DEMO)
-  def real_time_recognize(self, width=500, height=250):
+  async def real_time_recognize(self, width=500, height=250):
     if self.k_nn is None:
       self._set_knn()
 
@@ -183,6 +183,10 @@ class FaceNet(object):
     while True:
       _, frame = cap.read()
       result = detector.detect_faces(frame)
+
+      if not result:
+        print("facenotdetected")
+        await asyncio.sleep(1)
 
       if result:
         for person in result:
@@ -308,7 +312,7 @@ class Tests(object):
   HOME = os.getenv("HOME")
 
   # PATHS
-  img_dir = HOME + "/PycharmProjects/facial-recognition/images/database/"
+  img_dir = HOME + "/Desktop/facial-recognition/images/database/"
   people = ["ryan", "liam"] # [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store")]
 
   @staticmethod
@@ -331,20 +335,22 @@ class Tests(object):
 
   @staticmethod
   def recognize_test(facenet):
-    facenet.recognize(Tests.HOME + "/PycharmProjects/facial-recognition/images/test_images/ryan.jpg")
+    facenet.recognize(Tests.HOME + "/Desktop/facial-recognition/images/test_images/ryan.jpg")
 
   @staticmethod
-  def real_time_recognize_test(facenet):
-    facenet.real_time_recognize()
+  async def real_time_recognize_test(facenet):
+    await facenet.real_time_recognize()
 
 if __name__ == "__main__":
   suppress_tf_warnings()
 
   # NETWORK INIT
-  facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
+  facenet = FaceNet(Tests.HOME + "/Desktop/facial-recognition/models/facenet_keras.h5")
   facenet.set_data(Preprocessing.load(facenet.get_facenet(), Tests.img_dir, Tests.people))
 
   # Tests.recognize_test(facenet)
 
   # TESTING
-  Tests.real_time_recognize_test(facenet)
+  loop = asyncio.new_event_loop()
+  task = loop.create_task(Tests.real_time_recognize_test(facenet))
+  loop.run_until_complete(task)
