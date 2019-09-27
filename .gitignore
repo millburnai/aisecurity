@@ -2,6 +2,3 @@
 *.pyc
 .idea/
 .DS_STORE
-
-# Swap files
-*.swap

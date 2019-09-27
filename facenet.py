@@ -68,7 +68,6 @@ class FaceNet(object):
     self.k_nn = None # instantiated in functions
 
   # MUTATORS AND RETRIEVERS
-  @timer(message="Data processing time")
   def set_data(self, data):
     self.data = data
 
@@ -187,8 +186,8 @@ class FaceNet(object):
       result = detector.detect_faces(frame)
 
       if not result:
-        print("facenotdetected")
-        await asyncio.sleep(1)
+        print("face not detected")
+        await asyncio.sleep(0.01)
 
       if result:
         for person in result:
@@ -307,6 +306,22 @@ class Preprocessing(object):
         data["{}{}".format(person, index)] = {"path": path, "embedding": list(np.float64(embeddings[index]))}
     return data
 
+  @staticmethod
+  @timer(message="Data dumping time")
+  def dump_embeds(facenet, file):
+    embeds_dict = Preprocessing.load(facenet.get_facenet(), Tests.img_dir, Tests.people)
+    with open(file, "w+") as json_file:
+      json.dump(embeds_dict, json_file)
+
+  @staticmethod
+  @timer(message="Data retrieval time")
+  def retrieve_embeds(path):
+    with open(path, "r") as json_file:
+      data = json.load(json_file)
+      for key in data.keys():
+        data[key]["embedding"] = np.asarray(data[key]["embedding"])
+      return data
+
 # UNIT TESTING
 class Tests(object):
 
@@ -314,8 +329,8 @@ class Tests(object):
   HOME = os.getenv("HOME")
 
   # PATHS
-  img_dir = HOME + "/Desktop/facial-recognition/images/database/"
-  people = ["ryan", "liam"] # [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store")]
+  img_dir = HOME + "/PycharmProjects/facial-recognition/images/database/"
+  people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
 
   @staticmethod
   def compare_test(facenet):
@@ -337,39 +352,25 @@ class Tests(object):
 
   @staticmethod
   def recognize_test(facenet):
-    facenet.recognize(Tests.HOME + "/Desktop/facial-recognition/images/test_images/ryan.jpg")
+    facenet.recognize(Tests.HOME + "/PycharmProjects/facial-recognition/images/test_images/ryan.jpg")
 
   @staticmethod
   async def real_time_recognize_test(facenet):
     await facenet.real_time_recognize()
 
-def fileDump():
-  facenet = FaceNet(Tests.HOME + "/Desktop/facial-recognition/models/facenet_keras.h5")
-  yeet = Preprocessing.load(facenet.get_facenet(), Tests.img_dir, Tests.people)
-  with open("preprocessed.json", 'w+') as JSONFile:
-    json.dump(yeet, JSONFile)
-
-def fileRetrieve():
-  with open("preprocessed.json", 'r') as JSONFile:
-      data = json.load(JSONFile)
-      for d in data.keys(): data[d]['embedding'] = np.asarray(data[d]['embedding'])
-      return data
-
-
 if __name__ == "__main__":
   suppress_tf_warnings()
 
   # NETWORK INIT
-  fileDump()
-  facenet = FaceNet(Tests.HOME + "/Desktop/facial-recognition/models/facenet_keras.h5")
+  facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
+  # Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/database/processed.json")
 
-  facenet.set_data(fileRetrieve())
+  facenet.set_data(Preprocessing.retrieve_embeds(
+    Tests.HOME + "/PycharmProjects/facial-recognition/images/database/processed.json"))
 
   # Tests.recognize_test(facenet)
 
   # TESTING
-  
   loop = asyncio.new_event_loop()
   task = loop.create_task(Tests.real_time_recognize_test(facenet))
   loop.run_until_complete(task)
-  
