@@ -19,6 +19,7 @@ from keras import backend as K
 import numpy as np
 import cv2
 from skimage.transform import resize
+from sklearn import preprocessing, neighbors
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
@@ -56,6 +57,7 @@ class FaceNet(object):
 
   # HYPERPARAMETERS
   ALPHA = 1.0
+  MARGIN = 15
 
   # INITS
   @timer(message="Model load time")
@@ -69,14 +71,15 @@ class FaceNet(object):
     self.data = data
 
   def _set_knn(self):
-    # TODO: speed up recognize by replacing complete search of dataset with k-NN classifier
-    pass
-    # normalize_embeds = lambda embed_dict: np.array([embed_dict[person]["embedding"] for person in embed_dict])
-    #
-    # k_nn = keras.layers.Dense(name="k-nn", units=self.k_model.output_size, use_bias=False)
-    # k_nn.set_weights(normalize_embeds(self.data))
-    #
-    # self.k_nn = keras.Model(input=[k_nn.input], output=k_nn.output)
+    process = preprocessing.LabelEncoder()
+
+    k_nn_label_dict = [person[:-1] for person in self.data.keys()]
+    labels = process.fit_transform(k_nn_label_dict)
+    self.k_nn_label_dict = list(set(k_nn_label_dict))
+    embeddings = np.array([self.data[person]["embedding"] for person in self.data.keys()])
+
+    self.k_nn = neighbors.KNeighborsClassifier(n_neighbors=2)
+    self.k_nn.fit(embeddings, labels)
 
   def get_facenet(self):
     return self.k_model
@@ -88,8 +91,8 @@ class FaceNet(object):
     except TypeError:
       return np.linalg.norm(img_a - self.data[img_b]["embedding"]) # assumes img_a is a precomputed embedding
 
-  def predict(self, filepaths, batch_size=1, faces=None):
-    return Preprocessing.embed(self.k_model, filepaths, batch_size = batch_size, faces=faces)
+  def predict(self, filepaths, batch_size=1, faces=None, margin=15):
+    return Preprocessing.embed(self.k_model, filepaths, batch_size = batch_size, faces=faces, margin=margin)
 
   # COMPARE TWO SPECIFIC IMAGES
   def compare(self, img_a, img_b, verbose=True):
@@ -106,40 +109,36 @@ class FaceNet(object):
 
   # FACIAL RECOGNITION HELPER
   @timer(message="Recognition time")
-  def _recognize(self, img, verbose=True, faces=None):
+  def _recognize(self, img, verbose=True, faces=None, margin=15):
     assert self.data, "data must be provided"
 
-    def find_min_key(dict_):
-      minimum = (None, np.float("inf"))
-      for key, val in dict_.items():
-        if val < minimum[1]:
-          minimum = (key, val)
-      return minimum[0]
+    if self.k_nn is None:
+      self._set_knn()
 
-    embedding = self.predict([img], faces=faces)
-    avgs = {}
-    for person in self.data:
-      if person[:-1] not in avgs:
-        avgs[person[:-1]] = self.l2_dist(embedding, person)
-    best_match = find_min_key(avgs)
+    embedding = self.predict([img], faces=faces, margin=margin)
+
+    k_nn_preds = self.k_nn.predict(embedding)
+    best_match = self.k_nn_label_dict[np.argsort(k_nn_preds)[0]]
+
+    l2_dist = self.l2_dist(embedding, best_match + "0")
 
     if verbose:
-      if avgs[best_match] <= FaceNet.ALPHA:
-        print("Your image is a picture of \"{}\": L2 distance of {}".format(best_match, avgs[best_match]))
+      if np.argmax(k_nn_preds) <= FaceNet.ALPHA:
+        print("Your image is a picture of \"{}\": L2 distance of {}".format(best_match, l2_dist))
       else:
         print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
-          best_match, avgs[best_match]))
+          best_match, l2_dist))
       self.disp_imgs(img, "{}0".format(best_match), title="Best match: {}\nL2 distance: {}".format(
-        best_match, avgs[best_match]))
+        best_match, l2_dist))
 
-    return int(avgs[best_match] <= FaceNet.ALPHA), best_match, avgs[best_match]
+    return int(l2_dist <= FaceNet.ALPHA), best_match, l2_dist
 
   # FACIAL RECOGNITION
   def recognize(self, img):
     return self._recognize(img, verbose=True, faces=None)
 
   # REAL TIME RECOGNITION (DEMO)
-  def real_time_recognize(self, width=750, height=750):
+  def real_time_recognize(self, width=500, height=250):
     if self.k_nn is None:
       self._set_knn()
 
@@ -159,7 +158,8 @@ class FaceNet(object):
           x, y, height, width = faces
 
           try:
-            is_recognized, best_match, l2_dist = self._recognize(frame, verbose=False, faces=faces)
+            is_recognized, best_match, l2_dist = self._recognize(frame, verbose=False, faces=faces, margin=self.MARGIN)
+            print("L2 distance: {}".format(l2_dist))
           except ValueError:
             # TODO: find way to circumnavigate this error-- image is empty
             print("Empty image")
@@ -167,8 +167,11 @@ class FaceNet(object):
 
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognize else red
 
-          cv2.rectangle(frame, (x, y), (x + height, y + width), color, thickness=2)
-          cv2.putText(frame, best_match, org=(x, y), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.75, color=color)
+          corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
+          box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
+
+          cv2.rectangle(frame, corner, box, color, thickness=2)
+          cv2.putText(frame, best_match,  org=corner, fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.75, color=color)
 
       cv2.imshow("frame", frame)
 
@@ -294,7 +297,7 @@ class Tests(object):
     print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
 
   @staticmethod
-  def verify_test(facenet):
+  def recognize_test(facenet):
     facenet.recognize(Tests.HOME + "/PycharmProjects/facial-recognition/images/test_images/ryan.jpg")
 
   @staticmethod
@@ -307,6 +310,8 @@ if __name__ == "__main__":
   # NETWORK INIT
   facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
   facenet.set_data(Preprocessing.load(facenet.get_facenet(), Tests.img_dir, Tests.people))
+
+  # Tests.recognize_test(facenet)
 
   # TESTING
   Tests.real_time_recognize_test(facenet)
