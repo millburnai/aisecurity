@@ -28,7 +28,8 @@ def suppress_tf_warnings():
   os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
   import warnings
-  warnings.simplefilter(action = "ignore", category = FutureWarning)
+  warnings.simplefilter(action="ignore", category=FutureWarning)
+  warnings.simplefilter(action="ignore", category=UserWarning)
 
   import tensorflow as tf
   try:
