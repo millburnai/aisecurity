@@ -9,6 +9,7 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
 import asyncio
+import json
 import os
 from time import time
 import functools
@@ -67,6 +68,7 @@ class FaceNet(object):
     self.k_nn = None # instantiated in functions
 
   # MUTATORS AND RETRIEVERS
+  @timer(message="Data processing time")
   def set_data(self, data):
     self.data = data
 
@@ -302,7 +304,7 @@ class Preprocessing(object):
       img_paths = [os.path.join(person_dir, f) for f in os.listdir(person_dir) if not f.endswith(".DS_Store")]
       embeddings = Preprocessing.embed(facenet, img_paths)
       for index, path in enumerate(img_paths):
-        data["{}{}".format(person, index)] = {"path": path, "embedding": embeddings[index]}
+        data["{}{}".format(person, index)] = {"path": path, "embedding": list(np.float64(embeddings[index]))}
     return data
 
 # UNIT TESTING
@@ -341,16 +343,33 @@ class Tests(object):
   async def real_time_recognize_test(facenet):
     await facenet.real_time_recognize()
 
+def fileDump():
+  facenet = FaceNet(Tests.HOME + "/Desktop/facial-recognition/models/facenet_keras.h5")
+  yeet = Preprocessing.load(facenet.get_facenet(), Tests.img_dir, Tests.people)
+  with open("preprocessed.json", 'w+') as JSONFile:
+    json.dump(yeet, JSONFile)
+
+def fileRetrieve():
+  with open("preprocessed.json", 'r') as JSONFile:
+      data = json.load(JSONFile)
+      for d in data.keys(): data[d]['embedding'] = np.asarray(data[d]['embedding'])
+      return data
+
+
 if __name__ == "__main__":
   suppress_tf_warnings()
 
   # NETWORK INIT
+  fileDump()
   facenet = FaceNet(Tests.HOME + "/Desktop/facial-recognition/models/facenet_keras.h5")
-  facenet.set_data(Preprocessing.load(facenet.get_facenet(), Tests.img_dir, Tests.people))
+
+  facenet.set_data(fileRetrieve())
 
   # Tests.recognize_test(facenet)
 
   # TESTING
+  
   loop = asyncio.new_event_loop()
   task = loop.create_task(Tests.real_time_recognize_test(facenet))
   loop.run_until_complete(task)
+  
