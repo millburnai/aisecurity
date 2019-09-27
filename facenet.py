@@ -209,11 +209,11 @@ if __name__ == "__main__":
 
   # PATHS
   HOME = os.getenv("HOME")
-  img_dir = HOME + "/PycharmProjects/ai-security/images/database"
+  img_dir = HOME + "/PycharmProjects/facial-recognition/images/database"
   people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store")]
 
   # NETWORK INIT
-  facenet = FaceNet(HOME + "/PycharmProjects/ai-security/models/facenet_keras.h5")
+  facenet = FaceNet(HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
   facenet.set_data(Preprocessing.load(facenet, img_dir, people))
 
   # UNIT TESTS
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
 
   def verify_test():
-    facenet.recognize(HOME + "/PycharmProjects/ai-security/test.jpg")
+    facenet.recognize(HOME + "/PycharmProjects/facial-recognition/test.jpg")
 
   # TESTING
   verify_test()
