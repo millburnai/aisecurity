@@ -10,6 +10,7 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 """
 import asyncio
 import json
+import re
 import os
 from time import time
 import functools
@@ -72,21 +73,17 @@ class FaceNet(object):
     self.data = data
 
   def _set_knn(self):
-    pass
-    # process = preprocessing.LabelEncoder()
-    #
-    # k_nn_label_dict = [person[:-1] for person in self.data.keys()]
-    # labels = process.fit_transform(k_nn_label_dict)
-    # print(k_nn_label_dict, labels)
-    #
-    # self.k_nn_label_dict = list(set(k_nn_label_dict))
-    # embeddings = np.array([self.data[person]["embedding"] for person in self.data.keys()])
-    #
-    # self.k_nn = neighbors.KNeighborsClassifier(n_neighbors=2)
-    # self.k_nn.fit(embeddings, labels)
-    #
-    # print(self.k_nn.predict_proba(self.data["aryan0"]["embedding"].reshape(1, -1)))
-    # print(labels, labels.shape, embeddings.shape)
+    self.k_nn_label_dict = []
+    embeddings = []
+    for d in self.data.keys(): 
+      name = re.split("[0-9]", d)
+      self.k_nn_label_dict.append(name[0])
+      embeddings.append(self.data[d]["embedding"])
+    self.k_nn = neighbors.KNeighborsClassifier(n_neighbors = 1)
+    self.k_nn.fit(embeddings, self.k_nn_label_dict)
+    for label, emb in zip(self.k_nn_label_dict, embeddings):
+      print(label)
+      print(self.k_nn.predict(emb.reshape(1, -1)))
 
   def get_facenet(self):
     return self.k_model
@@ -130,53 +127,11 @@ class FaceNet(object):
   @timer(message="Recognition time")
   def _recognize(self, img, verbose=True, faces=None, margin=15):
     assert self.data, "data must be provided"
-
-    # if self.k_nn is None:
-    #   self._set_knn()
-    #
-    # embedding = self.predict([img], faces=faces, margin=margin)
-    #
-    # k_nn_preds = self.k_nn.predict(embedding)
-    # best_match = self.k_nn_label_dict[np.argsort(k_nn_preds)[0]]
-    #
-    # l2_dist = self.l2_dist(embedding, best_match + "0")
-    # print(best_match, self.l2_dist(embedding, "aryan0" if best_match == "ryan" else "ryan0"), l2_dist)
-    #
-    # if verbose:
-    #   if np.argmax(k_nn_preds) <= FaceNet.ALPHA:
-    #     print("Your image is a picture of \"{}\": L2 distance of {}".format(best_match, l2_dist))
-    #   else:
-    #     print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
-    #       best_match, l2_dist))
-    #   self.disp_imgs(img, "{}0".format(best_match), title="Best match: {}\nL2 distance: {}".format(
-    #     best_match, l2_dist))
-    #
-    # return int(l2_dist <= FaceNet.ALPHA), best_match, l2_dist
-
-    def find_min_key(dict_):
-      minimum = (None, np.float("inf"))
-      for key, val in dict_.items():
-        if val < minimum[1]:
-          minimum = (key, val)
-      return minimum[0]
-
-    embedding = self.predict([img], faces=faces)
-    avgs = {}
-    for person in self.data:
-      if person[:-1] not in avgs:
-        avgs[person[:-1]] = self.l2_dist(embedding, person)
-    best_match = find_min_key(avgs)
-
-    if verbose:
-      if avgs[best_match] <= FaceNet.ALPHA:
-        print("Your image is a picture of \"{}\": L2 distance of {}".format(best_match, avgs[best_match]))
-      else:
-        print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
-          best_match, avgs[best_match]))
-      self.disp_imgs(img, "{}0".format(best_match), title="Best match: {}\nL2 distance: {}".format(
-        best_match, avgs[best_match]))
-
-    return int(avgs[best_match] <= FaceNet.ALPHA), best_match, avgs[best_match]
+    if self.k_nn is None:
+      self._set_knn()
+    embedding = self.predict([img], faces=faces, margin=margin)
+    k_nn_preds = self.k_nn.predict(embedding)
+    return int(0 <= FaceNet.ALPHA), k_nn_preds[0], 0
 
   # FACIAL RECOGNITION
   def recognize(self, img):
@@ -341,7 +296,7 @@ class Tests(object):
   HOME = os.getenv("HOME")
 
   # PATHS
-  img_dir = HOME + "/PycharmProjects/facial-recognition/images/database/"
+  img_dir = HOME + "/Desktop/facial-recognition/images/database/"
   people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
 
   @staticmethod
@@ -364,7 +319,7 @@ class Tests(object):
 
   @staticmethod
   def recognize_test(facenet):
-    facenet.recognize(Tests.HOME + "/PycharmProjects/facial-recognition/images/test_images/ryan.jpg")
+    facenet.recognize(Tests.HOME + "/Desktop/facial-recognition/images/test_images/ryan.jpg")
 
   @staticmethod
   async def real_time_recognize_test(facenet):
@@ -374,11 +329,11 @@ if __name__ == "__main__":
   suppress_tf_warnings()
 
   # NETWORK INIT
-  facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
+  facenet = FaceNet(Tests.HOME + "/Desktop/facial-recognition/models/facenet_keras.h5")
   # Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/database/processed.json")
 
   facenet.set_data(Preprocessing.retrieve_embeds(
-    Tests.HOME + "/PycharmProjects/facial-recognition/images/database/processed.json"))
+    Tests.HOME + "/Desktop/facial-recognition/images/database/processed.json"))
 
   # Tests.recognize_test(facenet)
 
