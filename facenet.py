@@ -209,7 +209,7 @@ if __name__ == "__main__":
 
   # PATHS
   HOME = os.getenv("HOME")
-  img_dir = HOME + "/PycharmProjects/ai-security/images/database"
+  img_dir = HOME + "/PycharmProjects/ai-security/images/database/"
   people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store")]
 
   # NETWORK INIT
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
 
   def verify_test():
-    facenet.recognize(HOME + "/PycharmProjects/ai-security/test.jpg")
+    facenet.recognize(HOME + "/PycharmProjects/ai-security/images/test_images/ryan.jpg")
 
   # TESTING
   verify_test()
