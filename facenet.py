@@ -139,12 +139,15 @@ class FaceNet(object):
     return self._recognize(img, verbose=True, faces=None)
 
   # REAL TIME RECOGNITION (DEMO)
-  def realtime_recognize(self):
+  def real_time_recognize(self, width=500, height=500):
     if self.k_nn is None:
       self._set_knn()
 
     detector = MTCNN()
     cap = cv2.VideoCapture(0)
+
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
     while True:
       _, frame = cap.read()
@@ -291,8 +294,8 @@ if __name__ == "__main__":
   def verify_test():
     facenet.recognize(HOME + "/PycharmProjects/facial-recognition/images/test_images/ryan.jpg")
 
-  def realtime_recognize_test():
-    facenet.realtime_recognize()
+  def real_time_recognize_test():
+    facenet.real_time_recognize()
 
   # TESTING
-  realtime_recognize_test()
+  real_time_recognize_test()
