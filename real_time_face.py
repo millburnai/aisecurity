@@ -25,7 +25,7 @@ cap = cv2.VideoCapture(0)
 while True: 
     __, frame = cap.read()
     result = detector.detect_faces(frame)
-    if result != []:
+    if result:
         for person in result:
             bounding_box = person['box']
             keypoints = person['keypoints']

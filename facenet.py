@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import keras
 from keras import backend as K
 import numpy as np
+import cv2
 from skimage.transform import resize
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
@@ -71,11 +72,11 @@ class FaceNet(object):
     except TypeError:
       return np.linalg.norm(img_a - self.data[img_b]["embedding"]) # assumes img_a is a precomputed embedding
 
-  def predict(self, filepaths, batch_size = 1):
-    return Preprocessing.embed(self, filepaths, batch_size = batch_size)
+  def predict(self, filepaths, batch_size=1, faces=None):
+    return Preprocessing.embed(self, filepaths, batch_size = batch_size, faces=faces)
 
   # COMPARE TWO SPECIFIC IMAGES
-  def compare(self, img_a, img_b, verbose = True):
+  def compare(self, img_a, img_b, verbose=True):
     assert self.data, "data must be provided"
 
     dist = self.l2_dist(img_a, img_b)
@@ -89,7 +90,7 @@ class FaceNet(object):
 
   # FACIAL RECOGNITION
   @timer(message="Recognition time")
-  def recognize(self, img, verbose = True):
+  def recognize(self, img, verbose=True, faces=None):
     assert self.data, "data must be provided"
 
     def find_min_key(dict_):
@@ -102,13 +103,12 @@ class FaceNet(object):
     # TODO: speed up recognize by replacing complete search of dataset with k-NN classifier
     #       (preferably in keras)
 
-    embedding = self.predict([img])
+    embedding = self.predict([img], faces=faces)
     avgs = {}
     for person in self.data:
       if person[:-1] not in avgs:
         avgs[person[:-1]] = self.l2_dist(embedding, person)
     best_match = find_min_key(avgs)
-    print(best_match, avgs)
 
     if verbose:
       if avgs[best_match] <= FaceNet.ALPHA:
@@ -120,6 +120,34 @@ class FaceNet(object):
         best_match, avgs[best_match]))
 
     return int(avgs[best_match] <= FaceNet.ALPHA), best_match, avgs[best_match]
+
+  # REAL TIME RECOGNITION (DEMO)
+  def realtime_recognize(self):
+    detector = MTCNN()
+    cap = cv2.VideoCapture(0)
+
+    while True:
+      _, frame = cap.read()
+      result = detector.detect_faces(frame)
+
+      if result:
+        for person in result:
+          faces = person['box']
+          x, y, height, width = faces
+
+          is_recognized, best_match, l2_dist = self.recognize(frame, verbose=False, faces=faces)
+          color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognize else red
+
+          cv2.rectangle(frame, (x, y), (x + height, y + width), color, thickness=2)
+          cv2.putText(frame, best_match, org=(x, y), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.75, color=color)
+
+      cv2.imshow('frame', frame)
+
+      if cv1.waitKey(1) & 0xFF == ord("q"):
+        break
+
+    cap.release()
+    cv2.destroyAllWindows()
 
   # DISPLAYING
   def disp_imgs(self, img_a, img_b, title = None):
@@ -164,27 +192,31 @@ class Preprocessing(object):
     return whitened
 
   @staticmethod
-  def align_imgs(filepaths, margin):
-    detector = MTCNN()
-    # TODO: get faster MTCNN (takes more time to feed-forward than it does through FaceNet!)
+  def align_imgs(filepaths, margin, faces=None):
+    if not faces:
+      detector = MTCNN()
 
-    def align_img(path):
-      img = imread(path)
-      start = time()
-      faces = detector.detect_faces(img)[0]["box"]
-      print(time()-start)
-      assert len(faces) != 0, "face was not found in {}".format(path)
+    def align_img(path, faces=None):
+      try:
+        img = imread(path)
+      except OSError:
+        img = path # TODO: restructure so that you don't have to catch OSError-- let Preprocessing accept numpy arrays
+                   #       as images
+
+      if not faces:
+        faces = detector.detect_faces(img)[0]["box"]
+        assert len(faces) != 0, "face was not found in {}".format(path)
 
       x, y, width, height = faces
       cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
       resized = resize(cropped, (Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE), mode="reflect")
       return resized
-  
-    return np.array([align_img(path) for path in filepaths])
+
+    return np.array([align_img(path, faces=faces) for path in filepaths])
 
   @staticmethod
-  def embed(facenet, filepaths, margin = 10, batch_size = 1):
-    aligned_imgs = Preprocessing.whiten(Preprocessing.align_imgs(filepaths, margin))
+  def embed(facenet, filepaths, margin=15, batch_size=1, faces=None):
+    aligned_imgs = Preprocessing.whiten(Preprocessing.align_imgs(filepaths, margin, faces=faces))
     raw_embeddings = facenet.k_model.predict(aligned_imgs, batch_size=batch_size)
 
     l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
@@ -209,8 +241,8 @@ if __name__ == "__main__":
 
   # PATHS
   HOME = os.getenv("HOME")
-  img_dir = HOME + "/PycharmProjects/facial-recognition/images/database"
-  people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store")]
+  img_dir = HOME + "/PycharmProjects/facial-recognition/images/database/"
+  people = ["ryan", "liam"] # [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store")]
 
   # NETWORK INIT
   facenet = FaceNet(HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
@@ -235,7 +267,10 @@ if __name__ == "__main__":
     print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
 
   def verify_test():
-    facenet.recognize(HOME + "/PycharmProjects/facial-recognition/test.jpg")
+    facenet.recognize(HOME + "/PycharmProjects/facial-recognition/images/test_images/ryan.jpg")
+
+  def realtime_recognize_test():
+    facenet.realtime_recognize()
 
   # TESTING
-  verify_test()
+  realtime_recognize_test()
