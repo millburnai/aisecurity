@@ -10,6 +10,7 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 """
 
 import os
+import argparse
 from time import time
 import functools
 
@@ -260,8 +261,8 @@ class Preprocessing(object):
         data["{}{}".format(person, index)] = {"path": path, "embedding": embeddings[index]}
     return data
 
-if __name__ == "__main__":
-  suppress_tf_warnings()
+# UNIT TESTING
+class Tests(object):
 
   # PATHS
   HOME = os.getenv("HOME")
@@ -269,17 +270,13 @@ if __name__ == "__main__":
   img_dir = HOME + "/PycharmProjects/facial-recognition/images/database/"
   people = ["ryan", "liam"] # [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store")]
 
-  # NETWORK INIT
-  facenet = FaceNet(HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
-  facenet.set_data(Preprocessing.load(facenet.get_facenet(), img_dir, people))
-
-  # UNIT TESTS
-  def compare_test():
+  @staticmethod
+  def compare_test(facenet):
     start = time()
 
     my_imgs = []
-    for person in people:
-      for index in range(len([f for f in os.listdir(img_dir + person) if not f.endswith(".DS_Store")])):
+    for person in Tests.people:
+      for index in range(len([f for f in os.listdir(Tests.img_dir + person) if not f.endswith(".DS_Store")])):
         my_imgs.append("{}{}".format(person, index))
 
     count = 0
@@ -291,11 +288,20 @@ if __name__ == "__main__":
 
     print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
 
-  def verify_test():
-    facenet.recognize(HOME + "/PycharmProjects/facial-recognition/images/test_images/ryan.jpg")
+  @staticmethod
+  def verify_test(facenet):
+    facenet.recognize(Tests.HOME + "/PycharmProjects/facial-recognition/images/test_images/ryan.jpg")
 
-  def real_time_recognize_test():
+  @staticmethod
+  def real_time_recognize_test(facenet):
     facenet.real_time_recognize()
 
+if __name__ == "__main__":
+  suppress_tf_warnings()
+
+  # NETWORK INIT
+  facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
+  facenet.set_data(Preprocessing.load(facenet.get_facenet(), Tests.img_dir, Tests.people))
+
   # TESTING
-  real_time_recognize_test()
+  Tests.real_time_recognize_test(facenet)

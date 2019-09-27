@@ -2,13 +2,13 @@
 
 ## Development
 
-### - [ ] Optimize pre-processing
+### [ ] Optimize pre-processing
 
 Current preprocessing code (see `Preprocessing` class in facenet.py) is really slow; as a result, on an NVIDIA RTX 2060 
 GPU (a pretty powerful GPU), classification of a single image takes around 1.5 seconds-- way too slow for production 
 code.
 
-### - [x] Integrate real_time_face.py into `FaceNet` class
+### [x] Integrate real_time_face.py into `FaceNet` class
 Ideally, we would be able to run
 
 ```python
@@ -25,6 +25,6 @@ facenet.real_time_recognize()
 
 ```
 
-### - [ ] Convert TensorFlow .pb model to .h5 file
+### [ ] Convert TensorFlow .pb model to .h5 file
 
 See issues for more detail. Our current model works well but has trouble classifying certain races. 
