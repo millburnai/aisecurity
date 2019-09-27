@@ -91,26 +91,38 @@ class FaceNet(object):
   def get_facenet(self):
     return self.k_model
 
-  # GENERIC L2 DISTANCE
-  def l2_dist(self, img_a, img_b):
-    try:
-      return np.linalg.norm(self.data[img_a]["embedding"] - self.data[img_b]["embedding"])
-    except TypeError:
-      return np.linalg.norm(img_a - self.data[img_b]["embedding"]) # assumes img_a is a precomputed embedding
+  def get_embeds(self, *args, **kwargs):
+    embeds = []
+    for n in args:
+      if isinstance(n, str):
+        try:
+          n = self.data[n]["embedding"]
+        except TypeError:
+          n = self.predict([n], **kwargs)
+      elif not (n.ndim < 2 or (1 in n.shape)):
+        n = self.predict(n, **kwargs)
+      embeds.append(n)
+    return tuple(embeds)
 
-  def predict(self, filepaths, batch_size=1, faces=None, margin=15):
-    return Preprocessing.embed(self.k_model, filepaths, batch_size = batch_size, faces=faces, margin=margin)
+  # LOW-LEVLE COMPARISON FUNCTIONS
+  def l2_dist(self, a, b):
+    a, b = self.get_embeds(a, b)
+    return np.linalg.norm(a - b)
 
-  # COMPARE TWO SPECIFIC IMAGES
-  def compare(self, img_a, img_b, verbose=True):
+  def predict(self, paths_or_imgs, batch_size=1, faces=None, margin=15):
+    return Preprocessing.embed(self.k_model, paths_or_imgs, batch_size=batch_size, faces=faces, margin=margin)
+
+  # FACIAL COMPARISON
+  def compare(self, a, b, verbose=True):
     assert self.data, "data must be provided"
+    a, b = self.get_embeds(a, b)
 
-    dist = self.l2_dist(img_a, img_b)
+    dist = self.l2_dist(a, b)
     is_same = dist <= FaceNet.ALPHA
 
     if verbose:
-      print("L2 distance: {} -> {} and {} are the same person: {}".format(dist, img_a, img_b, is_same))
-      self.disp_imgs(img_a, img_b, title = "Same person: {}\n L2 distance: {}".format(is_same, dist))
+      print("L2 distance: {} -> {} and {} are the same person: {}".format(dist, a, b, is_same))
+      self.disp_imgs(a, b, title = "Same person: {}\n L2 distance: {}".format(is_same, dist))
 
     return int(is_same), dist
 
@@ -168,7 +180,8 @@ class FaceNet(object):
 
   # FACIAL RECOGNITION
   def recognize(self, img):
-    return self._recognize(img, verbose=True, faces=None)
+    # img can be a path, image, database name, or embedding
+    return self._recognize(self.get_embeds(img), verbose=True, faces=None)
 
   # REAL TIME RECOGNITION (DEMO)
   async def real_time_recognize(self, width=500, height=250):
@@ -261,20 +274,19 @@ class Preprocessing(object):
     return whitened
 
   @staticmethod
-  def align_imgs(filepaths, margin, faces=None):
+  def align_imgs(paths_or_imgs, margin, faces=None):
     if not faces:
       detector = MTCNN()
 
-    def align_img(path, faces=None):
+    def align_img(path_or_img, faces=None):
       try:
-        img = imread(path)
-      except OSError:
-        img = path # TODO: restructure so that you don't have to catch OSError-- let Preprocessing accept numpy arrays
-                   #       as images
+        img = imread(path_or_img)
+      except OSError: # if img is embedding
+        img = path_or_img
 
       if not faces:
         found = detector.detect_faces(img)
-        assert len(found) != 0, "face was not found in {}".format(path)
+        assert len(found) != 0, "face was not found in {}".format(path_or_img)
         faces = found[0]["box"]
 
       x, y, width, height = faces
@@ -282,11 +294,11 @@ class Preprocessing(object):
       resized = resize(cropped, (Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE), mode="reflect")
       return resized
 
-    return np.array([align_img(path, faces=faces) for path in filepaths])
+    return np.array([align_img(path_or_img, faces=faces) for path_or_img in paths_or_imgs])
 
   @staticmethod
-  def embed(facenet, filepaths, margin=15, batch_size=1, faces=None):
-    aligned_imgs = Preprocessing.whiten(Preprocessing.align_imgs(filepaths, margin, faces=faces))
+  def embed(facenet, paths_or_imgs, margin=15, batch_size=1, faces=None):
+    aligned_imgs = Preprocessing.whiten(Preprocessing.align_imgs(paths_or_imgs, margin, faces=faces))
     raw_embeddings = facenet.predict(aligned_imgs, batch_size=batch_size)
 
     l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
