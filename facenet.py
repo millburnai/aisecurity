@@ -9,6 +9,7 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
 
+import warnings
 import asyncio
 import json
 import os
@@ -66,21 +67,35 @@ class FaceNet(object):
   @timer(message="Model load time")
   def __init__(self, filepath):
     self.k_model = keras.models.load_model(filepath)
-    self.data = None # must be filled in by user
+    self._data = None # must be filled in by user
 
-  # MUTATORS AND RETRIEVERS
+  # MUTATORS
   def set_data(self, data):
     assert data is not None, "data must be provided"
-    self.data = data
+
+    def check_validity(data):
+      for key in data.keys():
+        assert isinstance(key, str), "data keys must be person names"
+        assert "embedding" in data[key], "data must have an 'embedding' key in person subdict"
+        if "path" not in data.keys():
+          warnings.warn("data needs a 'path' key in person subdict to display images")
+      return data
+
+    self._data = check_validity(data)
     self._set_knn()
 
   def _set_knn(self):
     k_nn_label_dict, embeddings = [], []
-    for person in self.data.keys():
+    for person in self._data.keys():
       k_nn_label_dict.append(person[:-1])
-      embeddings.append(self.data[person]["embedding"])
+      embeddings.append(self._data[person]["embedding"])
     self.k_nn = neighbors.KNeighborsClassifier(n_neighbors = 1)
     self.k_nn.fit(embeddings, k_nn_label_dict)
+
+  # RETRIEVERS
+  @property
+  def data(self):
+    return self.data
 
   def get_facenet(self):
     return self.k_model
@@ -90,7 +105,7 @@ class FaceNet(object):
     for n in args:
       if isinstance(n, str):
         try:
-          n = self.data[n]["embedding"]
+          n = self._data[n]["embedding"]
         except KeyError:
           n = self.predict([n], **kwargs)
       elif not (n.ndim < 2 or (1 in n.shape)):
@@ -108,7 +123,7 @@ class FaceNet(object):
 
   # FACIAL COMPARISON
   def compare(self, a, b, verbose=True):
-    assert self.data, "data must be provided"
+    assert self._data, "data must be provided"
 
     dist = self.l2_dist(a, b)
     is_same = dist <= FaceNet.ALPHA
@@ -122,12 +137,12 @@ class FaceNet(object):
   # FACIAL RECOGNITION HELPER
   @timer(message="Recognition time")
   def _recognize(self, img, faces=None, margin=15):
-    assert self.data, "data must be provided"
+    assert self._data, "data must be provided"
 
     embedding = self.get_embeds(img, faces=faces, margin=margin)
     best_match = self.k_nn.predict(embedding)[0]
 
-    l2_dist = self.l2_dist(embedding, self.data[best_match + "0"]["embedding"])
+    l2_dist = self.l2_dist(embedding, self._data[best_match + "0"]["embedding"])
 
     return int(l2_dist <= FaceNet.ALPHA), best_match, l2_dist
 
@@ -205,14 +220,14 @@ class FaceNet(object):
   def disp_imgs(self, img_a, img_b, title = None):
     plt.subplot(1, 2, 1)
     try:
-      plt.imshow(imread(self.data[img_a]["path"]))
+      plt.imshow(imread(self._data[img_a]["path"]))
     except KeyError:
       plt.imshow(imread(img_a))
     plt.axis("off")
 
     plt.subplot(1, 2, 2)
     try:
-      plt.imshow(imread(self.data[img_b]["path"]))
+      plt.imshow(imread(self._data[img_b]["path"]))
     except KeyError:
       plt.imshow(imread(img_b))
     plt.axis("off")
