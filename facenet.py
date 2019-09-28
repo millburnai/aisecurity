@@ -8,6 +8,7 @@ Facial recognition with FaceNet in Keras.
 Paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
+
 import asyncio
 import json
 import os
@@ -65,17 +66,18 @@ class FaceNet(object):
   def __init__(self, filepath):
     self.k_model = keras.models.load_model(filepath)
     self.data = None # must be filled in by user
-    self.k_nn = None # instantiated in functions
 
   # MUTATORS AND RETRIEVERS
   def set_data(self, data):
+    assert data is not None, "data must be provided"
     self.data = data
+    self._set_knn()
 
   def _set_knn(self):
     k_nn_label_dict, embeddings = [], []
-    for key in self.data.keys():
-      k_nn_label_dict.append(key[:-1])
-      embeddings.append(self.data[key]["embedding"])
+    for person in self.data.keys():
+      k_nn_label_dict.append(person[:-1])
+      embeddings.append(self.data[person]["embedding"])
     self.k_nn = neighbors.KNeighborsClassifier(n_neighbors = 1)
     self.k_nn.fit(embeddings, k_nn_label_dict)
 
@@ -88,14 +90,14 @@ class FaceNet(object):
       if isinstance(n, str):
         try:
           n = self.data[n]["embedding"]
-        except TypeError:
+        except KeyError:
           n = self.predict([n], **kwargs)
       elif not (n.ndim < 2 or (1 in n.shape)):
-        n = self.predict(n, **kwargs)
+        n = self.predict([n], **kwargs)
       embeds.append(n)
-    return tuple(embeds)
+    return tuple(embeds) if len(embeds) > 1 else embeds[0]
 
-  # LOW-LEVLE COMPARISON FUNCTIONS
+  # LOW-LEVEL COMPARISON FUNCTIONS
   def l2_dist(self, a, b):
     a, b = self.get_embeds(a, b)
     return np.linalg.norm(a - b)
@@ -106,7 +108,6 @@ class FaceNet(object):
   # FACIAL COMPARISON
   def compare(self, a, b, verbose=True):
     assert self.data, "data must be provided"
-    a, b = self.get_embeds(a, b)
 
     dist = self.l2_dist(a, b)
     is_same = dist <= FaceNet.ALPHA
@@ -122,13 +123,8 @@ class FaceNet(object):
   def _recognize(self, img, verbose=True, faces=None, margin=15):
     assert self.data, "data must be provided"
 
-    if self.k_nn is None:
-      self._set_knn()
-
-    embedding = self.predict([img], faces=faces, margin=margin)
-    k_nn_preds = self.k_nn.predict(embedding)
-
-    best_match = k_nn_preds[0]
+    embedding = self.get_embeds(img, faces=faces, margin=margin)
+    best_match = self.k_nn.predict(embedding)[0]
 
     l2_dist = self.l2_dist(embedding, self.data[best_match + "0"]["embedding"])
 
@@ -141,14 +137,14 @@ class FaceNet(object):
         self.disp_imgs(img, "{}0".format(best_match), title="Best match: {}\nL2 distance: {}".format(
           best_match, l2_dist))
 
-    return int(l2_dist <= FaceNet.ALPHA), k_nn_preds[0], l2_dist
+    return int(l2_dist <= FaceNet.ALPHA), best_match, l2_dist
 
   # FACIAL RECOGNITION
   def recognize(self, img):
     # img can be a path, image, database name, or embedding
-    return self._recognize(self.get_embeds(img), verbose=True, faces=None)
+    return self._recognize(img, verbose=True, faces=None)
 
-  # REAL TIME RECOGNITION (DEMO)
+  # REAL TIME RECOGNITION
   async def real_time_recognize(self, width=500, height=250):
     if self.k_nn is None:
       self._set_knn()
@@ -163,32 +159,28 @@ class FaceNet(object):
       _, frame = cap.read()
       result = detector.detect_faces(frame)
 
-      if not result:
-        print("face not detected")
-        await asyncio.sleep(0.01)
-
       if result:
         for person in result:
           faces = person["box"]
           x, y, height, width = faces
 
-          try:
-            is_recognized, best_match, l2_dist = self._recognize(frame, verbose=False, faces=faces, margin=self.MARGIN)
-            print("L2 distance: {}".format(l2_dist))
-          except ValueError:
-            # TODO: find way to circumnavigate this error-- image is empty
-            print("Empty image")
-            continue
+          is_recognized, best_match, l2_dist = self._recognize(frame, verbose=False, faces=faces, margin=self.MARGIN)
+          print("L2 distance: {} ({})".format(l2_dist, best_match))
 
-          color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognize else red
+          color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
 
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
 
           cv2.rectangle(frame, corner, box, color, thickness=2)
-          cv2.putText(frame, best_match,  org=corner, fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.75, color=color)
+          cv2.putText(frame, best_match, org=corner, fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.75, color=color)
+          await asyncio.sleep(K.epsilon())
 
-      cv2.imshow("frame", frame)
+      else:
+        print("No face detected")
+        await asyncio.sleep(K.epsilon())
+
+      cv2.imshow("CSII AI facial recognition v0.1", frame)
 
       if cv2.waitKey(1) & 0xFF == ord("q"):
         break
@@ -285,9 +277,9 @@ class Preprocessing(object):
 
   @staticmethod
   @timer(message="Data dumping time")
-  def dump_embeds(facenet, file):
-    embeds_dict = Preprocessing.load(facenet.get_facenet(), Tests.img_dir, Tests.people)
-    with open(file, "w+") as json_file:
+  def dump_embeds(facenet, path, img_dir, people):
+    embeds_dict = Preprocessing.load(facenet.get_facenet(), img_dir, people)
+    with open(path, "w+") as json_file:
       json.dump(embeds_dict, json_file)
 
   @staticmethod
@@ -295,8 +287,8 @@ class Preprocessing(object):
   def retrieve_embeds(path):
     with open(path, "r") as json_file:
       data = json.load(json_file)
-      for key in data.keys():
-        data[key]["embedding"] = np.asarray(data[key]["embedding"])
+      for person in data.keys():
+        data[person]["embedding"] = np.asarray(data[person]["embedding"])
       return data
 
 # UNIT TESTING
@@ -338,16 +330,12 @@ class Tests(object):
 if __name__ == "__main__":
   suppress_tf_warnings()
 
-  # NETWORK INIT
   facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
   # Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/database/processed.json")
 
   facenet.set_data(Preprocessing.retrieve_embeds(
     Tests.HOME + "/PycharmProjects/facial-recognition/images/database/processed.json"))
 
-  # Tests.recognize_test(facenet)
-
-  # TESTING
   loop = asyncio.new_event_loop()
   task = loop.create_task(Tests.real_time_recognize_test(facenet))
   loop.run_until_complete(task)
