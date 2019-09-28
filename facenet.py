@@ -35,10 +35,7 @@ def suppress_tf_warnings():
   warnings.simplefilter(action="ignore", category=UserWarning)
 
   import tensorflow as tf
-  try:
-    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-  except AttributeError:
-    tf.logging.set_verbosity(tf.logging.ERROR)
+  tf.logging.set_verbosity(tf.logging.ERROR)
 
 # DECORATORS
 def timer(message="Time elapsed"):
@@ -164,8 +161,12 @@ class FaceNet(object):
           faces = person["box"]
           x, y, height, width = faces
 
-          is_recognized, best_match, l2_dist = self._recognize(frame, verbose=False, faces=faces, margin=self.MARGIN)
-          print("L2 distance: {} ({})".format(l2_dist, best_match))
+          try:
+            is_recognized, best_match, l2_dist = self._recognize(frame, verbose=False, faces=faces, margin=self.MARGIN)
+            print("L2 distance: {} ({})".format(l2_dist, best_match))
+          except ValueError:
+            print("Image refresh rate too high")
+            continue
 
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
 
