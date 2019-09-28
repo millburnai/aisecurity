@@ -35,7 +35,10 @@ def suppress_tf_warnings():
   warnings.simplefilter(action="ignore", category=UserWarning)
 
   import tensorflow as tf
-  tf.logging.set_verbosity(tf.logging.ERROR)
+  try:
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+  except AttributeError:
+    tf.logging.set_verbosity(tf.logging.ERROR)
 
 # DECORATORS
 def timer(message="Time elapsed"):
@@ -179,18 +182,17 @@ class FaceNet(object):
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
 
-          FaceNet.add_box_and_label(frame, corner, box, color, radius, line_thickness, best_match)
+          FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, best_match)
           FaceNet.add_key_points(overlay, key_points, radius, color, line_thickness)
 
         cv2.addWeighted(overlay, 1.0 - self.TRANSPARENCY, frame, 1.0, 0, frame)
 
-        await asyncio.sleep(K.epsilon())
-
       else:
         print("No face detected")
-        await asyncio.sleep(K.epsilon())
 
       cv2.imshow("CSII AI facial recognition v0.1", frame)
+
+      await asyncio.sleep(K.epsilon())
 
       if cv2.waitKey(1) & 0xFF == ord("q"):
         break
@@ -220,7 +222,7 @@ class FaceNet(object):
     plt.show()
 
   @staticmethod
-  def add_box_and_label(frame, corner, box, color, radius, line_thickness, best_match):
+  def add_box_and_label(frame, corner, box, color, line_thickness, best_match):
     cv2.rectangle(frame, corner, box, color, thickness=line_thickness)
     cv2.putText(frame, best_match, org=corner, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1.25, color=color)
 
