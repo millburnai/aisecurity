@@ -183,10 +183,10 @@ class FaceNet(object):
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
 
           # TODO: make font size, thickness, radius all dependent on frame size
-          FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, best_match)
           FaceNet.add_key_points(overlay, key_points, radius, color, line_thickness)
+          cv2.addWeighted(overlay, 1.0 - self.TRANSPARENCY, frame, self.TRANSPARENCY, 0, frame)
 
-        cv2.addWeighted(overlay, 1.0 - self.TRANSPARENCY, frame, 1.0, 0, frame)
+          FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, best_match)
 
       else:
         print("No face detected")
@@ -225,7 +225,7 @@ class FaceNet(object):
   @staticmethod
   def add_box_and_label(frame, corner, box, color, line_thickness, best_match):
     cv2.rectangle(frame, corner, box, color, thickness=line_thickness)
-    cv2.putText(frame, best_match, org=corner, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1.25, color=color)
+    cv2.putText(frame, best_match, org=corner, fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.75, color=color)
 
   @staticmethod
   def add_key_points(overlay, key_points, radius, color, line_thickness):
