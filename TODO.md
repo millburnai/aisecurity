@@ -1,5 +1,7 @@
 # To-do
 
+Ordered in terms of precedence. Used internally instead of Issues.
+
 ## Development
 
 ### [x] Optimize pre-processing
@@ -38,3 +40,10 @@ TensorFlow model: https://drive.google.com/file/d/1EXPBSXwTaqrSC0OhUdXNmKSh9qJUQ
 ### Database appearance log
 
 Log appearances of people and the corresponding time in a database during real time facial recognition.
+
+
+## Features
+
+### Real time facial recognition appearance
+
+Make font size, bounding box size, and key point size all relative to the frame size.

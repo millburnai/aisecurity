@@ -182,6 +182,7 @@ class FaceNet(object):
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
 
+          # TODO: make font size, thickness, radius all dependent on frame size
           FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, best_match)
           FaceNet.add_key_points(overlay, key_points, radius, color, line_thickness)
 
