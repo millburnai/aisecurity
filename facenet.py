@@ -56,7 +56,8 @@ class FaceNet(object):
 
   # HYPERPARAMETERS
   ALPHA = 1.0
-  MARGIN = 15
+  MARGIN = 0
+  TRANSPARENCY = 0.5
 
   # INITS
   @timer(message="Model load time")
@@ -117,7 +118,7 @@ class FaceNet(object):
 
   # FACIAL RECOGNITION HELPER
   @timer(message="Recognition time")
-  def _recognize(self, img, verbose=True, faces=None, margin=15):
+  def _recognize(self, img, faces=None, margin=15):
     assert self.data, "data must be provided"
 
     embedding = self.get_embeds(img, faces=faces, margin=margin)
@@ -125,8 +126,15 @@ class FaceNet(object):
 
     l2_dist = self.l2_dist(embedding, self.data[best_match + "0"]["embedding"])
 
+    return int(l2_dist <= FaceNet.ALPHA), best_match, l2_dist
+
+  # FACIAL RECOGNITION
+  def recognize(self, img, verbose=True):
+    # img can be a path, image, database name, or embedding
+    is_recognized, best_match, l2_dist = self._recognize(img)
+
     if verbose:
-      if l2_dist <= FaceNet.ALPHA:
+      if is_recognized:
         print("Your image is a picture of \"{}\": L2 distance of {}".format(best_match, l2_dist))
       else:
         print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
@@ -134,35 +142,34 @@ class FaceNet(object):
         self.disp_imgs(img, "{}0".format(best_match), title="Best match: {}\nL2 distance: {}".format(
           best_match, l2_dist))
 
-    return int(l2_dist <= FaceNet.ALPHA), best_match, l2_dist
-
-  # FACIAL RECOGNITION
-  def recognize(self, img):
-    # img can be a path, image, database name, or embedding
-    return self._recognize(img, verbose=True, faces=None)
+    return is_recognized, best_match, l2_dist
 
   # REAL TIME RECOGNITION
   async def real_time_recognize(self, width=500, height=250):
-    if self.k_nn is None:
-      self._set_knn()
-
     detector = MTCNN()
     cap = cv2.VideoCapture(0)
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
+    line_thickness = round((width + height) / 375.)
+    radius = round(line_thickness / 2.)
+
     while True:
-      _, frame = cap.read()
-      result = detector.detect_faces(frame)
+      _, original_frame = cap.read()
+      result = detector.detect_faces(original_frame)
 
       if result:
+        frame = original_frame.copy()
+        overlay = original_frame.copy()
+
         for person in result:
-          faces = person["box"]
-          x, y, height, width = faces
+          face = person["box"]
+          key_points = person["keypoints"]
+          x, y, height, width = face
 
           try:
-            is_recognized, best_match, l2_dist = self._recognize(frame, verbose=False, faces=faces, margin=self.MARGIN)
+            is_recognized, best_match, l2_dist = self._recognize(frame, faces=face, margin=self.MARGIN)
             print("L2 distance: {} ({})".format(l2_dist, best_match))
           except ValueError:
             print("Image refresh rate too high")
@@ -173,15 +180,18 @@ class FaceNet(object):
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
 
-          cv2.rectangle(frame, corner, box, color, thickness=2)
-          cv2.putText(frame, best_match, org=corner, fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.75, color=color)
-          await asyncio.sleep(K.epsilon())
+          FaceNet.add_box_and_label(frame, corner, box, color, radius, best_match)
+          FaceNet.add_key_points(overlay, key_points, radius, color, line_thickness)
+
+        cv2.addWeighted(overlay, 1.0 - self.TRANSPARENCY, frame, 1.0 - self.TRANSPARENCY, 0, original_frame)
+
+        await asyncio.sleep(K.epsilon())
 
       else:
         print("No face detected")
         await asyncio.sleep(K.epsilon())
 
-      cv2.imshow("CSII AI facial recognition v0.1", frame)
+      cv2.imshow("CSII AI facial recognition v0.1", original_frame)
 
       if cv2.waitKey(1) & 0xFF == ord("q"):
         break
@@ -209,6 +219,24 @@ class FaceNet(object):
       plt.suptitle(title)
 
     plt.show()
+
+  @staticmethod
+  def add_box_and_label(frame, corner, box, color, radius, best_match):
+    cv2.rectangle(frame, corner, box, color, thickness=radius)
+    cv2.putText(frame, best_match, org=corner, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1.25, color=color)
+
+  @staticmethod
+  def add_key_points(overlay, key_points, radius, color, line_thickness):
+    cv2.circle(overlay, (key_points["left_eye"]), radius=radius, color=color, thickness=line_thickness)
+    cv2.circle(overlay, (key_points["right_eye"]), radius=radius, color=color, thickness=line_thickness)
+    cv2.circle(overlay, (key_points["nose"]), radius=radius, color=color, thickness=line_thickness)
+    cv2.circle(overlay, (key_points["mouth_left"]), radius=radius, color=color, thickness=line_thickness)
+    cv2.circle(overlay, (key_points["mouth_right"]), radius=radius, color=color, thickness=line_thickness)
+
+    cv2.line(overlay, key_points["left_eye"], key_points["nose"], color, thickness=radius)
+    cv2.line(overlay, key_points["right_eye"], key_points["nose"], color, thickness=radius)
+    cv2.line(overlay, key_points["mouth_left"], key_points["nose"], color, thickness=radius)
+    cv2.line(overlay, key_points["mouth_right"], key_points["nose"], color, thickness=radius)
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
