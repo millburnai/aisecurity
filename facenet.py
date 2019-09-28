@@ -56,7 +56,7 @@ class FaceNet(object):
 
   # HYPERPARAMETERS
   ALPHA = 1.0
-  MARGIN = 0
+  MARGIN = 10
   TRANSPARENCY = 0.5
 
   # INITS
@@ -100,7 +100,7 @@ class FaceNet(object):
     a, b = self.get_embeds(a, b)
     return np.linalg.norm(a - b)
 
-  def predict(self, paths_or_imgs, batch_size=1, faces=None, margin=15):
+  def predict(self, paths_or_imgs, batch_size=1, faces=None, margin=10):
     return Preprocessing.embed(self.k_model, paths_or_imgs, batch_size=batch_size, faces=faces, margin=margin)
 
   # FACIAL COMPARISON
@@ -156,12 +156,11 @@ class FaceNet(object):
     radius = round(line_thickness / 2.)
 
     while True:
-      _, original_frame = cap.read()
-      result = detector.detect_faces(original_frame)
+      _, frame = cap.read()
+      result = detector.detect_faces(frame)
 
       if result:
-        frame = original_frame.copy()
-        overlay = original_frame.copy()
+        overlay = frame.copy()
 
         for person in result:
           face = person["box"]
@@ -180,10 +179,10 @@ class FaceNet(object):
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
 
-          FaceNet.add_box_and_label(frame, corner, box, color, radius, best_match)
+          FaceNet.add_box_and_label(frame, corner, box, color, radius, line_thickness, best_match)
           FaceNet.add_key_points(overlay, key_points, radius, color, line_thickness)
 
-        cv2.addWeighted(overlay, 1.0 - self.TRANSPARENCY, frame, 1.0 - self.TRANSPARENCY, 0, original_frame)
+        cv2.addWeighted(overlay, 1.0 - self.TRANSPARENCY, frame, 1.0, 0, frame)
 
         await asyncio.sleep(K.epsilon())
 
@@ -191,7 +190,7 @@ class FaceNet(object):
         print("No face detected")
         await asyncio.sleep(K.epsilon())
 
-      cv2.imshow("CSII AI facial recognition v0.1", original_frame)
+      cv2.imshow("CSII AI facial recognition v0.1", frame)
 
       if cv2.waitKey(1) & 0xFF == ord("q"):
         break
@@ -221,8 +220,8 @@ class FaceNet(object):
     plt.show()
 
   @staticmethod
-  def add_box_and_label(frame, corner, box, color, radius, best_match):
-    cv2.rectangle(frame, corner, box, color, thickness=radius)
+  def add_box_and_label(frame, corner, box, color, radius, line_thickness, best_match):
+    cv2.rectangle(frame, corner, box, color, thickness=line_thickness)
     cv2.putText(frame, best_match, org=corner, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1.25, color=color)
 
   @staticmethod
