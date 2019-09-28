@@ -10,7 +10,6 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 """
 import asyncio
 import json
-import re
 import os
 from time import time
 import functools
@@ -21,7 +20,7 @@ from keras import backend as K
 import numpy as np
 import cv2
 from skimage.transform import resize
-from sklearn import preprocessing, neighbors
+from sklearn import neighbors
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
@@ -41,7 +40,7 @@ def suppress_tf_warnings():
     tf.logging.set_verbosity(tf.logging.ERROR)
 
 # DECORATORS
-def timer(message = "Time elapsed"):
+def timer(message="Time elapsed"):
 
   def _timer(func):
     @functools.wraps(func)
@@ -73,17 +72,12 @@ class FaceNet(object):
     self.data = data
 
   def _set_knn(self):
-    self.k_nn_label_dict = []
-    embeddings = []
-    for d in self.data.keys(): 
-      name = re.split("[0-9]", d)
-      self.k_nn_label_dict.append(name[0])
-      embeddings.append(self.data[d]["embedding"])
+    k_nn_label_dict, embeddings = [], []
+    for key in self.data.keys():
+      k_nn_label_dict.append(key[:-1])
+      embeddings.append(self.data[key]["embedding"])
     self.k_nn = neighbors.KNeighborsClassifier(n_neighbors = 1)
-    self.k_nn.fit(embeddings, self.k_nn_label_dict)
-    for label, emb in zip(self.k_nn_label_dict, embeddings):
-      print(label)
-      print(self.k_nn.predict(emb.reshape(1, -1)))
+    self.k_nn.fit(embeddings, k_nn_label_dict)
 
   def get_facenet(self):
     return self.k_model
@@ -127,11 +121,27 @@ class FaceNet(object):
   @timer(message="Recognition time")
   def _recognize(self, img, verbose=True, faces=None, margin=15):
     assert self.data, "data must be provided"
+
     if self.k_nn is None:
       self._set_knn()
+
     embedding = self.predict([img], faces=faces, margin=margin)
     k_nn_preds = self.k_nn.predict(embedding)
-    return int(0 <= FaceNet.ALPHA), k_nn_preds[0], 0
+
+    best_match = k_nn_preds[0]
+
+    l2_dist = self.l2_dist(embedding, self.data[best_match + "0"]["embedding"])
+
+    if verbose:
+      if l2_dist <= FaceNet.ALPHA:
+        print("Your image is a picture of \"{}\": L2 distance of {}".format(best_match, l2_dist))
+      else:
+        print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
+          best_match, l2_dist))
+        self.disp_imgs(img, "{}0".format(best_match), title="Best match: {}\nL2 distance: {}".format(
+          best_match, l2_dist))
+
+    return int(l2_dist <= FaceNet.ALPHA), k_nn_preds[0], l2_dist
 
   # FACIAL RECOGNITION
   def recognize(self, img):
@@ -296,7 +306,7 @@ class Tests(object):
   HOME = os.getenv("HOME")
 
   # PATHS
-  img_dir = HOME + "/Desktop/facial-recognition/images/database/"
+  img_dir = HOME + "/PycharmProjects/facial-recognition/images/database/"
   people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
 
   @staticmethod
@@ -319,7 +329,7 @@ class Tests(object):
 
   @staticmethod
   def recognize_test(facenet):
-    facenet.recognize(Tests.HOME + "/Desktop/facial-recognition/images/test_images/ryan.jpg")
+    facenet.recognize(Tests.HOME + "/PycharmProjects/facial-recognition/images/test_images/ryan.jpg")
 
   @staticmethod
   async def real_time_recognize_test(facenet):
@@ -329,11 +339,11 @@ if __name__ == "__main__":
   suppress_tf_warnings()
 
   # NETWORK INIT
-  facenet = FaceNet(Tests.HOME + "/Desktop/facial-recognition/models/facenet_keras.h5")
+  facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
   # Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/database/processed.json")
 
   facenet.set_data(Preprocessing.retrieve_embeds(
-    Tests.HOME + "/Desktop/facial-recognition/images/database/processed.json"))
+    Tests.HOME + "/PycharmProjects/facial-recognition/images/database/processed.json"))
 
   # Tests.recognize_test(facenet)
 
