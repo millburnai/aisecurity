@@ -95,7 +95,7 @@ class FaceNet(object):
   # RETRIEVERS
   @property
   def data(self):
-    return self.data
+    return self._data
 
   def get_facenet(self):
     return self.k_model
