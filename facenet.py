@@ -286,6 +286,21 @@ class FaceNet(object):
     cv2.line(overlay, key_points["mouth_left"], key_points["nose"], color, radius)
     cv2.line(overlay, key_points["mouth_right"], key_points["nose"], color, radius)
 
+  def show_embeds(self):
+
+    def closest_multiples(n):
+      if n == 0 or n == 1: return n, n
+      factors = [((i, int(n / i)), (abs(i - int(n / i)))) for i in range(1, n) if n % i == 0]
+      return factors[np.argmin(list(zip(*factors))[1]).item()][0]
+
+    for person in self.data:
+      embed = self.data[person]["embedding"]
+      embed.resize(*closest_multiples(embed.shape[0]))
+
+      plt.imshow(embed, cmap="gray")
+      plt.title("Embedding of \"{}\"".format(person[:-1]))
+      plt.show()
+
 # IMAGE PREPROCESSING
 class Preprocessing(object):
 
@@ -416,11 +431,13 @@ if __name__ == "__main__":
   suppress_tf_warnings()
 
   facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
-  Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json",
-                            Tests.img_dir, Tests.people)
+  # Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json",
+  #                           Tests.img_dir, Tests.people)
 
   facenet.set_data(Preprocessing.retrieve_embeds(
     Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json"))
+
+  facenet.show_embeds()
 
   use_log = False
 
