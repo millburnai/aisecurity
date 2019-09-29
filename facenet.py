@@ -78,7 +78,8 @@ class FaceNet(object):
     def check_validity(data):
       for key in data.keys():
         assert isinstance(key, str), "data keys must be person names"
-        assert "embedding" in data[key], "data must have an 'embedding' key in person subdict"
+        is_vector = data[key].ndim < 2 or (1 in data[key].shape)
+        assert isinstance(data[key], np.ndarray) and is_vector, "each data[key] must be a vectorized embedding"
         if "path" not in data.keys():
           warnings.warn("data needs a 'path' key in person subdict to display images")
       return data
@@ -90,7 +91,7 @@ class FaceNet(object):
     k_nn_label_dict, embeddings = [], []
     for person in self._data.keys():
       k_nn_label_dict.append(person[:-1])
-      embeddings.append(self._data[person]["embedding"])
+      embeddings.append(self._data[person])
     self.k_nn = neighbors.KNeighborsClassifier(n_neighbors = 1)
     self.k_nn.fit(embeddings, k_nn_label_dict)
 
@@ -107,7 +108,7 @@ class FaceNet(object):
     for n in args:
       if isinstance(n, str):
         try:
-          n = self._data[n]["embedding"]
+          n = self._data[n]
         except KeyError:
           n = self.predict([n], **kwargs)
       elif not (n.ndim < 2 or (1 in n.shape)):
@@ -132,7 +133,6 @@ class FaceNet(object):
 
     if verbose:
       print("L2 distance: {} -> {} and {} are the same person: {}".format(dist, a, b, is_same))
-      self.disp_imgs(a, b, title = "Same person: {}\n L2 distance: {}".format(is_same, dist))
 
     return int(is_same), dist
 
@@ -144,7 +144,7 @@ class FaceNet(object):
     embedding = self.get_embeds(img, faces=faces, margin=margin)
     best_match = self.k_nn.predict(embedding)[0]
 
-    l2_dist = self.l2_dist(embedding, self._data[best_match + "0"]["embedding"])
+    l2_dist = self.l2_dist(embedding, self._data[best_match + "0"])
 
     return int(l2_dist <= FaceNet.ALPHA), best_match, l2_dist
 
@@ -159,13 +159,11 @@ class FaceNet(object):
       else:
         print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
           best_match, l2_dist))
-        self.disp_imgs(img, "{}0".format(best_match), title="Best match: {}\nL2 distance: {}".format(
-          best_match, l2_dist))
 
     return is_recognized, best_match, l2_dist
 
   # REAL TIME FACIAL RECOGNITION
-  async def real_time_recognize(self, width=1000, height=1000, use_log=True):
+  async def real_time_recognize(self, width=500, height=250, use_log=True):
     detector = MTCNN()
     cap = cv2.VideoCapture(0)
 
@@ -248,26 +246,6 @@ class FaceNet(object):
     cv2.destroyAllWindows()
 
   # DISPLAYING
-  def disp_imgs(self, img_a, img_b, title = None):
-    plt.subplot(1, 2, 1)
-    try:
-      plt.imshow(imread(self._data[img_a]["path"]))
-    except KeyError:
-      plt.imshow(imread(img_a))
-    plt.axis("off")
-
-    plt.subplot(1, 2, 2)
-    try:
-      plt.imshow(imread(self._data[img_b]["path"]))
-    except KeyError:
-      plt.imshow(imread(img_b))
-    plt.axis("off")
-
-    if title is not None:
-      plt.suptitle(title)
-
-    plt.show()
-
   @staticmethod
   def add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness):
     cv2.rectangle(frame, corner, box, color, line_thickness)
@@ -294,7 +272,7 @@ class FaceNet(object):
       return factors[np.argmin(list(zip(*factors))[1]).item()][0]
 
     for person in self.data:
-      embed = self.data[person]["embedding"]
+      embed = self.data[person]
       embed.resize(*closest_multiples(embed.shape[0]))
 
       plt.imshow(embed, cmap="gray")
@@ -364,7 +342,7 @@ class Preprocessing(object):
       img_paths = [os.path.join(person_dir, f) for f in os.listdir(person_dir) if not f.endswith(".DS_Store")]
       embeddings = Preprocessing.embed(facenet, img_paths)
       for index, path in enumerate(img_paths):
-        data["{}{}".format(person, index)] = {"path": path, "embedding": list(np.float64(embeddings[index]))}
+        data["{}{}".format(person, index)] = embeddings[index]
     return data
 
   @staticmethod
@@ -375,12 +353,14 @@ class Preprocessing(object):
       new_people = [person for person in people if person + "0" not in old_embeds.keys()]
       new_embeds = Preprocessing.load(facenet.get_facenet(), img_dir, new_people)
       embeds_dict = {**old_embeds, **new_embeds} # combining dicts and overwriting any duplicates with new_embeds
-      for person in embeds_dict: # numpy arrays are not json-serializable
-        embeds_dict[person]["embedding"] = list(embeds_dict[person]["embedding"])
     else:
       embeds_dict = Preprocessing.load(facenet.get_facenet(), img_dir, people)
+
+    for person in embeds_dict:  # numpy arrays are not json-serializable
+      embeds_dict[person] = list(embeds_dict[person])
+
     with open(path, "w+") as json_file:
-      json.dump(embeds_dict, json_file, indent=4) # pretty-printing json file
+      json.dump(embeds_dict, json_file, indent=4, sort_keys=True) # pretty-printing json file
 
   @staticmethod
   @timer(message="Data retrieval time")
@@ -388,8 +368,8 @@ class Preprocessing(object):
     with open(path, "r") as json_file:
       data = json.load(json_file)
       for person in data.keys():
-        data[person]["embedding"] = np.asarray(data[person]["embedding"])
-      return data
+        data[person] = np.asarray(data[person])
+    return data
 
 # UNIT TESTING
 class Tests(object):
@@ -398,8 +378,8 @@ class Tests(object):
   HOME = os.getenv("HOME")
 
   # PATHS
-  img_dir = HOME + "/PycharmProjects/facial-recognition/images/_database/"
-  people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
+  img_dir = HOME + "/PycharmProjects/facial-recognition/images/database/"
+  people = None # [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
 
   @staticmethod
   def compare_test(facenet):
@@ -437,7 +417,7 @@ if __name__ == "__main__":
   facenet.set_data(Preprocessing.retrieve_embeds(
     Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json"))
 
-  facenet.show_embeds()
+  # facenet.show_embeds()
 
   use_log = False
 
