@@ -9,14 +9,14 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
 
-import log
+# import log
 import warnings
 import asyncio
 import json
 import os
-from time import time
+import time
 import functools
-from datetime import *
+# from datetime import *
 
 import matplotlib.pyplot as plt
 import keras
@@ -49,9 +49,9 @@ def timer(message="Time elapsed"):
   def _timer(func):
     @functools.wraps(func)
     def _func(*args, **kwargs):
-      start = time()
+      start = time.time()
       result = func(*args, **kwargs)
-      print("{}: {}s".format(message, round(time() - start, 3)))
+      print("{}: {}s".format(message, round(time.time() - start, 3)))
       return result
     return _func
 
@@ -165,7 +165,7 @@ class FaceNet(object):
     return is_recognized, best_match, l2_dist
 
   # REAL TIME FACIAL RECOGNITION
-  async def real_time_recognize(self, width=500, height=250):
+  async def real_time_recognize(self, width=500, height=250, use_log=True):
     detector = MTCNN()
     cap = cv2.VideoCapture(0)
 
@@ -177,13 +177,13 @@ class FaceNet(object):
     font_size = 4.5e-7 * width * height + 0.5
     # works for 6.25e4 pixel video cature to 1e6 pixel video capture
     # TODO: make font_size more adaptive (use cv2.getTextSize())
-    
-    rec_threshold = 0
-    unrec_threshold = 0
-    current_match = None
-    start_time = {}
-    suspicious = log.getNow(True)
-    num_suspicious = len(os.listdir(Tests.HOME + "/PycharmProject/facial-recognition/images/suspicious"))
+
+    if use_log:
+      rec_threshold = 0
+      unrec_threshold = 0
+      start_time = {}
+      suspicious = log.getNow(True)
+      num_suspicious = len(os.listdir(Tests.HOME + "/Desktop/facial-recognition/images/suspicious"))
 
     while True:
       _, frame = cap.read()
@@ -205,23 +205,26 @@ class FaceNet(object):
             continue
 
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
-          rec_threshold = rec_threshold+1 if is_recognized else 0
-          unrec_threshold = unrec_threshold+1 if not is_recognized else 0
-          if unrec_threshold > 5 and (log.getNow(True)-suspicious).total_seconds()>5:
-            path = Tests.HOME+"/Desktop/facial-recognition/images/suspicious/{}.jpg".format(num)
-            cv2.imwrite(path, frame)
-            log.suspiciousActivity(path)
-            num+=1
-            print("adding sus activity")
-            suspicious = log.getNow(True)
-          not_repeat = True if not best_match in start_time.keys() else (
-            True if (log.getNow(True)-start_time[best_match]).total_seconds()>5 else False
-          )
-          if rec_threshold > 5 and not_repeat: 
-            log.newTransaction(12808, 12808, best_match)
-            print("new transaction recorded")
-            current_match = best_match
-            start_time[current_match] = log.getNow(True)
+
+          # TODO(22pilarskil): make the log code object-oriented; also, please use snake typing lol
+          if use_log:
+            rec_threshold = rec_threshold+1 if is_recognized else 0
+            unrec_threshold = unrec_threshold+1 if not is_recognized else 0
+            if unrec_threshold > 5 and (log.getNow(True)-suspicious).total_seconds()>5:
+              path = Tests.HOME+"/Desktop/facial-recognition/images/suspicious/{}.jpg".format(num_suspicious)
+              cv2.imwrite(path, frame)
+              log.suspiciousActivity(path)
+              num_suspicious+=1
+              print("adding sus activity")
+              suspicious = log.getNow(True)
+            not_repeat = True if not best_match in start_time.keys() else (
+              True if (log.getNow(True)-start_time[best_match]).total_seconds()>5 else False
+            )
+            if rec_threshold > 5 and not_repeat:
+              log.newTransaction(12808, 12808, best_match)
+              print("new transaction recorded")
+              current_match = best_match
+              start_time[current_match] = log.getNow(True)
           
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
@@ -377,7 +380,7 @@ class Tests(object):
 
   @staticmethod
   def compare_test(facenet):
-    start = time()
+    start = time.time()
 
     my_imgs = []
     for person in Tests.people:
@@ -391,15 +394,15 @@ class Tests(object):
           facenet.compare(img_a, img_b)
           count += 1
 
-    print("Average time per comparison: {}s".format(round((time() - start) / count, 3)))
+    print("Average time per comparison: {}s".format(round((time.time() - start) / count, 3)))
 
   @staticmethod
   def recognize_test(facenet):
     facenet.recognize(Tests.HOME + "/PycharmProjects/facial-recognition/images/_test_images/ryan.jpg")
 
   @staticmethod
-  async def real_time_recognize_test(facenet):
-    await facenet.real_time_recognize()
+  async def real_time_recognize_test(facenet, use_log=True):
+    await facenet.real_time_recognize(use_log=use_log)
 
 if __name__ == "__main__":
   suppress_tf_warnings()
@@ -409,9 +412,14 @@ if __name__ == "__main__":
   #                           Tests.img_dir, Tests.people)
 
   facenet.set_data(Preprocessing.retrieve_embeds(
-    Tests.HOME + "/PycharmProjects/facial-recognition/images/_database/processed.json"))
+    Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json"))
 
-  log.init()
+  use_log = False
+
+  if use_log:
+    import log
+    from datetime import *
+    log.init()
   loop = asyncio.new_event_loop()
-  task = loop.create_task(Tests.real_time_recognize_test(facenet))
+  task = loop.create_task(Tests.real_time_recognize_test(facenet, use_log=use_log))
   loop.run_until_complete(task)
