@@ -165,7 +165,7 @@ class FaceNet(object):
     return is_recognized, best_match, l2_dist
 
   # REAL TIME FACIAL RECOGNITION
-  async def real_time_recognize(self, width=500, height=250, use_log=True):
+  async def real_time_recognize(self, width=1000, height=1000, use_log=True):
     detector = MTCNN()
     cap = cv2.VideoCapture(0)
 
@@ -354,10 +354,18 @@ class Preprocessing(object):
 
   @staticmethod
   @timer(message="Data dumping time")
-  def dump_embeds(facenet, path, img_dir, people):
-    embeds_dict = Preprocessing.load(facenet.get_facenet(), img_dir, people)
+  def dump_embeds(facenet, path, img_dir, people, overwrite=False):
+    if not overwrite:
+      old_embeds = Preprocessing.retrieve_embeds(path)
+      new_people = [person for person in people if person + "0" not in old_embeds.keys()]
+      new_embeds = Preprocessing.load(facenet.get_facenet(), img_dir, new_people)
+      embeds_dict = {**old_embeds, **new_embeds} # combining dicts and overwriting any duplicates with new_embeds
+      for person in embeds_dict: # numpy arrays are not json-serializable
+        embeds_dict[person]["embedding"] = list(embeds_dict[person]["embedding"])
+    else:
+      embeds_dict = Preprocessing.load(facenet.get_facenet(), img_dir, people)
     with open(path, "w+") as json_file:
-      json.dump(embeds_dict, json_file)
+      json.dump(embeds_dict, json_file, indent=4) # pretty-printing json file
 
   @staticmethod
   @timer(message="Data retrieval time")
@@ -408,8 +416,8 @@ if __name__ == "__main__":
   suppress_tf_warnings()
 
   facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
-  # Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/_database/processed.json",
-  #                           Tests.img_dir, Tests.people)
+  Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json",
+                            Tests.img_dir, Tests.people)
 
   facenet.set_data(Preprocessing.retrieve_embeds(
     Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json"))
