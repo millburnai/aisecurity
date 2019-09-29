@@ -9,12 +9,14 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
 
+import log
 import warnings
 import asyncio
 import json
 import os
 from time import time
 import functools
+from datetime import *
 
 import matplotlib.pyplot as plt
 import keras
@@ -148,14 +150,14 @@ class FaceNet(object):
 
   # FACIAL RECOGNITION
   def recognize(self, img, verbose=True):
-    # img can be a path, image, _database name, or embedding
+    # img can be a path, image, database name, or embedding
     is_recognized, best_match, l2_dist = self._recognize(img)
 
     if verbose:
       if is_recognized:
         print("Your image is a picture of \"{}\": L2 distance of {}".format(best_match, l2_dist))
       else:
-        print("Your image is not in the _database. The best match is \"{}\" with an L2 distance of ".format(
+        print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
           best_match, l2_dist))
         self.disp_imgs(img, "{}0".format(best_match), title="Best match: {}\nL2 distance: {}".format(
           best_match, l2_dist))
@@ -175,6 +177,13 @@ class FaceNet(object):
     font_size = 4.5e-7 * width * height + 0.5
     # works for 6.25e4 pixel video cature to 1e6 pixel video capture
     # TODO: make font_size more adaptive (use cv2.getTextSize())
+    
+    rec_threshold = 0
+    unrec_threshold = 0
+    current_match = None
+    start_time = {}
+    suspicious = log.getNow(True)
+    num_suspicious = len(os.listdir(Tests.HOME + "/PycharmProject/facial-recognition/images/suspicious"))
 
     while True:
       _, frame = cap.read()
@@ -196,7 +205,24 @@ class FaceNet(object):
             continue
 
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
-
+          rec_threshold = rec_threshold+1 if is_recognized else 0
+          unrec_threshold = unrec_threshold+1 if not is_recognized else 0
+          if unrec_threshold > 5 and (log.getNow(True)-suspicious).total_seconds()>5:
+            path = Tests.HOME+"/Desktop/facial-recognition/images/suspicious/{}.jpg".format(num)
+            cv2.imwrite(path, frame)
+            log.suspiciousActivity(path)
+            num+=1
+            print("adding sus activity")
+            suspicious = log.getNow(True)
+          not_repeat = True if not best_match in start_time.keys() else (
+            True if (log.getNow(True)-start_time[best_match]).total_seconds()>5 else False
+          )
+          if rec_threshold > 5 and not_repeat: 
+            log.newTransaction(12808, 12808, best_match)
+            print("new transaction recorded")
+            current_match = best_match
+            start_time[current_match] = log.getNow(True)
+          
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
 
@@ -385,6 +411,7 @@ if __name__ == "__main__":
   facenet.set_data(Preprocessing.retrieve_embeds(
     Tests.HOME + "/PycharmProjects/facial-recognition/images/_database/processed.json"))
 
+  log.init()
   loop = asyncio.new_event_loop()
   task = loop.create_task(Tests.real_time_recognize_test(facenet))
   loop.run_until_complete(task)
