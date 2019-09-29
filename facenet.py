@@ -148,21 +148,21 @@ class FaceNet(object):
 
   # FACIAL RECOGNITION
   def recognize(self, img, verbose=True):
-    # img can be a path, image, database name, or embedding
+    # img can be a path, image, _database name, or embedding
     is_recognized, best_match, l2_dist = self._recognize(img)
 
     if verbose:
       if is_recognized:
         print("Your image is a picture of \"{}\": L2 distance of {}".format(best_match, l2_dist))
       else:
-        print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
+        print("Your image is not in the _database. The best match is \"{}\" with an L2 distance of ".format(
           best_match, l2_dist))
         self.disp_imgs(img, "{}0".format(best_match), title="Best match: {}\nL2 distance: {}".format(
           best_match, l2_dist))
 
     return is_recognized, best_match, l2_dist
 
-  # REAL TIME RECOGNITION
+  # REAL TIME FACIAL RECOGNITION
   async def real_time_recognize(self, width=500, height=250):
     detector = MTCNN()
     cap = cv2.VideoCapture(0)
@@ -170,8 +170,11 @@ class FaceNet(object):
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
-    line_thickness = round((width + height) / 375.)
-    radius = round(line_thickness / 2.)
+    line_thickness = round(1e-6 * width * height + 1.5)
+    radius = round((1e-6 * width * height + 1.5) / 2.)
+    font_size = 4.5e-7 * width * height + 0.5
+    # works for 6.25e4 pixel video cature to 1e6 pixel video capture
+    # TODO: make font_size more adaptive (use cv2.getTextSize())
 
     while True:
       _, frame = cap.read()
@@ -197,11 +200,10 @@ class FaceNet(object):
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
 
-          # TODO: make font size, thickness, radius all dependent on frame size
           FaceNet.add_key_points(overlay, key_points, radius, color, line_thickness)
           cv2.addWeighted(overlay, 1.0 - self.TRANSPARENCY, frame, self.TRANSPARENCY, 0, frame)
 
-          FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, best_match)
+          FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness=1)
 
       else:
         print("No face detected")
@@ -238,22 +240,22 @@ class FaceNet(object):
     plt.show()
 
   @staticmethod
-  def add_box_and_label(frame, corner, box, color, line_thickness, best_match):
-    cv2.rectangle(frame, corner, box, color, thickness=line_thickness)
-    cv2.putText(frame, best_match, org=corner, fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.75, color=color)
+  def add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness):
+    cv2.rectangle(frame, corner, box, color, line_thickness)
+    cv2.putText(frame, best_match, corner, cv2.FONT_HERSHEY_SIMPLEX, font_size, color, thickness)
 
   @staticmethod
   def add_key_points(overlay, key_points, radius, color, line_thickness):
-    cv2.circle(overlay, (key_points["left_eye"]), radius=radius, color=color, thickness=line_thickness)
-    cv2.circle(overlay, (key_points["right_eye"]), radius=radius, color=color, thickness=line_thickness)
-    cv2.circle(overlay, (key_points["nose"]), radius=radius, color=color, thickness=line_thickness)
-    cv2.circle(overlay, (key_points["mouth_left"]), radius=radius, color=color, thickness=line_thickness)
-    cv2.circle(overlay, (key_points["mouth_right"]), radius=radius, color=color, thickness=line_thickness)
+    cv2.circle(overlay, (key_points["left_eye"]), radius, color, line_thickness)
+    cv2.circle(overlay, (key_points["right_eye"]), radius, color, line_thickness)
+    cv2.circle(overlay, (key_points["nose"]), radius, color, line_thickness)
+    cv2.circle(overlay, (key_points["mouth_left"]), radius, color, line_thickness)
+    cv2.circle(overlay, (key_points["mouth_right"]), radius, color, line_thickness)
 
-    cv2.line(overlay, key_points["left_eye"], key_points["nose"], color, thickness=radius)
-    cv2.line(overlay, key_points["right_eye"], key_points["nose"], color, thickness=radius)
-    cv2.line(overlay, key_points["mouth_left"], key_points["nose"], color, thickness=radius)
-    cv2.line(overlay, key_points["mouth_right"], key_points["nose"], color, thickness=radius)
+    cv2.line(overlay, key_points["left_eye"], key_points["nose"], color, radius)
+    cv2.line(overlay, key_points["right_eye"], key_points["nose"], color, radius)
+    cv2.line(overlay, key_points["mouth_left"], key_points["nose"], color, radius)
+    cv2.line(overlay, key_points["mouth_right"], key_points["nose"], color, radius)
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
@@ -344,7 +346,7 @@ class Tests(object):
   HOME = os.getenv("HOME")
 
   # PATHS
-  img_dir = HOME + "/PycharmProjects/facial-recognition/images/database/"
+  img_dir = HOME + "/PycharmProjects/facial-recognition/images/_database/"
   people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
 
   @staticmethod
@@ -367,7 +369,7 @@ class Tests(object):
 
   @staticmethod
   def recognize_test(facenet):
-    facenet.recognize(Tests.HOME + "/PycharmProjects/facial-recognition/images/test_images/ryan.jpg")
+    facenet.recognize(Tests.HOME + "/PycharmProjects/facial-recognition/images/_test_images/ryan.jpg")
 
   @staticmethod
   async def real_time_recognize_test(facenet):
@@ -377,10 +379,11 @@ if __name__ == "__main__":
   suppress_tf_warnings()
 
   facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
-  # Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/database/processed.json")
+  # Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/_database/processed.json",
+  #                           Tests.img_dir, Tests.people)
 
   facenet.set_data(Preprocessing.retrieve_embeds(
-    Tests.HOME + "/PycharmProjects/facial-recognition/images/database/processed.json"))
+    Tests.HOME + "/PycharmProjects/facial-recognition/images/_database/processed.json"))
 
   loop = asyncio.new_event_loop()
   task = loop.create_task(Tests.real_time_recognize_test(facenet))

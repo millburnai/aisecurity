@@ -37,13 +37,13 @@ It would be great if someone could convert the TensorFlow FaceNet model into a K
 
 TensorFlow model: https://drive.google.com/file/d/1EXPBSXwTaqrSC0OhUdXNmKSh9qJUQ55-/view
 
-### Database appearance log
+### [ ] Database appearance log
 
 Log appearances of people and the corresponding time in a database during real time facial recognition.
 
 
 ## Features
 
-### Real time facial recognition appearance
+### [ ] Real time facial recognition appearance
 
 Make font size, bounding box size, and key point size all relative to the frame size.
