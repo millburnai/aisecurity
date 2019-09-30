@@ -9,14 +9,12 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
 
-# import log
 import warnings
 import asyncio
 import json
 import os
 import time
 import functools
-# from datetime import *
 
 import matplotlib.pyplot as plt
 import keras
@@ -79,7 +77,7 @@ class FaceNet(object):
 
     def check_validity(data):
       for key in data.keys():
-        assert isinstance(key, str), "data keys must be person names"
+        assert isinstance(key, str), "data _keys must be person names"
         is_vector = data[key].ndim < 2 or (1 in data[key].shape)
         assert isinstance(data[key], np.ndarray) and is_vector, "each data[key] must be a vectorized embedding"
         if "path" not in data.keys():
@@ -96,6 +94,10 @@ class FaceNet(object):
       embeddings.append(self._data[person])
     self.k_nn = neighbors.KNeighborsClassifier(n_neighbors = 1)
     self.k_nn.fit(embeddings, k_nn_label_dict)
+
+  def _log_init(self, *args, **kwargs):
+    # TODO(22pilarskil)
+    raise NotImplementedError()
 
   # RETRIEVERS
   @property
@@ -166,6 +168,15 @@ class FaceNet(object):
 
   # REAL TIME FACIAL RECOGNITION
   async def real_time_recognize(self, width=500, height=250, use_log=True):
+    # TODO(22pilarskil): fill in code templates
+    if use_log:
+      self._log_init(None)
+      # rec_threshold = 0
+      # unrec_threshold = 0
+      # start_time = {}
+      # suspicious = log.getNow(True)
+      # num_suspicious = len(os.listdir(Tests.HOME + "/Desktop/facial-recognition/images/suspicious"))
+
     detector = MTCNN()
     cap = cv2.VideoCapture(0)
 
@@ -177,13 +188,6 @@ class FaceNet(object):
     font_size = 4.5e-7 * width * height + 0.5
     # works for 6.25e4 pixel video cature to 1e6 pixel video capture
     # TODO: make font_size more adaptive (use cv2.getTextSize())
-
-    if use_log:
-      rec_threshold = 0
-      unrec_threshold = 0
-      start_time = {}
-      suspicious = log.getNow(True)
-      num_suspicious = len(os.listdir(Tests.HOME + "/Desktop/facial-recognition/images/suspicious"))
 
     while True:
       _, frame = cap.read()
@@ -206,25 +210,26 @@ class FaceNet(object):
 
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
 
-          # TODO(22pilarskil): make the log code object-oriented; also, please use snake typing lol
           if use_log:
-            rec_threshold = rec_threshold+1 if is_recognized else 0
-            unrec_threshold = unrec_threshold+1 if not is_recognized else 0
-            if unrec_threshold > 5 and (log.getNow(True) - suspicious).total_seconds()>5:
-              path = Tests.HOME+"/Desktop/facial-recognition/images/suspicious/{}.jpg".format(num_suspicious)
-              cv2.imwrite(path, frame)
-              log.suspiciousActivity(path)
-              num_suspicious+=1
-              print("adding sus activity")
-              suspicious = log.getNow(True)
-            not_repeat = True if not best_match in start_time.keys() else (
-              True if (log.getNow(True) - start_time[best_match]).total_seconds() > 5 else False
-            )
-            if rec_threshold > 5 and not_repeat:
-              log.newTransaction(12808, 12808, best_match)
-              print("new transaction recorded")
-              current_match = best_match
-              start_time[current_match] = log.getNow(True)
+            self.log(None)
+          # if use_log:
+          #   rec_threshold = rec_threshold+1 if is_recognized else 0
+          #   unrec_threshold = unrec_threshold+1 if not is_recognized else 0
+          #   if unrec_threshold > 5 and (log.getNow(True) - suspicious).total_seconds()>5:
+          #     path = Tests.HOME+"/Desktop/facial-recognition/images/suspicious/{}.jpg".format(num_suspicious)
+          #     cv2.imwrite(path, frame)
+          #     log.suspiciousActivity(path)
+          #     num_suspicious+=1
+          #     print("adding sus activity")
+          #     suspicious = log.getNow(True)
+          #   not_repeat = True if not best_match in start_time._keys() else (
+          #     True if (log.getNow(True) - start_time[best_match]).total_seconds() > 5 else False
+          #   )
+          #   if rec_threshold > 5 and not_repeat:
+          #     log.newTransaction(12808, 12808, best_match)
+          #     print("new transaction recorded")
+          #     current_match = best_match
+          #     start_time[current_match] = log.getNow(True)
           
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
@@ -280,6 +285,11 @@ class FaceNet(object):
       plt.imshow(embed, cmap="gray")
       plt.title("Embedding of \"{}\"".format(person[:-1]))
       plt.show()
+
+  # LOGGING
+  def log(self, *args, **kwargs):
+    # TODO(22pilarskil)
+    raise NotImplementedError()
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
@@ -411,29 +421,28 @@ class Tests(object):
 if __name__ == "__main__":
   suppress_tf_warnings()
 
-  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json")
-  # with open("/Users/ryan/PycharmProjects/facial-recognition/images/encrypted_processed.json", "w") as json_file:
+  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/_processed.json")
+  # with open("/Users/ryan/PycharmProjects/facial-recognition/images/encrypted.json", "w") as json_file:
   #   json.dump(DataEncryption.encrypt_data(data), json_file, indent=4)
-  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted_processed.json")
+  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json")
   # data = DataEncryption.decrypt_data(data)
-  # print(list(data.keys()))
+  # print(list(data._keys()))
 
   facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
   # Preprocessing.dump_embeds(facenet,
-  #                           Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted_processed.json",
+  #                           Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json",
   #                           Tests.img_dir)
 
   facenet.set_data(Preprocessing.retrieve_embeds(
-    Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted_processed.json"))
+    Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json"))
 
   # facenet.show_embeds()
 
   use_log = False
-
-  if use_log:
-    from logs import log
-    from datetime import *
-    log.init()
+  # if use_log:
+  #   from logs import log
+  #   from datetime import *
+  #   log.init()
   loop = asyncio.new_event_loop()
   task = loop.create_task(Tests.real_time_recognize_test(facenet, use_log=use_log))
   loop.run_until_complete(task)

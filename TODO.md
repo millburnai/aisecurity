@@ -41,7 +41,11 @@ TensorFlow model: https://drive.google.com/file/d/1EXPBSXwTaqrSC0OhUdXNmKSh9qJUQ
 
 1. Log appearances of people and the corresponding time in a database during real time facial recognition. 
 
-2. Make log code object-oriented (i.e., integrate into FaceNet class as with the K-NN code)
+2. Make log code object-oriented (i.e., integrate into FaceNet class as with the K-NN code). Fill in the not implemented functions (`FaceNet._log_init`, `FaceNet.log`) and use them in `FaceNet.real_time_recognize`.
+
+### [x] Encryption security with database (@orangese)
+
+AES encryption for JSON image database. 
 
 
 ## Features

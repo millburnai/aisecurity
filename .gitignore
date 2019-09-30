@@ -3,3 +3,7 @@
 .idea/
 .DS_STORE
 _*
+
+# .gitignore exceptions for dev purposes
+!_keys
+!_processed.json

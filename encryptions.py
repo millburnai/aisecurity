@@ -17,9 +17,9 @@ from Crypto.Random import get_random_bytes
 
 # CONSTANTS
 NEWLINE = os.linesep.encode("utf8")
-__key_files = {"name": os.getenv("HOME") + "/PycharmProjects/facial-recognition/keys/embedding_keys.txt",
-               "embedding": os.getenv("HOME") + "/PycharmProjects/facial-recognition/keys/name_keys.txt"}
-__bit_encryption = 16
+_KEY_FILES = {"name": os.getenv("HOME") + "/PycharmProjects/facial-recognition/_keys/_embedding_keys.txt",
+               "embedding": os.getenv("HOME") + "/PycharmProjects/facial-recognition/_keys/_name_keys.txt"}
+_BIT_ENCRYPTION = 16
 
 # DECORATORS
 def require_permission(func):
@@ -34,30 +34,30 @@ def require_permission(func):
 # GENERATING ENCRYPTION INFO
 @require_permission
 def generate_key(key_type):
-  open(__key_files[key_type], "w").close()
-  with open(__key_files[key_type], "wb") as keys:
-    key = get_random_bytes(__bit_encryption)
+  open(_KEY_FILES[key_type], "w").close()
+  with open(_KEY_FILES[key_type], "wb") as keys:
+    key = get_random_bytes(_BIT_ENCRYPTION)
     keys.write(key)
 
 @require_permission
 def generate_cipher(key_type):
   key = get_key(key_type)
   cipher = AES.new(key, AES.MODE_EAX)
-  with open(__key_files[key_type], "ab") as keys:
+  with open(_KEY_FILES[key_type], "ab") as keys:
     keys.write(cipher.nonce)
   return cipher
 
 # RETRIEVALS
 @require_permission
 def get_key(key_type):
-  with open(__key_files[key_type], "rb") as keys:
-    return b"".join(keys.readlines())[:__bit_encryption]
+  with open(_KEY_FILES[key_type], "rb") as keys:
+    return b"".join(keys.readlines())[:_BIT_ENCRYPTION]
 
 @require_permission
 def get_nonce(key_type, position):
-  with open(__key_files[key_type], "rb") as keys:
-    joined_nonces = b"".join(keys.readlines())[__bit_encryption:]
-    nonce = joined_nonces[position * __bit_encryption:(position + 1) * __bit_encryption]
+  with open(_KEY_FILES[key_type], "rb") as keys:
+    joined_nonces = b"".join(keys.readlines())[_BIT_ENCRYPTION:]
+    nonce = joined_nonces[position * _BIT_ENCRYPTION:(position + 1) * _BIT_ENCRYPTION]
   return nonce
 
 # ENCRYPT AND DECRYPT
@@ -102,29 +102,3 @@ class DataEncryption(object):
       decrypted[name] = embed
 
     return decrypted
-
-if __name__ == "__main__":
-  data = {"person1": [0.1, 0.2, 0.3], "person2": [0.4, 0.5, 0.7]}
-  print(DataEncryption.decrypt_data(DataEncryption.encrypt_data(data)))
-  print(data)
-  print("it works!")
-
-  # test = "testing!"
-  # enc = "".join([chr(c) for c in list(encrypt(bytes(test, "utf8"), cipher))])
-  # print(decrypt(bytes([ord(c) for c in enc]), get_key()).decode("utf8"))
-
-  # key = get_key()
-  #
-  # original = [[0.3, 0.4, 0.5], [0.2, 0.3, 0.4]]
-  # encrypted = []
-  #
-  # for arr in original:
-  #   buf = bytes(struct.pack("%sd" % len(arr), *arr))
-  #
-  #   cipher = generate_cipher()
-  #   encrypted.append(list(encrypt(buf, cipher)))
-  #
-  # for num, arr in enumerate(encrypted):
-  #   decrypted = decrypt(bytes(arr), key, num)
-  #   fin = list(struct.unpack("%sd" % (len(decrypted) // 8), decrypted))
-  #   assert fin == original[num]
