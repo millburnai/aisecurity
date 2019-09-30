@@ -453,5 +453,5 @@ if __name__ == "__main__":
   facenet.set_data(Preprocessing.retrieve_embeds(
     Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json"))
 
-  facenet.show_embeds(encrypted=True)
+  # facenet.show_embeds(encrypted=True)
   facenet.real_time_recognize()
