@@ -17,7 +17,7 @@ from Crypto.Random import get_random_bytes
 
 # CONSTANTS
 NEWLINE = os.linesep.encode("utf8")
-__key_file = "/Users/ryan/PycharmProjects/facial-recognition/keys.txt"
+__key_file = os.getenv("HOME") + "/PycharmProjects/facial-recognition/keys.txt"
 __bit_encryption = 16
 
 # DECORATORS
@@ -39,16 +39,11 @@ def generate_key():
     keys.write(key)
 
 @require_permission
-def generate_cipher(new_nonce=True):
+def generate_cipher():
   key = get_key()
-  nonce = get_nonce()
   cipher = AES.new(key, AES.MODE_EAX)
-  with open(__key_file, "wb") as keys:
-    keys.write(key)
-    if new_nonce:
-      keys.write(cipher.nonce)
-    else:
-      keys.write(nonce)
+  with open(__key_file, "ab") as keys:
+    keys.write(cipher.nonce)
   return cipher
 
 # RETRIEVALS
@@ -58,10 +53,12 @@ def get_key():
     return b"".join(keys.readlines())[:__bit_encryption]
 
 @require_permission
-def get_nonce():
+def get_nonce(position):
   with open(__key_file, "rb") as keys:
-    joined = b"".join(keys.readlines())
-    nonce = joined[len(joined) - __bit_encryption:]
+    joined_nonces = b"".join(keys.readlines())[__bit_encryption:]
+    if position == -1:
+      position = len(joined_nonces) - 1
+    nonce = joined_nonces[position * __bit_encryption:(position + 1) * __bit_encryption]
   return nonce
 
 # ENCRYPT AND DECRYPT
@@ -69,8 +66,8 @@ def encrypt(data, cipher):
   cipher_text, tag = cipher.encrypt_and_digest(data)
   return cipher_text
 
-def decrypt(cipher_text, key):
-  decrypt_cipher = AES.new(key, AES.MODE_EAX, nonce=get_nonce())
+def decrypt(cipher_text, key, position=-1):
+  decrypt_cipher = AES.new(key, AES.MODE_EAX, nonce=get_nonce(position))
   return decrypt_cipher.decrypt(cipher_text)
 
 if __name__ == "__main__":
@@ -79,22 +76,21 @@ if __name__ == "__main__":
   key = get_key()
 
   test = "testing!"
-  cipher = generate_cipher()
   # enc = "".join([chr(c) for c in list(encrypt(bytes(test, "utf8"), cipher))])
   # print(decrypt(bytes([ord(c) for c in enc]), get_key()).decode("utf8"))
 
-  original = list(np.random.random((5, 128)))
+  original = np.random.random((5, 128))
   encrypted = []
   for arr in original:
-    arr = list(arr)
+    arr = arr.tolist()
 
-    buf = struct.pack("%sf" % len(arr), *arr)
+    buf = bytes(struct.pack("%sd" % len(arr), *arr))
+    # test = list(struct.unpack("%sd" % (len(buf) // 8), buf))
 
     cipher = generate_cipher()
-    encrypted.append(encrypt(buf, cipher))
-    fin = decrypt(encrypted[-1], key)
-    print(np.array_equal(list(struct.unpack("%sf" % (len(fin) // 4), fin)), arr))
+    encrypted.append(list(encrypt(buf, cipher)))
 
   for num, arr in enumerate(encrypted):
-    fin = decrypt(arr, get_key())
-    print(np.array_equal(list(struct.unpack("%sf" % (len(fin) // 4), fin)), original[num]))
+    decrypted = decrypt(bytes(arr), key, num)
+    fin = list(struct.unpack("%sd" % (len(decrypted) // 8), decrypted))
+    print(fin == original[num])

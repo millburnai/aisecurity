@@ -378,9 +378,6 @@ class Encryption(object):
   @staticmethod
   def encrypt_data(data):
 
-    def bytes_to_floats(floats_as_bytes):
-      return list(struct.unpack("%sf" % (len(floats_as_bytes) // 4), floats_as_bytes))
-
     def floats_to_bytes(float_list):
       return struct.pack("%sf" % len(float_list), *float_list)
 
@@ -398,11 +395,7 @@ class Encryption(object):
   def decrypt_data(data):
 
     def bytes_to_floats(floats_as_bytes):
-      return list(struct.unpack("%sf" % (len(floats_as_bytes) // 4), floats_as_bytes)) # 4 is the size of each byte
-
-    def floats_to_bytes(float_list):
-      float_list = list(float_list)
-      return struct.pack("%sf" % len(float_list), *float_list)
+      return list(struct.unpack("%sd" % (len(floats_as_bytes) // 8), floats_as_bytes))
 
     decrypted = {}
     for encrypted_person in data:
