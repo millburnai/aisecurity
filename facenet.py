@@ -28,7 +28,7 @@ from sklearn import neighbors
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
-from encryptions import *
+from encryptions import DataEncryption
 
 # ERROR HANDLING
 def suppress_tf_warnings():
@@ -210,7 +210,7 @@ class FaceNet(object):
           if use_log:
             rec_threshold = rec_threshold+1 if is_recognized else 0
             unrec_threshold = unrec_threshold+1 if not is_recognized else 0
-            if unrec_threshold > 5 and (log.getNow(True)-suspicious).total_seconds()>5:
+            if unrec_threshold > 5 and (log.getNow(True) - suspicious).total_seconds()>5:
               path = Tests.HOME+"/Desktop/facial-recognition/images/suspicious/{}.jpg".format(num_suspicious)
               cv2.imwrite(path, frame)
               log.suspiciousActivity(path)
@@ -218,7 +218,7 @@ class FaceNet(object):
               print("adding sus activity")
               suspicious = log.getNow(True)
             not_repeat = True if not best_match in start_time.keys() else (
-              True if (log.getNow(True)-start_time[best_match]).total_seconds()>5 else False
+              True if (log.getNow(True) - start_time[best_match]).total_seconds() > 5 else False
             )
             if rec_threshold > 5 and not_repeat:
               log.newTransaction(12808, 12808, best_match)
@@ -337,7 +337,8 @@ class Preprocessing(object):
 
   @staticmethod
   @timer(message="Data preprocessing time")
-  def load(facenet, img_dir, people):
+  def load(facenet, img_dir):
+    people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
     data = {}
     for person in people:
       person_dir = img_dir + person
@@ -349,7 +350,8 @@ class Preprocessing(object):
 
   @staticmethod
   @timer(message="Data dumping time")
-  def dump_embeds(facenet, path, img_dir, people, overwrite=False):
+  def dump_embeds(facenet, path, img_dir, overwrite=False):
+    people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
     if not overwrite:
       old_embeds = Preprocessing.retrieve_embeds(path)
       new_people = [person for person in people if person + "0" not in old_embeds.keys()]
@@ -358,7 +360,7 @@ class Preprocessing(object):
     else:
       embeds_dict = Preprocessing.load(facenet.get_facenet(), img_dir, people)
 
-    encrypted_data = Encryption.encrypt_data(embeds_dict)
+    encrypted_data = DataEncryption.encrypt_data(embeds_dict)
 
     with open(path, "w+") as json_file:
       json.dump(encrypted_data, json_file, indent=4, sort_keys=True, ensure_ascii=False)
@@ -368,42 +370,7 @@ class Preprocessing(object):
   def retrieve_embeds(path):
     with open(path, "r") as json_file:
       data = json.load(json_file)
-      for key in data:
-        data[key] = np.asarray(data[key])
-    # decrypted_data = Encryption.decrypt_data(data)
-    return data
-
-class Encryption(object):
-
-  @staticmethod
-  def encrypt_data(data):
-
-    def floats_to_bytes(float_list):
-      return struct.pack("%sf" % len(float_list), *float_list)
-
-    cipher = generate_cipher()
-    encrypted = {}
-    for person in data:
-      encrypted_person = person
-      encrypted_embed = list(encrypt(floats_to_bytes(data[person]), cipher))
-      encrypted[encrypted_person] = encrypted_embed
-      cipher = generate_cipher(new_nonce=False)
-
-    return encrypted
-
-  @staticmethod
-  def decrypt_data(data):
-
-    def bytes_to_floats(floats_as_bytes):
-      return list(struct.unpack("%sd" % (len(floats_as_bytes) // 8), floats_as_bytes))
-
-    decrypted = {}
-    for encrypted_person in data:
-      decrypted_person = encrypted_person
-      decrypted_embed = bytes_to_floats(decrypt(bytes(data[encrypted_person]), get_key()))
-      decrypted[decrypted_person] = np.array(decrypted_embed)
-
-    return decrypted
+    return DataEncryption.decrypt_data(data)
 
 # UNIT TESTING
 class Tests(object):
@@ -444,26 +411,27 @@ class Tests(object):
 if __name__ == "__main__":
   suppress_tf_warnings()
 
-  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/test.json")
-  # with open("/Users/ryan/PycharmProjects/facial-recognition/images/test.json", "w") as json_file:
-  #   json.dump(Encryption.encrypt_data(data), json_file, indent=4)
-  data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/test.json")
-  data = Encryption.decrypt_data(data)
-  print(list(data.values())[0])
+  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json")
+  # with open("/Users/ryan/PycharmProjects/facial-recognition/images/encrypted_processed.json", "w") as json_file:
+  #   json.dump(DataEncryption.encrypt_data(data), json_file, indent=4)
+  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted_processed.json")
+  # data = DataEncryption.decrypt_data(data)
+  # print(list(data.keys()))
 
   facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
-  # Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json",
-  #                           Tests.img_dir, Tests.people)
+  # Preprocessing.dump_embeds(facenet,
+  #                           Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted_processed.json",
+  #                           Tests.img_dir)
 
   facenet.set_data(Preprocessing.retrieve_embeds(
-    Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json"))
+    Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted_processed.json"))
 
-  facenet.show_embeds()
+  # facenet.show_embeds()
 
   use_log = False
 
   if use_log:
-    import log
+    from logs import log
     from datetime import *
     log.init()
   loop = asyncio.new_event_loop()
