@@ -358,21 +358,59 @@ class Preprocessing(object):
     else:
       embeds_dict = Preprocessing.load(facenet.get_facenet(), img_dir, people)
 
-    for person in embeds_dict:  # numpy arrays are not json-serializable
-      embeds_dict[person] = list(embeds_dict[person])
+    encrypted_data = Encryption.encrypt_data(embeds_dict)
 
     with open(path, "w+") as json_file:
-      json.dump(embeds_dict, json_file, indent=4, sort_keys=True) # pretty-printing json file
+      json.dump(encrypted_data, json_file, indent=4, sort_keys=True, ensure_ascii=False)
 
   @staticmethod
   @timer(message="Data retrieval time")
   def retrieve_embeds(path):
     with open(path, "r") as json_file:
       data = json.load(json_file)
-      for person in data.keys():
-        data[person] = np.asarray(data[person])
-    decrypted_data = dict((decrypt) for )
+      for key in data:
+        data[key] = np.asarray(data[key])
+    # decrypted_data = Encryption.decrypt_data(data)
     return data
+
+class Encryption(object):
+
+  @staticmethod
+  def encrypt_data(data):
+
+    def bytes_to_floats(floats_as_bytes):
+      return list(struct.unpack("%sf" % (len(floats_as_bytes) // 4), floats_as_bytes))
+
+    def floats_to_bytes(float_list):
+      return struct.pack("%sf" % len(float_list), *float_list)
+
+    cipher = generate_cipher()
+    encrypted = {}
+    for person in data:
+      encrypted_person = person
+      encrypted_embed = list(encrypt(floats_to_bytes(data[person]), cipher))
+      encrypted[encrypted_person] = encrypted_embed
+      cipher = generate_cipher(new_nonce=False)
+
+    return encrypted
+
+  @staticmethod
+  def decrypt_data(data):
+
+    def bytes_to_floats(floats_as_bytes):
+      return list(struct.unpack("%sf" % (len(floats_as_bytes) // 4), floats_as_bytes)) # 4 is the size of each byte
+
+    def floats_to_bytes(float_list):
+      float_list = list(float_list)
+      return struct.pack("%sf" % len(float_list), *float_list)
+
+    decrypted = {}
+    for encrypted_person in data:
+      decrypted_person = encrypted_person
+      decrypted_embed = bytes_to_floats(decrypt(bytes(data[encrypted_person]), get_key()))
+      decrypted[decrypted_person] = np.array(decrypted_embed)
+
+    return decrypted
 
 # UNIT TESTING
 class Tests(object):
@@ -413,6 +451,13 @@ class Tests(object):
 if __name__ == "__main__":
   suppress_tf_warnings()
 
+  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/test.json")
+  # with open("/Users/ryan/PycharmProjects/facial-recognition/images/test.json", "w") as json_file:
+  #   json.dump(Encryption.encrypt_data(data), json_file, indent=4)
+  data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/test.json")
+  data = Encryption.decrypt_data(data)
+  print(list(data.values())[0])
+
   facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
   # Preprocessing.dump_embeds(facenet, Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json",
   #                           Tests.img_dir, Tests.people)
@@ -420,7 +465,7 @@ if __name__ == "__main__":
   facenet.set_data(Preprocessing.retrieve_embeds(
     Tests.HOME + "/PycharmProjects/facial-recognition/images/processed.json"))
 
-  # facenet.show_embeds()
+  facenet.show_embeds()
 
   use_log = False
 
