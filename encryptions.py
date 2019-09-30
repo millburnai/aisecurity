@@ -97,6 +97,7 @@ class DataEncryption(object):
       byte_embed = decrypt(bytes(data[encrypted_name]), key_type="embedding", position=nonce_pos)
 
       embed = np.array(list(struct.unpack("%sd" % (len(byte_embed) // 8), byte_embed)), dtype=np.float32)
+      # using double precision (C long doubles not available in Python), hence integer division by 8 (double is 8 bits)
       name = decrypt(bytes([ord(c) for c in encrypted_name]), key_type="name", position=nonce_pos).decode("utf8")
 
       decrypted[name] = embed

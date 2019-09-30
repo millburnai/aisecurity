@@ -4,9 +4,9 @@
 .DS_STORE
 _*
 
-# .gitignore exceptions for dev purposes
+# .gitignore exceptions for dev purposes-- will be removed later
 !_processed.json
+
 !_keys
 !_embedding_keys.txt
 !_name_keys.txt
-# _keys will be .gitignored in production
