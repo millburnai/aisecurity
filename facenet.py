@@ -289,16 +289,17 @@ class FaceNet(object):
       factors = [((i, int(n / i)), (abs(i - int(n / i)))) for i in range(1, n) if n % i == 0]
       return factors[np.argmin(list(zip(*factors))[1]).item()][0]
 
-    data = DataEncryption.encrypt_data(self.data, encrypt_embeds=False, decryptable=False) if encrypted else self.data
+    data = DataEncryption.encrypt_data(self.data, ignore=["embeddings"], decryptable=False) if encrypted else self.data
     for person in data:
       embed = np.asarray(data[person])
-      embed.resize(*closest_multiples(embed.shape[0]))
+      embed = embed.reshape(*closest_multiples(embed.shape[0]))
 
       plt.imshow(embed, cmap="gray")
       try:
         plt.title(person)
       except TypeError:
-        raise ValueError("encrypted data cannot be displayed due to presence of non-UTF8-decodable values")
+        warnings.warn("encrypted data cannot be displayed due to presence of non-UTF8-decodable values")
+      plt.axis("off")
       plt.show()
 
       if single and person == list(data.keys())[0]:
