@@ -28,6 +28,8 @@ from sklearn import neighbors
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
+from encryptions import *
+
 # ERROR HANDLING
 def suppress_tf_warnings():
   import os
@@ -369,6 +371,7 @@ class Preprocessing(object):
       data = json.load(json_file)
       for person in data.keys():
         data[person] = np.asarray(data[person])
+    decrypted_data = dict((decrypt) for )
     return data
 
 # UNIT TESTING
