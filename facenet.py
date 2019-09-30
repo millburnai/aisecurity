@@ -36,6 +36,7 @@ def suppress_tf_warnings():
   import warnings
   warnings.simplefilter(action="ignore", category=FutureWarning)
   warnings.simplefilter(action="ignore", category=UserWarning)
+  warnings.simplefilter(action="ignore", category=RuntimeWarning)
 
   import tensorflow as tf
   try:
@@ -166,8 +167,8 @@ class FaceNet(object):
 
     return is_recognized, best_match, l2_dist
 
-  # REAL TIME FACIAL RECOGNITION
-  async def real_time_recognize(self, width=500, height=250, use_log=True):
+  # REAL-TIME FACIAL RECOGNITION HELPER
+  async def _real_time_recognize(self, width, height, use_log):
     # TODO(22pilarskil): fill in code templates
     if use_log:
       self._log_init(None)
@@ -252,6 +253,16 @@ class FaceNet(object):
     cap.release()
     cv2.destroyAllWindows()
 
+  # REAL-TIME FACIAL RECOGNITION
+  def real_time_recognize(self, width=500, height=250, use_log=False):
+
+    async def async_helper(recognize_func, *args, **kwargs):
+      await recognize_func(*args, **kwargs)
+
+    loop = asyncio.new_event_loop()
+    task = loop.create_task(async_helper(self._real_time_recognize, width=width, height=height, use_log=use_log))
+    loop.run_until_complete(task)
+
   # DISPLAYING
   @staticmethod
   def add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness):
@@ -271,20 +282,27 @@ class FaceNet(object):
     cv2.line(overlay, key_points["mouth_left"], key_points["nose"], color, radius)
     cv2.line(overlay, key_points["mouth_right"], key_points["nose"], color, radius)
 
-  def show_embeds(self):
+  def show_embeds(self, encrypted=False, single=False):
 
     def closest_multiples(n):
       if n == 0 or n == 1: return n, n
       factors = [((i, int(n / i)), (abs(i - int(n / i)))) for i in range(1, n) if n % i == 0]
       return factors[np.argmin(list(zip(*factors))[1]).item()][0]
 
-    for person in self.data:
-      embed = self.data[person]
+    data = DataEncryption.encrypt_data(self.data, encrypt_embeds=False, decryptable=False) if encrypted else self.data
+    for person in data:
+      embed = np.asarray(data[person])
       embed.resize(*closest_multiples(embed.shape[0]))
 
       plt.imshow(embed, cmap="gray")
-      plt.title("Embedding of \"{}\"".format(person[:-1]))
+      try:
+        plt.title(person)
+      except TypeError:
+        raise ValueError("encrypted data cannot be displayed due to presence of non-UTF8-decodable values")
       plt.show()
+
+      if single and person == list(data.keys())[0]:
+        break
 
   # LOGGING
   def log(self, *args, **kwargs):
@@ -377,10 +395,10 @@ class Preprocessing(object):
 
   @staticmethod
   @timer(message="Data retrieval time")
-  def retrieve_embeds(path):
+  def retrieve_embeds(path, encrypted=True):
     with open(path, "r") as json_file:
       data = json.load(json_file)
-    return DataEncryption.decrypt_data(data)
+    return DataEncryption.decrypt_data(data) if encrypted else data
 
 # UNIT TESTING
 class Tests(object):
@@ -421,11 +439,10 @@ class Tests(object):
 if __name__ == "__main__":
   suppress_tf_warnings()
 
-  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/_processed.json")
+  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/_processed.json", False)
   # with open("/Users/ryan/PycharmProjects/facial-recognition/images/encrypted.json", "w") as json_file:
   #   json.dump(DataEncryption.encrypt_data(data), json_file, indent=4)
   # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json")
-  # data = DataEncryption.decrypt_data(data)
   # print(list(data.keys()))
 
   facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
@@ -436,13 +453,5 @@ if __name__ == "__main__":
   facenet.set_data(Preprocessing.retrieve_embeds(
     Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json"))
 
-  # facenet.show_embeds()
-
-  use_log = False
-  # if use_log:
-  #   from logs import log
-  #   from datetime import *
-  #   log.init()
-  loop = asyncio.new_event_loop()
-  task = loop.create_task(Tests.real_time_recognize_test(facenet, use_log=use_log))
-  loop.run_until_complete(task)
+  facenet.show_embeds(encrypted=True)
+  facenet.real_time_recognize()

@@ -40,11 +40,12 @@ def generate_key(key_type):
     keys.write(key)
 
 @require_permission
-def generate_cipher(key_type):
+def generate_cipher(key_type, alloc_mem):
   key = get_key(key_type)
   cipher = AES.new(key, AES.MODE_EAX)
-  with open(_KEY_FILES[key_type], "ab") as keys:
-    keys.write(cipher.nonce)
+  if alloc_mem:
+    with open(_KEY_FILES[key_type], "ab") as keys:
+      keys.write(cipher.nonce)
   return cipher
 
 # RETRIEVALS
@@ -73,20 +74,21 @@ def decrypt(cipher_text, key_type, position):
 class DataEncryption(object):
 
   @staticmethod
-  def encrypt_data(data):
-    generate_key("embedding")
-    generate_key("name")
+  def encrypt_data(data, encrypt_embeds=True, decryptable=True):
+    if decryptable:
+      generate_key("embedding")
+      generate_key("name")
 
     encrypted = {}
     for person in data:
-      embedding_cipher = generate_cipher("embedding")
-      name_cipher = generate_cipher("name")
+      embedding_cipher = generate_cipher("embedding", alloc_mem=decryptable)
+      name_cipher = generate_cipher("name", alloc_mem=decryptable)
 
       encrypted_embed = list(encrypt(bytes(struct.pack("%sd" % len(data[person]), *data[person])), embedding_cipher))
       encrypted_name = "".join([chr(c) for c in list(encrypt(bytearray(person, encoding="utf8"), name_cipher))])
       # bytes are not json-serializable
 
-      encrypted[encrypted_name] = encrypted_embed
+      encrypted[encrypted_name] = encrypted_embed if encrypt_embeds else data[person]
 
     return encrypted
 
