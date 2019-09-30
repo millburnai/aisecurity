@@ -6,4 +6,7 @@ _*
 
 # .gitignore exceptions for dev purposes
 !_processed.json
-# keys will be .gitignored in production
+!_keys
+!_embedding_keys.txt
+!_name_keys.txt
+# _keys will be .gitignored in production

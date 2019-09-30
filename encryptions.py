@@ -17,8 +17,8 @@ from Crypto.Random import get_random_bytes
 
 # CONSTANTS
 NEWLINE = os.linesep.encode("utf8")
-_KEY_FILES = {"name": os.getenv("HOME") + "/PycharmProjects/facial-recognition/keys/_embedding_keys.txt",
-               "embedding": os.getenv("HOME") + "/PycharmProjects/facial-recognition/keys/_name_keys.txt"}
+_KEY_FILES = {"name": os.getenv("HOME") + "/PycharmProjects/facial-recognition/_keys/_embedding_keys.txt",
+               "embedding": os.getenv("HOME") + "/PycharmProjects/facial-recognition/_keys/_name_keys.txt"}
 _BIT_ENCRYPTION = 16
 
 # DECORATORS

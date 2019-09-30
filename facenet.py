@@ -77,7 +77,7 @@ class FaceNet(object):
 
     def check_validity(data):
       for key in data.keys():
-        assert isinstance(key, str), "data keys must be person names"
+        assert isinstance(key, str), "data _keys must be person names"
         is_vector = data[key].ndim < 2 or (1 in data[key].shape)
         assert isinstance(data[key], np.ndarray) and is_vector, "each data[key] must be a vectorized embedding"
         if "path" not in data.keys():
@@ -222,7 +222,7 @@ class FaceNet(object):
           #     num_suspicious+=1
           #     print("adding sus activity")
           #     suspicious = log.getNow(True)
-          #   not_repeat = True if not best_match in start_time.keys() else (
+          #   not_repeat = True if not best_match in start_time._keys() else (
           #     True if (log.getNow(True) - start_time[best_match]).total_seconds() > 5 else False
           #   )
           #   if rec_threshold > 5 and not_repeat:
@@ -426,7 +426,7 @@ if __name__ == "__main__":
   #   json.dump(DataEncryption.encrypt_data(data), json_file, indent=4)
   # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json")
   # data = DataEncryption.decrypt_data(data)
-  # print(list(data.keys()))
+  # print(list(data._keys()))
 
   facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
   # Preprocessing.dump_embeds(facenet,
