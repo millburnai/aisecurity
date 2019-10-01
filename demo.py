@@ -1,4 +1,13 @@
 
+"""
+
+"demo.py"
+
+Demonstration of facial recognition system.
+
+"""
+
+# SETUP AND ERROR HANDLING
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -13,18 +22,17 @@ try:
 except AttributeError:
   tf.logging.set_verbosity(tf.logging.ERROR)
 
+# ACTUAL DEMO
 from facenet import *
 
-HOME = os.getenv("HOME")
-
 print("Loading facial recognition system...")
-facenet = FaceNet(HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
+facenet = FaceNet(Paths.HOME + "/models/facenet_keras.h5")
 
 print("Loading encrypted database...")
-facenet.set_data(Preprocessing.retrieve_embeds(HOME + "/PycharmProjects/facial-recognition/images/encrypted.json"))
+facenet.set_data(Preprocessing.retrieve_embeds(Paths.HOME + "/images/encrypted.json"))
 
 fig = plt.gcf()
-plt.imshow(imread(HOME + "/PycharmProjects/facial-recognition/images/data_example.png"))
+plt.imshow(imread(Paths.HOME + "/images/data_example.png"))
 plt.title("Example data point from database")
 plt.axis("off")
 fig.canvas.set_window_title("Facial recognition demo")
@@ -32,4 +40,4 @@ plt.show()
 
 input("Press any key to continue:")
 
-facenet.real_time_recognize()
+facenet.real_time_recognize(use_log=False)

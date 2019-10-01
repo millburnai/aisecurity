@@ -1,3 +1,12 @@
+
+/*
+
+"init.sql"
+
+Initializes MySQL log.
+
+*/
+
 DROP DATABASE IF EXISTS LOG
 CREATE DATABASE LOG
 USE LOG

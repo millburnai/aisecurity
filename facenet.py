@@ -270,7 +270,7 @@ class FaceNet(object):
   # LOGGING
   @staticmethod
   def log_activity(is_recognized, best_match, frame):
-    get_path = lambda num: Tests.HOME + "/Desktop/facial-recognition/images/_suspicious/{}.jpg".format(num)
+    get_path = lambda num: Paths.HOME + "/images/_suspicious/{}.jpg".format(num)
 
     log.rec_threshold = log.update_rec_threshold(is_recognized)
     log.unrec_threshold = log.update_unrec_threshold(is_recognized)
@@ -376,23 +376,41 @@ class Preprocessing(object):
       data = json.load(json_file)
     return DataEncryption.decrypt_data(data) if encrypted else data
 
-# UNIT TESTING
+# PATHS
+class Paths(object):
+
+  HOME = os.getenv("HOME")
+  if os.path.exists(HOME + "/PycharmProjects/facial-recognition"):
+    HOME += "/PycharmProjects/facial-recognition"
+  elif os.path.exists(HOME + "/Desktop/facial-recognition"):
+    HOME += "/Desktop/facial-recognition"
+  else:
+    raise FileNotFoundError("facial-recognition repository not found")
+
+  img_dir = HOME + "/images/database/"
+
+  people = None
+  if os.path.exists(img_dir):
+    people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
+
+# TESTS
 class Tests(object):
 
-  # CONSTANTS
-  HOME = os.getenv("HOME")
-
-  # PATHS
-  img_dir = HOME + "/Desktop/facial-recognition/images/database/"
-  people = None # [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
+  @staticmethod
+  def redump():
+    data = Preprocessing.retrieve_embeds(Paths.HOME + "/images/_processed.json", False)
+    with open("/images/encrypted.json", "w") as json_file:
+      json.dump(DataEncryption.encrypt_data(data), json_file, indent=4)
+    data = Preprocessing.retrieve_embeds(Paths.HOME + "/images/encrypted.json")
+    print(list(data.keys()))
 
   @staticmethod
   def compare_test(facenet):
     start = time.time()
 
     my_imgs = []
-    for person in Tests.people:
-      for index in range(len([f for f in os.listdir(Tests.img_dir + person) if not f.endswith(".DS_Store")])):
+    for person in Paths.HOME:
+      for index in range(len([f for f in os.listdir(Paths.img_dir + person) if not f.endswith(".DS_Store")])):
         my_imgs.append("{}{}".format(person, index))
 
     count = 0
@@ -406,26 +424,16 @@ class Tests(object):
 
   @staticmethod
   def recognize_test(facenet):
-    facenet.recognize(Tests.HOME + "/Desktop/facial-recognition/images/_test_images/ryan.jpg")
+    facenet.recognize(Paths.HOME + "/images/_test_images/ryan.jpg")
 
   @staticmethod
   async def real_time_recognize_test(facenet, use_log=True):
     await facenet.real_time_recognize(use_log=use_log)
 
 if __name__ == "__main__":
-  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/_processed.json", False)
-  # with open("/Users/ryan/PycharmProjects/facial-recognition/images/encrypted.json", "w") as json_file:
-  #   json.dump(DataEncryption.encrypt_data(data), json_file, indent=4)
-  # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json")
-  # print(list(data.keys()))
+  facenet = FaceNet(Paths.HOME + "/models/facenet_keras.h5")
 
-  facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
-  # Preprocessing.dump_embeds(facenet,
-  #                           Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json",
-  #                           Tests.img_dir)
-
-  facenet.set_data(Preprocessing.retrieve_embeds(
-    Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json"))
+  facenet.set_data(Preprocessing.retrieve_embeds(Paths.HOME + "/images/encrypted.json"))
 
   # facenet.show_embeds(encrypted=True)
   facenet.real_time_recognize(use_log=False)
