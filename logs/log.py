@@ -15,7 +15,7 @@ import mysql.connector
 from extras.paths import Paths
 
 # SETUP
-THRESHOLD = 5
+THRESHOLD = 15
 
 rec_threshold = 0
 unrec_threshold = 0
@@ -34,18 +34,18 @@ except FileNotFoundError:
 
 try:
   database = mysql.connector.connect(
-      host="localhost",
-      user="root",
-      passwd="Blast314",
-      database="LOG"
+    host="localhost",
+    user="root",
+    passwd="Blast314",
+    database="LOG"
   )
   cursor = database.cursor()
 except mysql.connector.errors.DatabaseError:
-  warnings.warn("No MySQL database found or password incorrect")
+  warnings.warn("Database credentials missing or incorrect")
 
 # LOGGING INIT AND HELPERS
 def init():
-  instructions = open("init.sql", "r")
+  instructions = open(Paths.HOME + "/logs/init.sql", "r")
   for cmd in instructions:
     cursor.execute(cmd)
     database.commit()
@@ -79,7 +79,7 @@ def update_unrec_threshold(is_recognized):
 def add_transaction(student_name):
   global transaction_id, current_match, start_time
 
-  add = "INSERT INTO Transactions (id, student_id, name_, date_, time_) VALUES ({}, {}, \'{}\', \'{}\', \'{}\')".format(
+  add = "INSERT INTO Transactions (id, student_id, name_, date_, time_) VALUES ({}, {}, '{}', '{}', '{}')".format(
     transaction_id, get_id(student_name), student_name, *get_now())
   cursor.execute(add)
   database.commit()
@@ -89,7 +89,7 @@ def add_transaction(student_name):
   transaction_id += 1
 
 def add_suspicious(path):
-  add = "INSERT INTO Suspicious (path_to_img, date_, time_) VALUES (\'{}\', \'{}\', \'{}\')".format(path, *get_now())
+  add = "INSERT INTO Suspicious (path_to_img, date_, time_) VALUES ('{}', '{}', '{}')".format(path, *get_now())
   cursor.execute(add)
   database.commit()
 

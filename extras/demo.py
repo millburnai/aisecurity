@@ -30,6 +30,7 @@ facenet = FaceNet(Paths.HOME + "/models/facenet_keras.h5")
 
 print("Loading encrypted database...")
 facenet.set_data(Preprocessing.retrieve_embeds(Paths.HOME + "/images/encrypted.json"))
+print(facenet.data.keys())
 
 fig = plt.gcf()
 plt.imshow(imread(Paths.HOME + "/images/data_example.png"))
@@ -38,6 +39,6 @@ plt.axis("off")
 fig.canvas.set_window_title("Facial recognition demo")
 plt.show()
 
-input("Press any key to continue:")
+# input("Press any key to continue:")
 
 facenet.real_time_recognize(use_log=True)

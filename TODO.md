@@ -37,6 +37,13 @@ It would be great if someone could convert the TensorFlow FaceNet model into a K
 
 TensorFlow model: https://drive.google.com/file/d/1EXPBSXwTaqrSC0OhUdXNmKSh9qJUQ55-/view
 
+### [x] Database appearance log (@22pilarskil)
+
+[x] Log appearances of people and the corresponding time in a database during real time facial recognition. 
+
+[x] Make log code object-oriented (i.e., integrate into FaceNet class as with the K-NN code). Fill in the not implemented functions (`FaceNet._log_init`, `FaceNet.log`) and use them in `FaceNet.real_time_recognize`.
+
+[ ] Update logging threshold (@orangese).
 
 ### [x] Encryption security with database (@orangese)
 

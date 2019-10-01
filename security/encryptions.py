@@ -78,6 +78,8 @@ class DataEncryption(object):
 
   @staticmethod
   def encrypt_data(data, ignore=None, decryptable=True):
+    if ignore is None:
+      ignore = []
     if decryptable:
       generate_key("embedding")
       generate_key("name")

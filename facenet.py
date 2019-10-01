@@ -193,7 +193,7 @@ class FaceNet(object):
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
 
           if use_log:
-            self.log_activity(is_recognized, best_match, frame)
+            self.log_activity(is_recognized, best_match, frame, log_suspicious=False)
           
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
@@ -270,21 +270,19 @@ class FaceNet(object):
 
   # LOGGING
   @staticmethod
-  def log_activity(is_recognized, best_match, frame):
+  def log_activity(is_recognized, best_match, frame, log_suspicious=True):
     get_path = lambda num: Paths.HOME + "/images/_suspicious/{}.jpg".format(num)
 
     log.rec_threshold = log.update_rec_threshold(is_recognized)
     log.unrec_threshold = log.update_unrec_threshold(is_recognized)
 
     if log.unrec_threshold > log.THRESHOLD and (log.get_now(True) - log.suspicious).total_seconds() > log.THRESHOLD:
-      path = get_path(log.num_suspicious)
-      cv2.imwrite(path, frame)
-      log.add_suspicious(path)
-      print("Suspicious activity")
-
-    if log.rec_threshold > log.THRESHOLD and log.verify_repeat(best_match):
+      if log_suspicious:
+        path = get_path(log.num_suspicious)
+        cv2.imwrite(path, frame)
+        log.add_suspicious(path)
+    elif log.rec_threshold > log.THRESHOLD and log.verify_repeat(best_match):
       log.add_transaction(best_match)
-      print("New transaction recorded")
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
@@ -342,8 +340,9 @@ class Preprocessing(object):
 
   @staticmethod
   @timer(message="Data preprocessing time")
-  def load(facenet, img_dir):
-    people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
+  def load(facenet, img_dir, people=None):
+    if people is None:
+      people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
     data = {}
     for person in people:
       person_dir = img_dir + person
@@ -355,20 +354,20 @@ class Preprocessing(object):
 
   @staticmethod
   @timer(message="Data dumping time")
-  def dump_embeds(facenet, path, img_dir, overwrite=False):
+  def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, overwrite=False):
     people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
     if not overwrite:
-      old_embeds = Preprocessing.retrieve_embeds(path)
+      old_embeds = Preprocessing.retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path)
       new_people = [person for person in people if person + "0" not in old_embeds.keys()]
-      new_embeds = Preprocessing.load(facenet.get_facenet(), img_dir, new_people)
+      new_embeds = Preprocessing.load(facenet.get_facenet(), img_dir, people=new_people)
       embeds_dict = {**old_embeds, **new_embeds} # combining dicts and overwriting any duplicates with new_embeds
     else:
       embeds_dict = Preprocessing.load(facenet.get_facenet(), img_dir, people)
 
     encrypted_data = DataEncryption.encrypt_data(embeds_dict)
 
-    with open(path, "w+") as json_file:
-      json.dump(encrypted_data, json_file, indent=4, sort_keys=True, ensure_ascii=False)
+    with open(dump_path, "w+") as json_file:
+      json.dump(encrypted_data, json_file, indent=4, ensure_ascii=False)
 
   @staticmethod
   @timer(message="Data retrieval time")
