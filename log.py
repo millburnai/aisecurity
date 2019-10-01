@@ -34,11 +34,11 @@ except FileNotFoundError:
 
 try:
   database = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    passwd="Blast314",
-    database="LOG"
-  )
+      host="localhost",
+      user="root",
+      passwd="KittyCat123",
+      database="LOG"
+      )
   cursor = database.cursor()
 except mysql.connector.errors.DatabaseError:
   warnings.warn("Database credentials missing or incorrect")
@@ -73,7 +73,7 @@ def update_rec_threshold(is_recognized):
   return rec_threshold + 1 if is_recognized else 0
 
 def update_unrec_threshold(is_recognized):
-  return unrec_threshold + 1 if is_recognized else 0
+  return unrec_threshold + 1 if not is_recognized else 0
 
 # LOGGING FUNCTIONS
 def add_transaction(student_name):
