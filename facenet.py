@@ -26,9 +26,9 @@ from sklearn import neighbors
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
-from paths import Paths
-from encryptions import DataEncryption
-import log
+from extras.paths import Paths
+from security.encryptions import DataEncryption
+from logs import log
 
 # DECORATORS
 def timer(message="Time elapsed"):
@@ -376,6 +376,7 @@ class Preprocessing(object):
     with open(path, "r") as json_file:
       data = json.load(json_file)
     return DataEncryption.decrypt_data(data) if encrypted else data
+<<<<<<< HEAD
 
 # TESTS
 class Tests(object):
@@ -421,3 +422,5 @@ if __name__ == "__main__":
 
   # facenet.show_embeds(encrypted=True)
   facenet.real_time_recognize(use_log=True)
+=======
+>>>>>>> 69c276f765afd6a978dc63bcc34fddfd31aca29f

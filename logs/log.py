@@ -12,6 +12,7 @@ import os
 from datetime import *
 
 import mysql.connector
+from extras.paths import Paths
 
 # SETUP
 THRESHOLD = 5
@@ -19,13 +20,14 @@ THRESHOLD = 5
 rec_threshold = 0
 unrec_threshold = 0
 start_time = {}
+
 suspicious = None
 current_match = None
 transaction_id = 0
 num_suspicious = 0
 
 try:
-  num_suspicious = len(os.listdir(os.getenv("HOME") + "/Desktop/facial-recognition/images/_suspicious"))
+  num_suspicious = len(os.listdir(Paths.HOME + "/images/_suspicious"))
 except FileNotFoundError:
   num_suspicious = None
   warnings.warn("No \"suspicious\" directory found")
@@ -34,19 +36,19 @@ try:
   database = mysql.connector.connect(
       host="localhost",
       user="root",
-      passwd="KittyCat123",
-      database="KIOSK"
+      passwd="Blast314",
+      database="LOG"
   )
   cursor = database.cursor()
 except mysql.connector.errors.DatabaseError:
-  warnings.warn("No MySQL database found")
+  warnings.warn("No MySQL database found or password incorrect")
 
 # LOGGING INIT AND HELPERS
 def init():
-  with open("init.sql", "r") as instructions:
-    for command in instructions:
-      cursor.execute(command)
-      database.commit()
+  instructions = open("init.sql", "r")
+  for cmd in instructions:
+    cursor.execute(cmd)
+    database.commit()
 
 def get_now(compare=False):
   now = datetime.now()

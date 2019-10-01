@@ -15,12 +15,13 @@ import numpy as np
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-from paths import Paths
+from extras.paths import Paths
 
 # CONSTANTS
 NEWLINE = os.linesep.encode("utf8")
-_KEY_FILES = {"name": Paths.HOME + "/_keys/_embedding_keys.txt",
-              "embedding": Paths.HOME + "/_keys/_name_keys.txt"}
+_KEY_FILES = {"name": Paths.HOME + "/security/_keys/_embedding_keys.txt",
+              "embedding": Paths.HOME + "/security/_keys/_name_keys.txt"}
+
 _BIT_ENCRYPTION = 16
 
 # DECORATORS

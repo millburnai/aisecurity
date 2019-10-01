@@ -8,6 +8,6 @@ _*
 !_processed.json
 !_suspicious
 
-!_keys
+!security/_keys
 !_embedding_keys.txt
 !_name_keys.txt
