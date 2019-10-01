@@ -12,7 +12,7 @@ import os
 from datetime import *
 
 import mysql.connector
-from paths import Paths
+from extras.paths import Paths
 
 # SETUP
 THRESHOLD = 5
