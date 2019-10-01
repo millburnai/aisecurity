@@ -14,7 +14,6 @@ import asyncio
 import json
 import os
 import time
-import log
 import functools
 
 import matplotlib.pyplot as plt
@@ -28,23 +27,7 @@ from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
 from encryptions import DataEncryption
-print(log.yeet)
-
-# ERROR HANDLING
-def suppress_tf_warnings():
-  import os
-  os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-
-  import warnings
-  warnings.simplefilter(action="ignore", category=FutureWarning)
-  warnings.simplefilter(action="ignore", category=UserWarning)
-  warnings.simplefilter(action="ignore", category=RuntimeWarning)
-
-  import tensorflow as tf
-  try:
-    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-  except AttributeError:
-    tf.logging.set_verbosity(tf.logging.ERROR)
+import log
 
 # DECORATORS
 def timer(message="Time elapsed"):
@@ -74,6 +57,12 @@ class FaceNet(object):
     self.k_model = keras.models.load_model(filepath)
     self._data = None # must be filled in by user
 
+  @staticmethod
+  def _log_init():
+    log.init()
+    if log.suspicious is None:
+      log.suspicious = log.get_now(True)
+
   # MUTATORS
   def set_data(self, data):
     assert data is not None, "data must be provided"
@@ -83,8 +72,6 @@ class FaceNet(object):
         assert isinstance(key, str), "data keys must be person names"
         is_vector = data[key].ndim < 2 or (1 in data[key].shape)
         assert isinstance(data[key], np.ndarray) and is_vector, "each data[key] must be a vectorized embedding"
-        if "path" not in data.keys():
-          warnings.warn("data needs a 'path' key in person subdict to display images")
       return data
 
     self._data = check_validity(data)
@@ -97,7 +84,6 @@ class FaceNet(object):
       embeddings.append(self._data[person])
     self.k_nn = neighbors.KNeighborsClassifier(n_neighbors=len(k_nn_label_dict) // len(set(k_nn_label_dict)))
     self.k_nn.fit(embeddings, k_nn_label_dict)
-
 
   # RETRIEVERS
   @property
@@ -167,29 +153,6 @@ class FaceNet(object):
     return is_recognized, best_match, l2_dist
 
   # REAL-TIME FACIAL RECOGNITION HELPER
-
-    # LOGGING
-  def log_(self, is_recognized, best_match, frame):
-     log.rec_threshold = log.rec_threshold+1 if is_recognized else 0
-     log.unrec_threshold = log.unrec_threshold+1 if not is_recognized else 0
-     if log.unrec_threshold > 5 and (log.getNow(True) - log.suspicious).total_seconds()>5:
-       path = Tests.HOME+"/Desktop/facial-recognition/images/suspicious/{}.jpg".format(log.num_suspicious)
-       cv2.imwrite(path, frame)
-       log.suspiciousActivity(path)
-       log.num_suspicious+=1
-       print("adding sus activity")
-       log.suspicious = log.getNow(True)
-     not_repeat = True if not best_match in log.start_time.keys() else (
-       True if (log.getNow(True) - log.start_time[best_match]).total_seconds() > 5 else False
-    )
-     if log.rec_threshold > 5 and not_repeat:
-       log.newTransaction(12808, 12808, best_match)
-       print("new transaction recorded")
-       log.current_match = best_match
-       log.start_time[log.current_match] = log.getNow(True)
-  def _log_init(self):
-    log.init()
-
   async def _real_time_recognize(self, width, height, use_log):
     # TODO(22pilarskil): fill in code templates
     if use_log:
@@ -229,7 +192,7 @@ class FaceNet(object):
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
 
           if use_log:
-            self.log_(is_recognized, best_match, frame)
+            self.log_activity(is_recognized, best_match, frame)
           
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
@@ -303,6 +266,24 @@ class FaceNet(object):
 
       if single and person == list(data.keys())[0]:
         break
+
+  # LOGGING
+  @staticmethod
+  def log_activity(is_recognized, best_match, frame):
+    get_path = lambda num: Tests.HOME + "/Desktop/facial-recognition/images/_suspicious/{}.jpg".format(num)
+
+    log.rec_threshold = log.update_rec_threshold(is_recognized)
+    log.unrec_threshold = log.update_unrec_threshold(is_recognized)
+
+    if log.unrec_threshold > log.THRESHOLD and (log.get_now(True) - log.suspicious).total_seconds() > log.THRESHOLD:
+      path = get_path(log.num_suspicious)
+      cv2.imwrite(path, frame)
+      log.add_suspicious(path)
+      print("Suspicious activity")
+
+    if log.rec_threshold > log.THRESHOLD and log.verify_repeat(best_match):
+      log.add_transaction(best_match)
+      print("New transaction recorded")
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
@@ -432,21 +413,19 @@ class Tests(object):
     await facenet.real_time_recognize(use_log=use_log)
 
 if __name__ == "__main__":
-  suppress_tf_warnings()
-
   # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/_processed.json", False)
   # with open("/Users/ryan/PycharmProjects/facial-recognition/images/encrypted.json", "w") as json_file:
   #   json.dump(DataEncryption.encrypt_data(data), json_file, indent=4)
   # data = Preprocessing.retrieve_embeds(Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json")
   # print(list(data.keys()))
 
-  facenet = FaceNet(Tests.HOME + "/Desktop/facial-recognition/models/facenet_keras.h5")
+  facenet = FaceNet(Tests.HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
   # Preprocessing.dump_embeds(facenet,
   #                           Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json",
   #                           Tests.img_dir)
 
   facenet.set_data(Preprocessing.retrieve_embeds(
-    Tests.HOME + "/Desktop/facial-recognition/images/encrypted.json"))
+    Tests.HOME + "/PycharmProjects/facial-recognition/images/encrypted.json"))
 
   # facenet.show_embeds(encrypted=True)
-  facenet.real_time_recognize()
+  facenet.real_time_recognize(use_log=False)

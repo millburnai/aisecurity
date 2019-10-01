@@ -1,8 +1,21 @@
 
+import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+import warnings
+warnings.simplefilter(action="ignore", category=FutureWarning)
+warnings.simplefilter(action="ignore", category=UserWarning)
+warnings.simplefilter(action="ignore", category=RuntimeWarning)
+
+import tensorflow as tf
+try:
+  tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+except AttributeError:
+  tf.logging.set_verbosity(tf.logging.ERROR)
+
 from facenet import *
 
 HOME = os.getenv("HOME")
-suppress_tf_warnings()
 
 print("Loading facial recognition system...")
 facenet = FaceNet(HOME + "/PycharmProjects/facial-recognition/models/facenet_keras.h5")
