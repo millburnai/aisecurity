@@ -15,6 +15,8 @@ import numpy as np
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
+from paths import Paths
+
 # CONSTANTS
 NEWLINE = os.linesep.encode("utf8")
 _KEY_FILES = {"name": os.getenv("HOME") + "/_keys/_embedding_keys.txt",

@@ -26,6 +26,7 @@ from sklearn import neighbors
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
+from paths import Paths
 from encryptions import DataEncryption
 import log
 
@@ -375,23 +376,6 @@ class Preprocessing(object):
     with open(path, "r") as json_file:
       data = json.load(json_file)
     return DataEncryption.decrypt_data(data) if encrypted else data
-
-# PATHS
-class Paths(object):
-
-  HOME = os.getenv("HOME")
-  if os.path.exists(HOME + "/PycharmProjects/facial-recognition"):
-    HOME += "/PycharmProjects/facial-recognition"
-  elif os.path.exists(HOME + "/Desktop/facial-recognition"):
-    HOME += "/Desktop/facial-recognition"
-  else:
-    raise FileNotFoundError("facial-recognition repository not found")
-
-  img_dir = HOME + "/images/database/"
-
-  people = None
-  if os.path.exists(img_dir):
-    people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
 
 # TESTS
 class Tests(object):
