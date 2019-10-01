@@ -9,13 +9,6 @@ Unit testing for "facenet.py".
 
 from facenet import *
 
-def redump():
-  data = Preprocessing.retrieve_embeds(Paths.HOME + "/images/_processed.json", False)
-  with open("/images/encrypted.json", "w") as json_file:
-    json.dump(DataEncryption.encrypt_data(data), json_file, indent=4)
-  data = Preprocessing.retrieve_embeds(Paths.HOME + "/images/encrypted.json")
-  print(list(data.keys()))
-
 def compare_test(facenet):
   start = time.time()
 
