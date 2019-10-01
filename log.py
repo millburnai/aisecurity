@@ -34,18 +34,11 @@ except FileNotFoundError:
 
 try:
   database = mysql.connector.connect(
-<<<<<<< HEAD:log.py
       host="localhost",
       user="root",
       passwd="KittyCat123",
       database="LOG"
-=======
-    host="localhost",
-    user="root",
-    passwd="Blast314",
-    database="LOG"
->>>>>>> 3332b76036fa9c78fb9dc46b78b484a3917fca0b:logs/log.py
-  )
+      )
   cursor = database.cursor()
 except mysql.connector.errors.DatabaseError:
   warnings.warn("Database credentials missing or incorrect")

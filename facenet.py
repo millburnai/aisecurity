@@ -270,13 +270,8 @@ class FaceNet(object):
 
   # LOGGING
   @staticmethod
-<<<<<<< HEAD
-  def log_activity(is_recognized, best_match, frame):
-    get_path = lambda num: os.getenv("HOME") + "/Desktop/facial-recognition"+"/images/_suspicious/{}.jpg".format(num)
-=======
   def log_activity(is_recognized, best_match, frame, log_suspicious=True):
     get_path = lambda num: Paths.HOME + "/images/_suspicious/{}.jpg".format(num)
->>>>>>> 3332b76036fa9c78fb9dc46b78b484a3917fca0b
 
     log.rec_threshold = log.update_rec_threshold(is_recognized)
     log.unrec_threshold = log.update_unrec_threshold(is_recognized)
