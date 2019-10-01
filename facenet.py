@@ -155,7 +155,6 @@ class FaceNet(object):
 
   # REAL-TIME FACIAL RECOGNITION HELPER
   async def _real_time_recognize(self, width, height, use_log):
-    # TODO(22pilarskil): fill in code templates
     if use_log:
       self._log_init()
 
@@ -270,7 +269,7 @@ class FaceNet(object):
 
   # LOGGING
   @staticmethod
-  def log_activity(is_recognized, best_match, frame, log_suspicious=True):
+  def log_activity(is_recognized, best_match, frame, log_suspicious):
     get_path = lambda num: Paths.HOME + "/images/_suspicious/{}.jpg".format(num)
 
     log.rec_threshold = log.update_rec_threshold(is_recognized)
