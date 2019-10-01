@@ -271,7 +271,7 @@ class FaceNet(object):
   # LOGGING
   @staticmethod
   def log_activity(is_recognized, best_match, frame):
-    get_path = lambda num: Paths.HOME + "/images/_suspicious/{}.jpg".format(num)
+    get_path = lambda num: os.getenv("HOME") + "/Desktop/facial-recognition"+"/images/_suspicious/{}.jpg".format(num)
 
     log.rec_threshold = log.update_rec_threshold(is_recognized)
     log.unrec_threshold = log.update_unrec_threshold(is_recognized)
@@ -382,10 +382,10 @@ class Tests(object):
 
   @staticmethod
   def redump():
-    data = Preprocessing.retrieve_embeds(Paths.HOME + "/images/_processed.json", False)
+    data = Preprocessing.retrieve_embeds(os.getenv("HOME") + "/Desktop/facial-recognition"+"/images/_processed.json", False)
     with open("/images/encrypted.json", "w") as json_file:
       json.dump(DataEncryption.encrypt_data(data), json_file, indent=4)
-    data = Preprocessing.retrieve_embeds(Paths.HOME + "/images/encrypted.json")
+    data = Preprocessing.retrieve_embeds(os.getenv("HOME") + "/Desktop/facial-recognition"+"/images/encrypted.json")
     print(list(data.keys()))
 
   @staticmethod
@@ -393,7 +393,7 @@ class Tests(object):
     start = time.time()
 
     my_imgs = []
-    for person in Paths.HOME:
+    for person in os.getenv("HOME"):
       for index in range(len([f for f in os.listdir(Paths.img_dir + person) if not f.endswith(".DS_Store")])):
         my_imgs.append("{}{}".format(person, index))
 
@@ -408,16 +408,16 @@ class Tests(object):
 
   @staticmethod
   def recognize_test(facenet):
-    facenet.recognize(Paths.HOME + "/images/_test_images/ryan.jpg")
+    facenet.recognize(os.getenv("HOME") +"/Desktop/facial-recognition"+ "/images/_test_images/ryan.jpg")
 
   @staticmethod
   async def real_time_recognize_test(facenet, use_log=True):
     await facenet.real_time_recognize(use_log=use_log)
 
 if __name__ == "__main__":
-  facenet = FaceNet(Paths.HOME + "/models/facenet_keras.h5")
+  facenet = FaceNet(os.getenv("HOME") +"/Desktop/facial-recognition"+ "/models/facenet_keras.h5")
 
-  facenet.set_data(Preprocessing.retrieve_embeds(Paths.HOME + "/images/encrypted.json"))
+  facenet.set_data(Preprocessing.retrieve_embeds(os.getenv("HOME") +"/Desktop/facial-recognition"+ "/images/encrypted.json"))
 
   # facenet.show_embeds(encrypted=True)
-  facenet.real_time_recognize(use_log=False)
+  facenet.real_time_recognize(use_log=True)
