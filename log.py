@@ -1,5 +1,6 @@
 import mysql.connector
 from datetime import *
+import os
 '''
 import asyncio
 first = datetime.now()
@@ -12,6 +13,11 @@ print((first-datetime.now()).total_seconds())
 
 print(datetime.now().hour)
 '''
+yeet = "hi"
+rec_threshold = 0
+unrec_threshold = 0
+start_time = {}
+num_suspicious = len(os.listdir("/Users/michaelpilarski/Desktop/facial-recognition/images/suspicious"))
 
 mydb = mysql.connector.connect(
     host="localhost",
@@ -45,4 +51,4 @@ def suspiciousActivity(pathToImg):
   mycursor.execute("INSERT INTO Suspicious (path_to_img, date_, time_) VALUES (\'{}\', \'{}\', \'{}\')".format(pathToImg, date, time))
   mydb.commit()
 
-init()
+suspicious = getNow(True)
