@@ -21,6 +21,7 @@ from paths import Paths
 NEWLINE = os.linesep.encode("utf8")
 _KEY_FILES = {"name": Paths.HOME + "/_keys/_embedding_keys.txt",
               "embedding": Paths.HOME + "/_keys/_name_keys.txt"}
+
 _BIT_ENCRYPTION = 16
 
 # DECORATORS

@@ -416,8 +416,4 @@ class Tests(object):
 
 if __name__ == "__main__":
   facenet = FaceNet(Paths.HOME + "/models/facenet_keras.h5")
-
   facenet.set_data(Preprocessing.retrieve_embeds(Paths.HOME + "/images/encrypted.json"))
-
-  # facenet.show_embeds(encrypted=True)
-  facenet.real_time_recognize(use_log=False)
