@@ -30,7 +30,7 @@ try:
   database = mysql.connector.connect(
       host="localhost",
       user="root",
-      passwd="Blast314",
+      passwd="Blast314" if "ryan" in Paths.HOME else "KittyCat123",
       database="LOG"
       )
   cursor = database.cursor()
