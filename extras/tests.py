@@ -9,6 +9,7 @@ Unit testing for "facenet.py".
 
 from facenet import *
 
+# TESTS
 def compare_test(facenet):
   start = time.time()
 

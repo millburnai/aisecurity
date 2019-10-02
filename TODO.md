@@ -43,12 +43,11 @@ TensorFlow model: https://drive.google.com/file/d/1EXPBSXwTaqrSC0OhUdXNmKSh9qJUQ
 
 [x] Make log code object-oriented (i.e., integrate into FaceNet class as with the K-NN code). Fill in the not implemented functions (`FaceNet._log_init`, `FaceNet.log`) and use them in `FaceNet.real_time_recognize`.
 
-[ ] Update logging threshold (@orangese).
+[x] Update logging threshold (@orangese).
 
 ### [x] Encryption security with database (@orangese)
 
 AES encryption for JSON image database. 
-
 
 ## Features
 

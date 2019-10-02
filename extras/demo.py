@@ -22,6 +22,15 @@ try:
 except AttributeError:
   tf.logging.set_verbosity(tf.logging.ERROR)
 
+import sys
+try:
+  from extras.paths import Paths
+except ModuleNotFoundError:
+  print("Running in terminal")
+  from paths import Paths
+
+sys.path.insert(1, Paths.HOME)
+
 # ACTUAL DEMO
 import sys
 from paths import Paths
