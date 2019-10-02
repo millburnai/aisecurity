@@ -274,7 +274,7 @@ class FaceNet(object):
     log.update_current_logs(is_recognized, best_match, now)
 
     if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and now - log.unrec_last_logged > log.THRESHOLDS["cooldown"]:
-      path = Paths.HOME + "/images/_suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/suspicious")))
+      path = Paths.HOME + "/images/_suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/images/_suspicious")))
       cv2.imwrite(path, frame)
       log.log_suspicious(path)
       print("Suspicious activity logged")
