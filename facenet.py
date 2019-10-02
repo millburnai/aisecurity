@@ -30,7 +30,6 @@ from extras.paths import Paths
 from security.encryptions import DataEncryption
 from logs import log
 
-
 # DECORATORS
 def timer(message="Time elapsed"):
 
@@ -58,12 +57,6 @@ class FaceNet(object):
   def __init__(self, filepath):
     self.k_model = keras.models.load_model(filepath)
     self._data = None # must be filled in by user
-
-  @staticmethod
-  def _log_init():
-    log.init()
-    if log.suspicious is None:
-      log.suspicious = log.get_now(True)
 
   # MUTATORS
   def set_data(self, data):
@@ -157,7 +150,7 @@ class FaceNet(object):
   # REAL-TIME FACIAL RECOGNITION HELPER
   async def _real_time_recognize(self, width, height, use_log):
     if use_log:
-      self._log_init()
+      log.init(flush=True)
 
     detector = MTCNN()
     cap = cv2.VideoCapture(0)
@@ -193,7 +186,7 @@ class FaceNet(object):
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
 
           if use_log:
-            self.log_activity(is_recognized, best_match, frame, log_suspicious=False)
+            self.log_activity(is_recognized, best_match)
           
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
@@ -270,19 +263,21 @@ class FaceNet(object):
 
   # LOGGING
   @staticmethod
-  def log_activity(is_recognized, best_match, frame, log_suspicious):
-    get_path = lambda num: Paths.HOME + "/images/_suspicious/{}.jpg".format(num)
+  def log_activity(is_recognized, best_match):
+    get_percent_same = lambda l: (len(recognized_people) - len(set(recognized_people))) / len(recognized_people)
+    get_mode = lambda l: max(set(l), key=l.count)
 
-    log.rec_threshold = log.update_rec_threshold(is_recognized)
-    log.unrec_threshold = log.update_unrec_threshold(is_recognized)
+    now = time.time()
 
-    if log.unrec_threshold > log.THRESHOLD and (log.get_now(True) - log.suspicious).total_seconds() > log.THRESHOLD:
-      if log_suspicious:
-        path = get_path(log.num_suspicious)
-        cv2.imwrite(path, frame)
-        log.add_suspicious(path)
-    elif log.rec_threshold > log.THRESHOLD and log.verify_repeat(best_match):
-      log.add_transaction(best_match)
+    if log.num_recognized >= log.THRESHOLDS["num_recognized"] and now - log.last_logged > log.THRESHOLDS["cooldown"]:
+      recognized_people = list(log.current_log.keys())
+
+      if get_percent_same(recognized_people) <= log.THRESHOLDS["percent_same"]:
+        log.log_person(get_mode(recognized_people), times=list(log.current_log.values()))
+
+    elif is_recognized:
+      log.current_log[best_match] = now
+      log.num_recognized += 1
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):

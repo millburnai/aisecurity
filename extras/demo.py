@@ -21,6 +21,9 @@ try:
   tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 except AttributeError:
   tf.logging.set_verbosity(tf.logging.ERROR)
+#
+# import sys
+# sys.path.insert(0, ["/home/ryan/PycharmProjects/facial-recognition"])
 
 # ACTUAL DEMO
 from facenet import *

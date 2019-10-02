@@ -7,12 +7,72 @@ MySQL logging handling.
 
 """
 
+import time
 import warnings
-import os
-from datetime import *
 
 import mysql.connector
+
 from extras.paths import Paths
+
+
+# SETUP
+THRESHOLDS = {"num_recognized": 10,
+              "percent_same": 0.2,
+              "cooldown": 10}
+
+num_recognized = 0
+current_log = {}
+last_logged = 0.
+
+try:
+  database = mysql.connector.connect(
+      host="localhost",
+      user="root",
+      passwd="Blast314",
+      database="LOG"
+      )
+  cursor = database.cursor()
+except mysql.connector.errors.DatabaseError:
+  warnings.warn("Database credentials missing or incorrect")
+
+# LOGGING INIT AND HELPERS
+def init(flush=False):
+  cursor.execute("USE LOG;")
+  database.commit()
+
+  if flush:
+    instructions = open(Paths.HOME + "/logs/drop.sql", "r")
+    for cmd in instructions:
+      if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"): # allows for docstrings
+        cursor.execute(cmd)
+        database.commit()
+
+def get_now(seconds):
+  date_and_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(seconds))
+  return date_and_time.split(" ")
+
+def get_id(name):
+  # will be filled in later
+  return 00000
+
+# LOGGING FUNCTIONS
+def log_person(student_name, times):
+  add = "INSERT INTO Transactions (student_id, student_name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
+    get_id(student_name), student_name, *get_now(sum(times) / len(times)))
+  cursor.execute(add)
+  database.commit()
+
+  global last_logged
+  last_logged = time.time()
+
+  _flush_current()
+
+def _flush_current():
+  global current_log, num_recognized
+  current_log = {}
+  num_recognized = 0
+
+"""
 
 # SETUP
 THRESHOLD = 15
@@ -21,7 +81,7 @@ rec_threshold = 0
 unrec_threshold = 0
 start_time = {}
 
-suspicious = None
+suspicious = get_now(True)
 current_match = None
 transaction_id = 0
 num_suspicious = 0
@@ -89,7 +149,7 @@ def add_transaction(student_name):
   transaction_id += 1
 
 def add_suspicious(path):
-  add = "INSERT INTO Suspicious (path_to_img, date_, time_) VALUES ('{}', '{}', '{}')".format(path, *get_now())
+  add = "INSERT INTO Suspicious (path_to_img, date, time) VALUES ('{}', '{}', '{}')".format(path, *get_now())
   cursor.execute(add)
   database.commit()
 
@@ -97,3 +157,5 @@ def add_suspicious(path):
   transaction_id += 1
   num_suspicious += 1
   suspicious = get_now(True)
+  
+"""
