@@ -21,9 +21,15 @@ try:
   tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 except AttributeError:
   tf.logging.set_verbosity(tf.logging.ERROR)
-#
-# import sys
-# sys.path.insert(0, ["/home/ryan/PycharmProjects/facial-recognition"])
+
+import sys
+try:
+  from extras.paths import Paths
+except ModuleNotFoundError:
+  print("Running in terminal")
+  from paths import Paths
+
+sys.path.insert(1, Paths.HOME)
 
 # ACTUAL DEMO
 from facenet import *
