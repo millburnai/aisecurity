@@ -36,7 +36,7 @@ try:
   database = mysql.connector.connect(
       host="localhost",
       user="root",
-      passwd="KittyCat123",
+      passwd="Blast314",
       database="LOG"
       )
   cursor = database.cursor()

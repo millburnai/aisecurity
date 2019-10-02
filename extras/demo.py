@@ -23,6 +23,9 @@ except AttributeError:
   tf.logging.set_verbosity(tf.logging.ERROR)
 
 # ACTUAL DEMO
+import sys
+from paths import Paths
+sys.path.insert(1, Paths.HOME)
 from facenet import *
 
 print("Loading facial recognition system...")
