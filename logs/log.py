@@ -13,22 +13,26 @@ import warnings
 import mysql.connector
 
 from extras.paths import Paths
+from datetime import datetime
 
 
 # SETUP
 THRESHOLDS = {"num_recognized": 10,
               "percent_same": 0.2,
-              "cooldown": 10}
+              "cooldown": 10, 
+              "num_unrecognized": 5}
 
 num_recognized = 0
+num_unrecognized = 0
 current_log = {}
-last_logged = 0.
+unrec_last_logged = datetime.now()
+rec_last_logged = datetime.now()
 
 try:
   database = mysql.connector.connect(
       host="localhost",
       user="root",
-      passwd="Blast314",
+      passwd="KittyCat123",
       database="LOG"
       )
   cursor = database.cursor()
@@ -56,21 +60,45 @@ def get_id(name):
   return 00000
 
 # LOGGING FUNCTIONS
+def get_now_liam(compare=False):
+  now = datetime.now()
+  if compare:
+    return now
+  else:
+    time = datetime.strptime("{}:{}:{}".format(now.hour, now.minute, now.second), "%H:%M:%S")
+    date = datetime.strptime("{}/{}/{}".format(now.day, now.month, now.year), "%d/%m/%Y")
+    return date, time
+
 def log_person(student_name, times):
   add = "INSERT INTO Transactions (student_id, student_name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
     get_id(student_name), student_name, *get_now(sum(times) / len(times)))
   cursor.execute(add)
   database.commit()
 
-  global last_logged
-  last_logged = time.time()
+  global rec_last_logged
+  rec_last_logged = datetime.now()
 
   _flush_current()
 
-def _flush_current():
-  global current_log, num_recognized
-  current_log = {}
-  num_recognized = 0
+def log_suspicious(path_to_img):
+	date, time = get_now_liam()
+	add = "INSERT INTO Suspicious (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(path_to_img, date, time)
+	cursor.execute(add)
+	database.commit()
+	_flush_current(person=False)
+	global unrec_last_logged
+	unrec_last_logged = datetime.now()
+
+  
+
+def _flush_current(person=True):
+  if person:
+	  global current_log, num_recognized
+	  current_log = {}
+	  num_recognized = 0
+  else:
+  	global num_unrecognized
+  	num_unrecognized = 0
 
 """
 

@@ -25,6 +25,7 @@ from skimage.transform import resize
 from sklearn import neighbors
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
+from datetime import datetime
 
 from extras.paths import Paths
 from security.encryptions import DataEncryption
@@ -186,7 +187,7 @@ class FaceNet(object):
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
 
           if use_log:
-            self.log_activity(is_recognized, best_match)
+            self.log_activity(is_recognized, best_match, frame)
           
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
@@ -198,6 +199,7 @@ class FaceNet(object):
 
       else:
         print("No face detected")
+        log._flush_current()
 
       cv2.imshow("CSII AI facial recognition v0.1", frame)
 
@@ -262,22 +264,40 @@ class FaceNet(object):
         break
 
   # LOGGING
+
+
   @staticmethod
-  def log_activity(is_recognized, best_match):
+  def log_activity(is_recognized, best_match, frame):
     get_percent_same = lambda l: (len(recognized_people) - len(set(recognized_people))) / len(recognized_people)
     get_mode = lambda l: max(set(l), key=l.count)
 
-    now = time.time()
+    now = datetime.now()
 
-    if log.num_recognized >= log.THRESHOLDS["num_recognized"] and now - log.last_logged > log.THRESHOLDS["cooldown"]:
+    if is_recognized:
+      log.current_log[best_match] = now
+      log.num_recognized += 1
+      log.num_unrecognized = 0
+    else:
+     log.num_unrecognized += 1
+     log.num_recognized = 0
+
+
+    if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and (now - log.unrec_last_logged).total_seconds() > log.THRESHOLDS["cooldown"]:
+      print((now-log.unrec_last_logged).total_seconds())
+      num_suspicious = len(os.listdir(Paths.HOME + "/suspicious"))
+      path = Paths.HOME+"/suspicious/{}.jpg".format(num_suspicious)
+      cv2.imwrite(path, frame)
+      log.log_suspicious(path)
+      print("sus")
+
+
+    if log.num_recognized >= log.THRESHOLDS["num_recognized"] and (now - log.rec_last_logged).total_seconds() > log.THRESHOLDS["cooldown"]:
       recognized_people = list(log.current_log.keys())
 
       if get_percent_same(recognized_people) <= log.THRESHOLDS["percent_same"]:
         log.log_person(get_mode(recognized_people), times=list(log.current_log.values()))
+      print("people")
 
-    elif is_recognized:
-      log.current_log[best_match] = now
-      log.num_recognized += 1
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
