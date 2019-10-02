@@ -23,8 +23,8 @@ THRESHOLDS = {"num_recognized": 10,
 num_recognized = 0
 num_unrecognized = 0
 current_log = {}
-unrec_last_logged = time.time() - 2.0 # two seconds before anything can be logged
-rec_last_logged = time.time() - 2.0
+unrec_last_logged = time.time() - 3.0 # three seconds before anything can be logged
+rec_last_logged = time.time() - 3.0
 
 try:
   database = mysql.connector.connect(
