@@ -264,40 +264,27 @@ class FaceNet(object):
         break
 
   # LOGGING
-
-
   @staticmethod
   def log_activity(is_recognized, best_match, frame):
-    get_percent_same = lambda l: (len(recognized_people) - len(set(recognized_people))) / len(recognized_people)
+    get_percent_diff = lambda l: (len(recognized_people) - len(set(recognized_people))) / len(recognized_people)
     get_mode = lambda l: max(set(l), key=l.count)
 
-    now = datetime.now()
+    now = time.time()
 
-    if is_recognized:
-      log.current_log[best_match] = now
-      log.num_recognized += 1
-      log.num_unrecognized = 0
-    else:
-     log.num_unrecognized += 1
-     log.num_recognized = 0
+    log.update_current_logs(is_recognized, best_match, now)
 
-
-    if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and (now - log.unrec_last_logged).total_seconds() > log.THRESHOLDS["cooldown"]:
-      print((now-log.unrec_last_logged).total_seconds())
-      num_suspicious = len(os.listdir(Paths.HOME + "/suspicious"))
-      path = Paths.HOME+"/suspicious/{}.jpg".format(num_suspicious)
+    if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and now - log.unrec_last_logged > log.THRESHOLDS["cooldown"]:
+      path = Paths.HOME + "/suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/suspicious")))
       cv2.imwrite(path, frame)
       log.log_suspicious(path)
-      print("sus")
+      print("Suspicious activity logged")
 
-
-    if log.num_recognized >= log.THRESHOLDS["num_recognized"] and (now - log.rec_last_logged).total_seconds() > log.THRESHOLDS["cooldown"]:
+    if log.num_recognized >= log.THRESHOLDS["num_recognized"] and now - log.rec_last_logged > log.THRESHOLDS["cooldown"]:
       recognized_people = list(log.current_log.keys())
 
-      if get_percent_same(recognized_people) <= log.THRESHOLDS["percent_same"]:
+      if get_percent_diff(recognized_people) <= log.THRESHOLDS["percent_diff"]:
         log.log_person(get_mode(recognized_people), times=list(log.current_log.values()))
-      print("people")
-
+        print("Regular activity logged")
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
