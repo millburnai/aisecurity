@@ -7,31 +7,26 @@ Demonstration of facial recognition system.
 
 """
 
-# SETUP AND ERROR HANDLING
+# SETUP
+import sys
 import os
+
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
+# ERROR HANDLING
 import warnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
 warnings.simplefilter(action="ignore", category=UserWarning)
 warnings.simplefilter(action="ignore", category=RuntimeWarning)
 
-
-"""
-
-"demo.py"
-
-Facial recognition demonstration.
-
-"""
-
-# SETUP AND ERROR HANDLING
 import tensorflow as tf
+
 try:
   tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 except AttributeError:
   tf.logging.set_verbosity(tf.logging.ERROR)
 
+# PATH SETUP
 try:
   # for Pycharm
   from extras.paths import Paths
@@ -44,14 +39,15 @@ except ModuleNotFoundError:
 # ACTUAL DEMO
 from facenet import *
 
-cprint("Loading facial recognition system", attrs=["bold"], end="")
+cprint("\nLoading facial recognition system", attrs=["bold"], end="")
 cprint("...", attrs=["bold", "blink"])
 facenet = FaceNet(Paths.HOME + "/models/facenet_keras.h5")
 
-cprint("Loading encrypted database", attrs=["bold"], end="")
+cprint("\nLoading encrypted database", attrs=["bold"], end="")
 cprint("...", attrs=["bold", "blink"])
-facenet.set_data(Preprocessing.retrieve_embeds(Paths.HOME + "/images/encrypted.json"))
+facenet.set_data(Preprocessing.retrieve_embeds(Paths.HOME + "/database/encrypted.json"))
 
-input("Press ENTER to continue:")
+input("\nPress ENTER to continue:")
 
+print("\n")
 facenet.real_time_recognize(use_log=True)

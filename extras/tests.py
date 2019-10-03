@@ -28,7 +28,7 @@ def compare_test(facenet):
   print("Average time per comparison: {}s".format(round((time.time() - start) / count, 3)))
 
 def recognize_test(facenet):
-  facenet.recognize(Paths.HOME + "/images/_test_images/ryan.jpg")
+  facenet.recognize(Paths.HOME + "/database/_test_images/ryan.jpg")
 
 async def real_time_recognize_test(facenet, use_log=True):
   await facenet.real_time_recognize(use_log=use_log)

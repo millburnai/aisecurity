@@ -278,7 +278,7 @@ class FaceNet(object):
     log.update_current_logs(is_recognized, best_match, l2_dist)
 
     if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and cooldown_ok(log.unrec_last_logged) and log_susp:
-      path = Paths.HOME + "/images/_suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/images/_suspicious")))
+      path = Paths.HOME + "/database/_suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/database/_suspicious")))
       cv2.imwrite(path, frame)
       log.log_suspicious(path)
       cprint("Suspicious activity logged", color="red", attrs=["bold"])
@@ -288,7 +288,6 @@ class FaceNet(object):
         recognized_person = get_mode(log.current_log)
         log.log_person(recognized_person, times=log.current_log[recognized_person])
         cprint("Regular activity logged", color="green", attrs=["bold"])
-        print(time.time() - log.rec_last_logged)
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):

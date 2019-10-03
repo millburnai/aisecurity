@@ -18,7 +18,7 @@ class Paths(object):
   else:
     raise FileNotFoundError("facial-recognition repository not found")
 
-  img_dir = HOME + "/images/database/"
+  img_dir = HOME + "/database/database/"
 
   people = None
   if os.path.exists(img_dir):
