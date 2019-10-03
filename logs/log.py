@@ -20,7 +20,8 @@ THRESHOLDS = {
   "num_unrecognized": 25,
   "percent_diff": 0.2,
   "cooldown": 10,
-  "time_since_previous": 3
+  "time_since_previous": 3,
+  "maximum_error": 1
 }
 
 num_recognized = 0
@@ -63,8 +64,9 @@ def get_id(name):
 def get_percent_diff(best_match):
   return 1.0 - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
 
-def update_current_logs(is_recognized, best_match, now):
-  if is_recognized:
+def update_current_logs(is_recognized, best_match, l2_dist):
+  if is_recognized and l2_dist <= THRESHOLDS["maximum_error"]:
+    now = time.time()
     global current_log, num_recognized, num_unrecognized
 
     if best_match not in current_log:
@@ -75,9 +77,9 @@ def update_current_logs(is_recognized, best_match, now):
     if len(current_log[best_match]) == 1 or get_percent_diff(best_match) <= THRESHOLDS["percent_diff"]:
       num_recognized += 1
       num_unrecognized = 0
-    else:
-      num_unrecognized += 1
-      num_recognized = 0
+  else:
+    num_unrecognized += 1
+    num_recognized = 0
 
 # LOGGING FUNCTIONS
 def log_person(student_name, times):
@@ -86,7 +88,7 @@ def log_person(student_name, times):
   cursor.execute(add)
   database.commit()
 
-  flush_current()
+  flush_current(regular_activity=True)
 
 def log_suspicious(path_to_img):
   add = "INSERT INTO Suspicious (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
@@ -94,15 +96,14 @@ def log_suspicious(path_to_img):
   cursor.execute(add)
   database.commit()
 
-  flush_current(is_recognized=False)
+  flush_current(regular_activity=False)
 
-def flush_current(is_recognized=True):
-  if is_recognized:
-    global current_log, num_recognized, rec_last_logged
+def flush_current(regular_activity=True):
+  global current_log, num_recognized, rec_last_logged, num_unrecognized, unrec_last_logged
+  if regular_activity:
     current_log = {}
     num_recognized = 0
     rec_last_logged = time.time()
   else:
-    global num_unrecognized, unrec_last_logged
     num_unrecognized = 0
     unrec_last_logged = time.time()

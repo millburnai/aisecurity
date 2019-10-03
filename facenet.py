@@ -194,7 +194,7 @@ class FaceNet(object):
           FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness=1)
 
           if use_log:
-            self.log_activity(is_recognized, best_match, frame, log_susp=True)
+            self.log_activity(is_recognized, best_match, frame, l2_dist, log_susp=True)
 
       else:
         log.flush_current()
@@ -264,19 +264,18 @@ class FaceNet(object):
 
   # LOGGING
   @staticmethod
-  def log_activity(is_recognized, best_match, frame, log_susp=True):
-    cooldown_ok = lambda t: now - t > log.THRESHOLDS["cooldown"]
+  def log_activity(is_recognized, best_match, frame, l2_dist, log_susp=True):
+    print(time.time()-log.unrec_last_logged)
+    cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
 
-    def get_mode(d):
+    def get_mode(d): #gets highest number in current log
       max_key = list(d.keys())[0]
       for key in d:
         if len(d[key]) > len(d[max_key]):
           max_key = key
       return max_key
 
-    now = time.time()
-
-    log.update_current_logs(is_recognized, best_match, now)
+    log.update_current_logs(is_recognized, best_match, l2_dist)
 
     if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and cooldown_ok(log.unrec_last_logged) and log_susp:
       path = Paths.HOME + "/images/_suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/images/_suspicious")))
