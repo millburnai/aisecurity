@@ -15,16 +15,19 @@ import mysql.connector
 from extras.paths import Paths
 
 # SETUP
-THRESHOLDS = {"num_recognized": 10,
-              "num_unrecognized": 5,
-              "percent_diff": 0.2,
-              "cooldown": 10}
+THRESHOLDS = {
+  "num_recognized": 3,
+  "num_unrecognized": 25,
+  "percent_diff": 0.2,
+  "cooldown": 10,
+  "time_since_previous": 3
+}
 
 num_recognized = 0
 num_unrecognized = 0
 current_log = {}
-unrec_last_logged = time.time() - 3.0 # three seconds before anything can be logged
-rec_last_logged = time.time() - 3.0
+unrec_last_logged = time.time()
+rec_last_logged = time.time()
 
 try:
   database = mysql.connector.connect(
@@ -55,18 +58,26 @@ def get_now(seconds):
 
 def get_id(name):
   # will be filled in later
-  return str(00000)
+  return "00000"
+
+def get_percent_diff(best_match):
+  return 1.0 - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
 
 def update_current_logs(is_recognized, best_match, now):
-  global current_log, num_recognized, num_unrecognized
-
   if is_recognized:
-    current_log[best_match] = now
-    num_recognized += 1
-    num_unrecognized = 0
-  else:
-    num_unrecognized += 1
-    num_recognized = 0
+    global current_log, num_recognized, num_unrecognized
+
+    if best_match not in current_log:
+      current_log[best_match] = [now]
+    else:
+      current_log[best_match].append(now)
+
+    if len(current_log[best_match]) == 1 or get_percent_diff(best_match) <= THRESHOLDS["percent_diff"]:
+      num_recognized += 1
+      num_unrecognized = 0
+    else:
+      num_unrecognized += 1
+      num_recognized = 0
 
 # LOGGING FUNCTIONS
 def log_person(student_name, times):
@@ -75,10 +86,7 @@ def log_person(student_name, times):
   cursor.execute(add)
   database.commit()
 
-  global rec_last_logged
-  rec_last_logged = time.time()
-
-  _flush_current()
+  flush_current()
 
 def log_suspicious(path_to_img):
   add = "INSERT INTO Suspicious (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
@@ -86,16 +94,15 @@ def log_suspicious(path_to_img):
   cursor.execute(add)
   database.commit()
 
-  global unrec_last_logged
-  unrec_last_logged = time.time()
+  flush_current(is_recognized=False)
 
-  _flush_current(is_recognized=False)
-
-def _flush_current(is_recognized=True):
+def flush_current(is_recognized=True):
   if is_recognized:
-    global current_log, num_recognized
+    global current_log, num_recognized, rec_last_logged
     current_log = {}
     num_recognized = 0
+    rec_last_logged = time.time()
   else:
-    global num_unrecognized
+    global num_unrecognized, unrec_last_logged
     num_unrecognized = 0
+    unrec_last_logged = time.time()

@@ -22,19 +22,17 @@ try:
 except AttributeError:
   tf.logging.set_verbosity(tf.logging.ERROR)
 
-import sys
 try:
+  # for Pycharm
   from extras.paths import Paths
 except ModuleNotFoundError:
-  print("Running in terminal")
+  # for terminal
+  import sys
   from paths import Paths
-
-sys.path.insert(1, Paths.HOME)
+  sys.path.insert(1, Paths.HOME)
 
 # ACTUAL DEMO
 import sys
-from paths import Paths
-sys.path.insert(1, Paths.HOME)
 from facenet import *
 
 print("Loading facial recognition system...")

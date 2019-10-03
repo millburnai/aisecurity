@@ -186,9 +186,6 @@ class FaceNet(object):
 
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
 
-          if use_log:
-            self.log_activity(is_recognized, best_match, frame)
-          
           corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
           box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
 
@@ -197,9 +194,12 @@ class FaceNet(object):
 
           FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness=1)
 
+          if use_log:
+            self.log_activity(is_recognized, best_match, frame, log_susp=True)
+
       else:
+        log.flush_current()
         print("No face detected")
-        log._flush_current()
 
       cv2.imshow("CSII AI facial recognition v0.1", frame)
 
@@ -265,25 +265,30 @@ class FaceNet(object):
 
   # LOGGING
   @staticmethod
-  def log_activity(is_recognized, best_match, frame):
-    get_percent_diff = lambda l: (len(recognized_people) - len(set(recognized_people))) / len(recognized_people)
-    get_mode = lambda l: max(set(l), key=l.count)
+  def log_activity(is_recognized, best_match, frame, log_susp=True):
+    cooldown_ok = lambda t: now - t > log.THRESHOLDS["cooldown"]
+
+    def get_mode(d):
+      max_key = list(d.keys())[0]
+      for key in d:
+        if len(d[key]) > len(d[max_key]):
+          max_key = key
+      return max_key
 
     now = time.time()
 
     log.update_current_logs(is_recognized, best_match, now)
 
-    if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and now - log.unrec_last_logged > log.THRESHOLDS["cooldown"]:
+    if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and cooldown_ok(log.unrec_last_logged) and log_susp:
       path = Paths.HOME + "/images/_suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/images/_suspicious")))
       cv2.imwrite(path, frame)
       log.log_suspicious(path)
       print("Suspicious activity logged")
 
-    if log.num_recognized >= log.THRESHOLDS["num_recognized"] and now - log.rec_last_logged > log.THRESHOLDS["cooldown"]:
-      recognized_people = list(log.current_log.keys())
-
-      if get_percent_diff(recognized_people) <= log.THRESHOLDS["percent_diff"]:
-        log.log_person(get_mode(recognized_people), times=list(log.current_log.values()))
+    if log.num_recognized >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.rec_last_logged):
+      if log.get_percent_diff(best_match) <= log.THRESHOLDS["percent_diff"]:
+        recognized_person = get_mode(log.current_log)
+        log.log_person(recognized_person, times=log.current_log[recognized_person])
         print("Regular activity logged")
 
 # IMAGE PREPROCESSING
