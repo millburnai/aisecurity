@@ -32,13 +32,14 @@ except ModuleNotFoundError:
   sys.path.insert(1, Paths.HOME)
 
 # ACTUAL DEMO
-import sys
 from facenet import *
 
-print("Loading facial recognition system...")
+cprint("Loading facial recognition system", attrs=["bold"], end="")
+cprint("...", attrs=["bold", "blink"])
 facenet = FaceNet(Paths.HOME + "/models/facenet_keras.h5")
 
-print("Loading encrypted database...")
+cprint("Loading encrypted database", attrs=["bold"], end="")
+cprint("...", attrs=["bold", "blink"])
 facenet.set_data(Preprocessing.retrieve_embeds(Paths.HOME + "/images/encrypted.json"))
 
 fig = plt.gcf()
