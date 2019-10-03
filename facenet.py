@@ -188,7 +188,7 @@ class FaceNet(object):
           try:
             is_recognized, best_match, l2_dist = self._recognize(frame, faces=face, margin=self.HYPERPARAMS["margin"])
             print("L2 distance: {} ({})".format(l2_dist, best_match))
-          except ValueError:
+          except tf.errors.InvalidArgumentError:
             print("Image refresh rate too high")
             continue
 
