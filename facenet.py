@@ -23,7 +23,6 @@ import keras
 from keras import backend as K
 import numpy as np
 import cv2
-from skimage.transform import resize
 from sklearn import neighbors
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
@@ -50,9 +49,12 @@ def timer(message="Time elapsed"):
 class FaceNet(object):
 
   # HYPERPARAMETERS
-  ALPHA = 1.0
-  MARGIN = 10
-  TRANSPARENCY = 0.5
+  HYPERPARAMS = {
+    "alpha": 1.0,
+    "margin": 10,
+    "clear": 0.5,
+    "update_alpha": 5
+  }
 
   # INITS
   @timer(message="Model load time")
@@ -117,7 +119,7 @@ class FaceNet(object):
     assert self._data, "data must be provided"
 
     dist = self.l2_dist(a, b)
-    is_same = dist <= FaceNet.ALPHA
+    is_same = dist <= FaceNet.HYPERPARAMS["alpha"]
 
     if verbose:
       print("L2 distance: {} -> {} and {} are the same person: {}".format(dist, a, b, is_same))
@@ -134,7 +136,7 @@ class FaceNet(object):
 
     l2_dist = self.l2_dist(embedding, self._data[best_match + "0"])
 
-    return int(l2_dist <= FaceNet.ALPHA), best_match, l2_dist
+    return int(l2_dist <= FaceNet.HYPERPARAMS["alpha"]), best_match, l2_dist
 
   # FACIAL RECOGNITION
   def recognize(self, img, verbose=True):
@@ -151,7 +153,7 @@ class FaceNet(object):
     return is_recognized, best_match, l2_dist
 
   # REAL-TIME FACIAL RECOGNITION HELPER
-  async def _real_time_recognize(self, width, height, use_log):
+  async def _real_time_recognize(self, width, height, use_log, adaptive_alpha):
     if use_log:
       log.init(flush=True)
 
@@ -165,49 +167,57 @@ class FaceNet(object):
     radius = round((1e-6 * width * height + 1.5) / 2.)
     font_size = 4.5e-7 * width * height + 0.5
     # works for 6.25e4 pixel video cature to 1e6 pixel video capture
-    # TODO: make font_size more adaptive (use cv2.getTextSize())
 
     missed_frames = 0
-    average = 0
-    testing = 0
+    l2_dists = []
+
     while True:
       _, frame = cap.read()
       result = detector.detect_faces(frame)
-
 
       if result:
         overlay = frame.copy()
 
         for person in result:
+          # using MTCNN to detect faces
           face = person["box"]
           key_points = person["keypoints"]
           x, y, height, width = face
 
+          # facial recognition
           try:
-            is_recognized, best_match, l2_dist = self._recognize(frame, faces=face, margin=self.MARGIN)
+            is_recognized, best_match, l2_dist = self._recognize(frame, faces=face, margin=self.HYPERPARAMS["margin"])
             print("L2 distance: {} ({})".format(l2_dist, best_match))
           except ValueError:
             print("Image refresh rate too high")
             continue
-          if testing < 10 and is_recognized:
-            testing += 1
-            average += l2_dist
-          elif testing == 10:
-            self.ALPHA = (average/10)+.2
 
+          # draw boxes, lines, and text
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
 
-          corner = (x - self.MARGIN // 2, y - self.MARGIN // 2)
-          box = (x + height + self.MARGIN // 2, y + width + self.MARGIN // 2)
+          corner = (x - self.HYPERPARAMS["margin"] // 2, y - self.HYPERPARAMS["margin"] // 2)
+          box = (x + height + self.HYPERPARAMS["margin"] // 2, y + width + self.HYPERPARAMS["margin"] // 2)
 
           FaceNet.add_key_points(overlay, key_points, radius, color, line_thickness)
-          cv2.addWeighted(overlay, 1.0 - self.TRANSPARENCY, frame, self.TRANSPARENCY, 0, frame)
+          cv2.addWeighted(overlay, 1.0 - self.HYPERPARAMS["clear"], frame, self.HYPERPARAMS["clear"], 0, frame)
 
           text = best_match if is_recognized else ""
           FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
 
+          # log activity
           if use_log:
-            self.log_activity(is_recognized, best_match, frame, log_susp=True)
+            self.log_activity(is_recognized, best_match, frame, num_faces = len(result), log_susp=True)
+
+          # adaptive recognition threshold
+          if is_recognized and adaptive_alpha:
+            l2_dists.append(l2_dist)
+            if len(l2_dists) % round(self.HYPERPARAMS["update_alpha"]) == 0:
+              # update alpha changes proportionally to the magnitude of hte update
+              updated = 0.9 * self.HYPERPARAMS["alpha"] + 0.1 * (sum(l2_dists) / len(l2_dists) + 0.2)
+              self.HYPERPARAMS["update_alpha"] *= 1 + (updated / self.HYPERPARAMS["alpha"])
+              # alpha is a weighted average of the previous alpha and the new alpha
+              self.HYPERPARAMS["alpha"] = updated
+              l2_dists = []
 
       else:
         missed_frames += 1
@@ -233,7 +243,7 @@ class FaceNet(object):
       await recognize_func(*args, **kwargs)
 
     loop = asyncio.new_event_loop()
-    task = loop.create_task(async_helper(self._real_time_recognize, width=width, height=height, use_log=use_log))
+    task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log, adaptive_alpha=True))
     loop.run_until_complete(task)
 
   # DISPLAYING
@@ -280,10 +290,10 @@ class FaceNet(object):
 
   # LOGGING
   @staticmethod
-  def log_activity(is_recognized, best_match, frame, log_susp=True):
+  def log_activity(is_recognized, best_match, frame, num_faces, log_susp=True):
     cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
 
-    def get_mode(d): #gets highest number in current log
+    def get_mode(d): #gets most frequent person in current log
       max_key = list(d.keys())[0]
       for key in d:
         if len(d[key]) > len(d[max_key]):
@@ -292,11 +302,12 @@ class FaceNet(object):
 
     log.update_current_logs(is_recognized, best_match)
 
-    if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and cooldown_ok(log.unrec_last_logged) and log_susp:
-      path = Paths.HOME + "/database/_suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/database/_suspicious")))
-      cv2.imwrite(path, frame)
-      log.log_suspicious(path)
-      cprint("Suspicious activity logged", color="red", attrs=["bold"])
+    if num_faces < 2 and log_susp:
+      if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and cooldown_ok(log.unrec_last_logged):
+        path = Paths.HOME + "/database/_suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/database/_suspicious")))
+        cv2.imwrite(path, frame)
+        log.log_suspicious(path)
+        cprint("Suspicious activity logged", color="red", attrs=["bold"])
 
     if log.num_recognized >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.rec_last_logged):
       if log.get_percent_diff(best_match) <= log.THRESHOLDS["percent_diff"]:
@@ -344,16 +355,14 @@ class Preprocessing(object):
       x, y, width, height = faces
       cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
       resized = tf.image.resize_images(
-        images = cropped, 
+        images = cropped,
         size = (Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE),
         align_corners = True,
-        preserve_aspect_ratio = False,
-        )
-      resized = np.asarray(K.eval(resized))
-      return resized
+        preserve_aspect_ratio = False
+      )
+      return np.asarray(K.eval(resized))
 
     return np.array([np.asarray(align_img(path_or_img, faces=faces)) for path_or_img in paths_or_imgs])
-    
 
   @staticmethod
   def embed(facenet, paths_or_imgs, margin=15, batch_size=1, faces=None):

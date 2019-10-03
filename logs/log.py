@@ -16,8 +16,8 @@ from extras.paths import Paths
 
 # SETUP
 THRESHOLDS = {
-  "num_recognized": 3.0,
-  "num_unrecognized": 3.0,
+  "num_recognized": 3,
+  "num_unrecognized": 3,
   "percent_diff": 0.2,
   "cooldown": 10.0,
   "time_since_previous": 3.0,
