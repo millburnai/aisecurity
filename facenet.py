@@ -69,6 +69,7 @@ class FaceNet(object):
     def check_validity(data):
       for key in data.keys():
         assert isinstance(key, str), "data keys must be person names"
+        data[key] = np.asarray(data[key])
         is_vector = data[key].ndim < 2 or (1 in data[key].shape)
         assert isinstance(data[key], np.ndarray) and is_vector, "each data[key] must be a vectorized embedding"
       return data
@@ -359,12 +360,7 @@ class Preprocessing(object):
 
       x, y, width, height = faces
       cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
-      resized = tf.image.resize_images(
-        images = cropped,
-        size = (Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE),
-        align_corners = True,
-        preserve_aspect_ratio = False
-      )
+      resized = tf.image.resize(cropped, size=(Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE), align_corners=True)
       return np.asarray(K.eval(resized))
 
     return np.array([np.asarray(align_img(path_or_img, faces=faces)) for path_or_img in paths_or_imgs])
@@ -393,9 +389,9 @@ class Preprocessing(object):
 
   @staticmethod
   @timer(message="Data dumping time")
-  def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, overwrite=False):
+  def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False):
     people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
-    if not overwrite:
+    if not full_overwrite:
       old_embeds = Preprocessing.retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path)
       new_people = [person for person in people if person + "0" not in old_embeds.keys()]
       new_embeds = Preprocessing.load(facenet.get_facenet(), img_dir, people=new_people)
