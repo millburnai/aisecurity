@@ -206,18 +206,12 @@ class FaceNet(object):
 
           # log activity
           if use_log:
-            self.log_activity(is_recognized, best_match, frame, num_faces = len(result), log_susp=True)
+            self.log_activity(is_recognized, best_match, frame, num_faces=len(result), log_susp=True)
 
           # adaptive recognition threshold
           if is_recognized and adaptive_alpha:
             l2_dists.append(l2_dist)
-            if len(l2_dists) % round(self.HYPERPARAMS["update_alpha"]) == 0:
-              # update alpha changes proportionally to the magnitude of hte update
-              updated = 0.9 * self.HYPERPARAMS["alpha"] + 0.1 * (sum(l2_dists) / len(l2_dists) + 0.2)
-              self.HYPERPARAMS["update_alpha"] *= 1 + (updated / self.HYPERPARAMS["alpha"])
-              # alpha is a weighted average of the previous alpha and the new alpha
-              self.HYPERPARAMS["alpha"] = updated
-              l2_dists = []
+            l2_dists = self.update_alpha(l2_dists)
 
       else:
         missed_frames += 1
@@ -314,6 +308,17 @@ class FaceNet(object):
         recognized_person = get_mode(log.current_log)
         log.log_person(recognized_person, times=log.current_log[recognized_person])
         cprint("Regular activity logged", color="green", attrs=["bold"])
+
+  # ADAPTIVE ALPHA
+  def update_alpha(self, l2_dists):
+    if len(l2_dists) % round(self.HYPERPARAMS["update_alpha"]) == 0:
+      updated = 0.9 * self.HYPERPARAMS["alpha"] + 0.1 * (sum(l2_dists) / len(l2_dists) + 0.2)
+      # alpha is a weighted average of the previous alpha and the new alpha
+      self.HYPERPARAMS["update_alpha"] *= 1 + (updated / self.HYPERPARAMS["alpha"])
+      # update alpha changes proportionally to the magnitude of the update
+      self.HYPERPARAMS["alpha"] = updated
+      l2_dists = []
+    return l2_dists
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
