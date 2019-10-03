@@ -16,6 +16,7 @@ import os
 import time
 import functools
 from termcolor import cprint
+import tensorflow as tf
 
 import matplotlib.pyplot as plt
 import keras
@@ -108,7 +109,8 @@ class FaceNet(object):
     return np.linalg.norm(a - b)
 
   def predict(self, paths_or_imgs, batch_size=1, faces=None, margin=10):
-    return Preprocessing.embed(self.k_model, paths_or_imgs, batch_size=batch_size, faces=faces, margin=margin)
+    preprocessing =  Preprocessing.embed(self.k_model, paths_or_imgs, batch_size=batch_size, faces=faces, margin=margin)
+    return preprocessing
 
   # FACIAL COMPARISON
   def compare(self, a, b, verbose=True):
@@ -166,7 +168,8 @@ class FaceNet(object):
     # TODO: make font_size more adaptive (use cv2.getTextSize())
 
     missed_frames = 0
-
+    average = 0
+    testing = 0
     while True:
       _, frame = cap.read()
       result = detector.detect_faces(frame)
@@ -186,6 +189,11 @@ class FaceNet(object):
           except ValueError:
             print("Image refresh rate too high")
             continue
+          if testing < 10 and is_recognized:
+            testing += 1
+            average += l2_dist
+          elif testing == 10:
+            self.ALPHA = (average/10)+.2
 
           color = (0, 255, 0) if is_recognized else (0, 0, 255) # green if is_recognized else red
 
@@ -195,7 +203,8 @@ class FaceNet(object):
           FaceNet.add_key_points(overlay, key_points, radius, color, line_thickness)
           cv2.addWeighted(overlay, 1.0 - self.TRANSPARENCY, frame, self.TRANSPARENCY, 0, frame)
 
-          FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness=1)
+          text = best_match if is_recognized else ""
+          FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
 
           if use_log:
             self.log_activity(is_recognized, best_match, frame, log_susp=True)
@@ -334,19 +343,24 @@ class Preprocessing(object):
 
       x, y, width, height = faces
       cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
-      resized = resize(cropped, (Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE), mode="reflect")
+      resized = tf.image.resize_images(
+        images = cropped, 
+        size = (Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE),
+        align_corners = True,
+        preserve_aspect_ratio = False,
+        )
+      resized = np.asarray(K.eval(resized))
       return resized
 
-    return np.array([align_img(path_or_img, faces=faces) for path_or_img in paths_or_imgs])
+    return np.array([np.asarray(align_img(path_or_img, faces=faces)) for path_or_img in paths_or_imgs])
+    
 
   @staticmethod
   def embed(facenet, paths_or_imgs, margin=15, batch_size=1, faces=None):
     aligned_imgs = Preprocessing.whiten(Preprocessing.align_imgs(paths_or_imgs, margin, faces=faces))
     raw_embeddings = facenet.predict(aligned_imgs, batch_size=batch_size)
-
     l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
     normalized_embeddings = l2_normalize(raw_embeddings)
-
     return normalized_embeddings
 
   @staticmethod
