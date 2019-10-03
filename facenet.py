@@ -25,7 +25,6 @@ from skimage.transform import resize
 from sklearn import neighbors
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
-from datetime import datetime
 
 from extras.paths import Paths
 from security.encryptions import DataEncryption
