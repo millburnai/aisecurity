@@ -26,9 +26,11 @@ THRESHOLDS = {
 
 num_recognized = 0
 num_unrecognized = 0
+
+rec_last_logged = time.time() - THRESHOLDS["num_recognized"] + 0.1 # don't log for first 0.1 secs
+unrec_last_logged = time.time() - THRESHOLDS["num_unrecognized"] + 0.1
+
 current_log = {}
-unrec_last_logged = time.time()
-rec_last_logged = time.time()
 
 try:
   database = mysql.connector.connect(
@@ -69,9 +71,10 @@ def get_percent_diff(best_match):
   return 1.0 - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
 
 def update_current_logs(is_recognized, best_match, l2_dist):
+  global current_log, num_recognized, num_unrecognized
+
   if is_recognized and l2_dist <= THRESHOLDS["max_error"]:
     now = time.time()
-    global current_log, num_recognized, num_unrecognized
 
     if best_match not in current_log:
       current_log[best_match] = [now]
@@ -81,6 +84,7 @@ def update_current_logs(is_recognized, best_match, l2_dist):
     if len(current_log[best_match]) == 1 or get_percent_diff(best_match) <= THRESHOLDS["percent_diff"]:
       num_recognized += 1
       num_unrecognized = 0
+
   else:
     num_unrecognized += 1
     num_recognized = 0
