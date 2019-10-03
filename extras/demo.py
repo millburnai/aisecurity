@@ -16,6 +16,16 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 warnings.simplefilter(action="ignore", category=UserWarning)
 warnings.simplefilter(action="ignore", category=RuntimeWarning)
 
+
+"""
+
+"demo.py"
+
+Facial recognition demonstration.
+
+"""
+
+# SETUP AND ERROR HANDLING
 import tensorflow as tf
 try:
   tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
@@ -42,13 +52,6 @@ cprint("Loading encrypted database", attrs=["bold"], end="")
 cprint("...", attrs=["bold", "blink"])
 facenet.set_data(Preprocessing.retrieve_embeds(Paths.HOME + "/images/encrypted.json"))
 
-fig = plt.gcf()
-plt.imshow(imread(Paths.HOME + "/images/data_example.png"))
-plt.title("Example data point from database")
-plt.axis("off")
-fig.canvas.set_window_title("Facial recognition demo")
-plt.show()
-
-input("Press any key to continue:")
+input("Press ENTER to continue:")
 
 facenet.real_time_recognize(use_log=True)

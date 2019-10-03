@@ -288,6 +288,7 @@ class FaceNet(object):
         recognized_person = get_mode(log.current_log)
         log.log_person(recognized_person, times=log.current_log[recognized_person])
         cprint("Regular activity logged", color="green", attrs=["bold"])
+        print(time.time() - log.rec_last_logged)
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):

@@ -40,6 +40,7 @@ try:
       database="LOG"
       )
   cursor = database.cursor()
+
 except mysql.connector.errors.DatabaseError:
   warnings.warn("Database credentials missing or incorrect")
 
@@ -96,6 +97,9 @@ def log_person(student_name, times):
   cursor.execute(add)
   database.commit()
 
+  global rec_last_logged
+  rec_last_logged = time.time()
+
   flush_current(regular_activity=True)
 
 def log_suspicious(path_to_img):
@@ -104,14 +108,15 @@ def log_suspicious(path_to_img):
   cursor.execute(add)
   database.commit()
 
+  global unrec_last_logged
+  unrec_last_logged = time.time()
+
   flush_current(regular_activity=False)
 
 def flush_current(regular_activity=True):
-  global current_log, num_recognized, rec_last_logged, num_unrecognized, unrec_last_logged
+  global current_log, num_recognized, num_unrecognized
   if regular_activity:
     current_log = {}
     num_recognized = 0
-    rec_last_logged = time.time()
   else:
     num_unrecognized = 0
-    unrec_last_logged = time.time()
