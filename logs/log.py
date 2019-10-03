@@ -16,12 +16,12 @@ from extras.paths import Paths
 
 # SETUP
 THRESHOLDS = {
-  "num_recognized": 3,
-  "num_unrecognized": 25,
+  "num_recognized": 3.0,
+  "num_unrecognized": 25.0,
   "percent_diff": 0.2,
-  "cooldown": 10,
-  "time_since_previous": 3,
-  "maximum_error": 1
+  "cooldown": 10.0,
+  "time_since_previous": 3.0,
+  "max_error": 1.0
 }
 
 num_recognized = 0
@@ -42,7 +42,7 @@ except mysql.connector.errors.DatabaseError:
   warnings.warn("Database credentials missing or incorrect")
 
 # LOGGING INIT AND HELPERS
-def init(flush=False):
+def init(flush=False, thresholds=None):
   cursor.execute("USE LOG;")
   database.commit()
 
@@ -52,6 +52,10 @@ def init(flush=False):
       if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"): # allows for docstrings
         cursor.execute(cmd)
         database.commit()
+
+  if thresholds:
+    global THRESHOLDS
+    THRESHOLDS = {**THRESHOLDS, **thresholds} # combining and overwriting THRESHOLDS with thresholds param
 
 def get_now(seconds):
   date_and_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(seconds))
@@ -65,7 +69,7 @@ def get_percent_diff(best_match):
   return 1.0 - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
 
 def update_current_logs(is_recognized, best_match, l2_dist):
-  if is_recognized and l2_dist <= THRESHOLDS["maximum_error"]:
+  if is_recognized and l2_dist <= THRESHOLDS["max_error"]:
     now = time.time()
     global current_log, num_recognized, num_unrecognized
 

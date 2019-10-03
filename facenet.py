@@ -15,6 +15,7 @@ import json
 import os
 import time
 import functools
+from termcolor import cprint
 
 import matplotlib.pyplot as plt
 import keras
@@ -150,7 +151,7 @@ class FaceNet(object):
   # REAL-TIME FACIAL RECOGNITION HELPER
   async def _real_time_recognize(self, width, height, use_log):
     if use_log:
-      log.init(flush=True)
+      log.init(flush=True, thresholds={"max_error": self.ALPHA})
 
     detector = MTCNN()
     cap = cv2.VideoCapture(0)
@@ -265,7 +266,6 @@ class FaceNet(object):
   # LOGGING
   @staticmethod
   def log_activity(is_recognized, best_match, frame, l2_dist, log_susp=True):
-    print(time.time()-log.unrec_last_logged)
     cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
 
     def get_mode(d): #gets highest number in current log
@@ -281,13 +281,13 @@ class FaceNet(object):
       path = Paths.HOME + "/images/_suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/images/_suspicious")))
       cv2.imwrite(path, frame)
       log.log_suspicious(path)
-      print("Suspicious activity logged")
+      cprint("Suspicious activity logged", color="red", attrs=["bold"])
 
     if log.num_recognized >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.rec_last_logged):
       if log.get_percent_diff(best_match) <= log.THRESHOLDS["percent_diff"]:
         recognized_person = get_mode(log.current_log)
         log.log_person(recognized_person, times=log.current_log[recognized_person])
-        print("Regular activity logged")
+        cprint("Regular activity logged", color="green", attrs=["bold"])
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
