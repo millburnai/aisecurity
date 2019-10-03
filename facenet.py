@@ -151,7 +151,7 @@ class FaceNet(object):
   # REAL-TIME FACIAL RECOGNITION HELPER
   async def _real_time_recognize(self, width, height, use_log):
     if use_log:
-      log.init(flush=True, thresholds={"max_error": self.ALPHA})
+      log.init(flush=True)
 
     detector = MTCNN()
     cap = cv2.VideoCapture(0)
@@ -165,9 +165,12 @@ class FaceNet(object):
     # works for 6.25e4 pixel video cature to 1e6 pixel video capture
     # TODO: make font_size more adaptive (use cv2.getTextSize())
 
+    missed_frames = 0
+
     while True:
       _, frame = cap.read()
       result = detector.detect_faces(frame)
+
 
       if result:
         overlay = frame.copy()
@@ -195,10 +198,13 @@ class FaceNet(object):
           FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness=1)
 
           if use_log:
-            self.log_activity(is_recognized, best_match, frame, l2_dist, log_susp=True)
+            self.log_activity(is_recognized, best_match, frame, log_susp=True)
 
       else:
-        log.flush_current()
+        missed_frames += 1
+        if missed_frames > log.THRESHOLDS["missed_frames"]:
+          missed_frames = 0
+          log.flush_current()
         print("No face detected")
 
       cv2.imshow("CSII AI facial recognition v0.1", frame)
@@ -265,7 +271,7 @@ class FaceNet(object):
 
   # LOGGING
   @staticmethod
-  def log_activity(is_recognized, best_match, frame, l2_dist, log_susp=True):
+  def log_activity(is_recognized, best_match, frame, log_susp=True):
     cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
 
     def get_mode(d): #gets highest number in current log
@@ -275,7 +281,7 @@ class FaceNet(object):
           max_key = key
       return max_key
 
-    log.update_current_logs(is_recognized, best_match, l2_dist)
+    log.update_current_logs(is_recognized, best_match)
 
     if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and cooldown_ok(log.unrec_last_logged) and log_susp:
       path = Paths.HOME + "/database/_suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/database/_suspicious")))

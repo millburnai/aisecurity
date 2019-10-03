@@ -49,5 +49,4 @@ facenet.set_data(Preprocessing.retrieve_embeds(Paths.HOME + "/database/encrypted
 
 input("\nPress ENTER to continue:")
 
-print("\n")
 facenet.real_time_recognize(use_log=True)

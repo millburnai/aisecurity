@@ -21,13 +21,13 @@ THRESHOLDS = {
   "percent_diff": 0.2,
   "cooldown": 10.0,
   "time_since_previous": 3.0,
-  "max_error": 1.0
+  "missed_frames": 10
 }
 
 num_recognized = 0
 num_unrecognized = 0
 
-rec_last_logged = time.time() - THRESHOLDS["num_recognized"] + 0.1 # don't log for first 0.1 secs
+rec_last_logged = time.time() - THRESHOLDS["num_recognized"] + 0.1 # don't log for first 0.1s- it's just warming up then
 unrec_last_logged = time.time() - THRESHOLDS["num_unrecognized"] + 0.1
 
 current_log = {}
@@ -71,10 +71,10 @@ def get_id(name):
 def get_percent_diff(best_match):
   return 1.0 - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
 
-def update_current_logs(is_recognized, best_match, l2_dist):
+def update_current_logs(is_recognized, best_match):
   global current_log, num_recognized, num_unrecognized
 
-  if is_recognized and l2_dist <= THRESHOLDS["max_error"]:
+  if is_recognized:
     now = time.time()
 
     if best_match not in current_log:
