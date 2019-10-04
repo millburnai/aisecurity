@@ -17,7 +17,7 @@ from extras.paths import Paths
 # SETUP
 THRESHOLDS = {
   "num_recognized": 3,
-  "num_unrecognized": 3,
+  "num_unknown": 3,
   "percent_diff": 0.2,
   "cooldown": 10.0,
   "time_since_previous": 3.0,
@@ -25,10 +25,10 @@ THRESHOLDS = {
 }
 
 num_recognized = 0
-num_unrecognized = 0
+num_unknown = 0
 
-rec_last_logged = time.time() - THRESHOLDS["num_recognized"] + 0.1 # don't log for first 0.1s- it's just warming up then
-unrec_last_logged = time.time() - THRESHOLDS["num_unrecognized"] + 0.1
+last_logged = time.time() - THRESHOLDS["num_recognized"] + 0.1 # don't log for first 0.1s- it's just warming up then
+unk_last_logged = time.time() - THRESHOLDS["num_unknown"] + 0.1
 
 current_log = {}
 
@@ -72,7 +72,7 @@ def get_percent_diff(best_match):
   return 1.0 - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
 
 def update_current_logs(is_recognized, best_match):
-  global current_log, num_recognized, num_unrecognized
+  global current_log, num_recognized, num_unknown
 
   if is_recognized:
     now = time.time()
@@ -84,39 +84,39 @@ def update_current_logs(is_recognized, best_match):
 
     if len(current_log[best_match]) == 1 or get_percent_diff(best_match) <= THRESHOLDS["percent_diff"]:
       num_recognized += 1
-      num_unrecognized = 0
+      num_unknown = 0
 
   else:
-    num_unrecognized += 1
+    num_unknown += 1
     num_recognized = 0
 
 # LOGGING FUNCTIONS
 def log_person(student_name, times):
-  add = "INSERT INTO Transactions (student_id, student_name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
+  add = "INSERT INTO Activity (student_id, student_name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
     get_id(student_name), student_name, *get_now(sum(times) / len(times)))
   cursor.execute(add)
   database.commit()
 
-  global rec_last_logged
-  rec_last_logged = time.time()
+  global last_logged
+  last_logged = time.time()
 
   flush_current(regular_activity=True)
 
-def log_suspicious(path_to_img):
-  add = "INSERT INTO Suspicious (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
-    path_to_img, *get_now(time.time()))
+def log_unknown():
+  add = "INSERT INTO Unknown (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
+    "<DEPRECATED>", *get_now(time.time()))
   cursor.execute(add)
   database.commit()
 
-  global unrec_last_logged
-  unrec_last_logged = time.time()
+  global unk_last_logged
+  unk_last_logged = time.time()
 
   flush_current(regular_activity=False)
 
 def flush_current(regular_activity=True):
-  global current_log, num_recognized, num_unrecognized
+  global current_log, num_recognized, num_unknown
   if regular_activity:
     current_log = {}
     num_recognized = 0
   else:
-    num_unrecognized = 0
+    num_unknown = 0

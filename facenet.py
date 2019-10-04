@@ -16,14 +16,14 @@ import os
 import time
 import functools
 from termcolor import cprint
-import tensorflow as tf
 
 import matplotlib.pyplot as plt
+import numpy as np
 import keras
 from keras import backend as K
-import numpy as np
 import cv2
 from sklearn import neighbors
+from skimage.transform import resize
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
@@ -59,7 +59,7 @@ class FaceNet(object):
   # INITS
   @timer(message="Model load time")
   def __init__(self, filepath):
-    self.k_model = keras.models.load_model(filepath)
+    self.facenet = keras.models.load_model(filepath)
     self._data = None # must be filled in by user
 
   # MUTATORS
@@ -70,8 +70,8 @@ class FaceNet(object):
       for key in data.keys():
         assert isinstance(key, str), "data keys must be person names"
         data[key] = np.asarray(data[key])
-        is_vector = data[key].ndim < 2 or (1 in data[key].shape)
-        assert isinstance(data[key], np.ndarray) and is_vector, "each data[key] must be a vectorized embedding"
+        is_vector = data[key].ndim <= 2 and (1 in data[key].shape or data[key].ndim == 1)
+        assert is_vector, "each data[key] must be a vectorized embedding"
       return data
 
     self._data = check_validity(data)
@@ -90,9 +90,6 @@ class FaceNet(object):
   def data(self):
     return self._data
 
-  def get_facenet(self):
-    return self.k_model
-
   def get_embeds(self, *args, **kwargs):
     embeds = []
     for n in args:
@@ -100,20 +97,19 @@ class FaceNet(object):
         try:
           n = self._data[n]
         except KeyError:
-          n = self.predict([n], **kwargs)
-      elif not (n.ndim < 2 or (1 in n.shape)):
-        n = self.predict([n], **kwargs)
+          n = self.predict([n], margin=self.HYPERPARAMS["margin"], **kwargs)
+      elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)): # n must be a vector
+        n = self.predict([n], margin=self.HYPERPARAMS["margin"], **kwargs)
       embeds.append(n)
     return tuple(embeds) if len(embeds) > 1 else embeds[0]
 
-  # LOW-LEVEL COMPARISON FUNCTIONS
+  # LOW-LEVEL FUNCTIONS
   def l2_dist(self, a, b):
     a, b = self.get_embeds(a, b)
     return np.linalg.norm(a - b)
 
-  def predict(self, paths_or_imgs, batch_size=1, faces=None, margin=10):
-    preprocessing =  Preprocessing.embed(self.k_model, paths_or_imgs, batch_size=batch_size, faces=faces, margin=margin)
-    return preprocessing
+  def predict(self, paths_or_imgs, *args, **kwargs):
+    return Preprocessing.embed(self.facenet, paths_or_imgs, *args, **kwargs)
 
   # FACIAL COMPARISON
   def compare(self, a, b, verbose=True):
@@ -129,10 +125,10 @@ class FaceNet(object):
 
   # FACIAL RECOGNITION HELPER
   @timer(message="Recognition time")
-  def _recognize(self, img, faces=None, margin=15):
+  def _recognize(self, img, faces=None):
     assert self._data, "data must be provided"
 
-    embedding = self.get_embeds(img, faces=faces, margin=margin)
+    embedding = self.get_embeds(img, faces=faces)
     best_match = self.k_nn.predict(embedding)[0]
 
     l2_dist = self.l2_dist(embedding, self._data[best_match + "0"])
@@ -187,9 +183,9 @@ class FaceNet(object):
 
           # facial recognition
           try:
-            is_recognized, best_match, l2_dist = self._recognize(frame, faces=face, margin=self.HYPERPARAMS["margin"])
+            is_recognized, best_match, l2_dist = self._recognize(frame, faces=face)
             print("L2 distance: {} ({})".format(l2_dist, best_match))
-          except tf.errors.InvalidArgumentError:
+          except ValueError:
             print("Image refresh rate too high")
             continue
 
@@ -207,7 +203,7 @@ class FaceNet(object):
 
           # log activity
           if use_log:
-            self.log_activity(is_recognized, best_match, frame, num_faces=len(result), log_susp=True)
+            self.log_activity(is_recognized, best_match, frame, num_faces=len(result), log_unknown=True)
 
           # adaptive recognition threshold
           if is_recognized and adaptive_alpha:
@@ -285,7 +281,7 @@ class FaceNet(object):
 
   # LOGGING
   @staticmethod
-  def log_activity(is_recognized, best_match, frame, num_faces, log_susp=True):
+  def log_activity(is_recognized, best_match, frame, num_faces, log_unknown=True):
     cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
 
     def get_mode(d): #gets most frequent person in current log
@@ -297,23 +293,26 @@ class FaceNet(object):
 
     log.update_current_logs(is_recognized, best_match)
 
-    if num_faces < 2 and log_susp:
-      if log.num_unrecognized >= log.THRESHOLDS["num_unrecognized"] and cooldown_ok(log.unrec_last_logged):
-        path = Paths.HOME + "/database/_suspicious/{}.jpg".format(len(os.listdir(Paths.HOME + "/database/_suspicious")))
-        cv2.imwrite(path, frame)
-        log.log_suspicious(path)
-        cprint("Suspicious activity logged", color="red", attrs=["bold"])
-
-    if log.num_recognized >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.rec_last_logged):
+    if log.num_recognized >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.last_logged):
       if log.get_percent_diff(best_match) <= log.THRESHOLDS["percent_diff"]:
         recognized_person = get_mode(log.current_log)
         log.log_person(recognized_person, times=log.current_log[recognized_person])
         cprint("Regular activity logged", color="green", attrs=["bold"])
 
+    if num_faces < 2 and log_unknown:
+      if log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
+        log.log_unknown()
+        cprint("Unknown activity logged", color="red", attrs=["bold"])
+
+        # recording unknown images is deprecated and will be removed/changed later
+        cv2.imwrite(
+          Paths.HOME + "/database/_unknown/{}.jpg".format(len(os.listdir(Paths.HOME + "/database/_unknown"))),
+          frame)
+
   # ADAPTIVE ALPHA
   def update_alpha(self, l2_dists):
     if len(l2_dists) % round(self.HYPERPARAMS["update_alpha"]) == 0:
-      updated = 0.9 * self.HYPERPARAMS["alpha"] + 0.1 * (sum(l2_dists) / len(l2_dists) + 0.2)
+      updated = 0.9 * self.HYPERPARAMS["alpha"] + 0.1 * (sum(l2_dists) / len(l2_dists) + 0.3)
       # alpha is a weighted average of the previous alpha and the new alpha
       self.HYPERPARAMS["update_alpha"] *= 1 + (updated / self.HYPERPARAMS["alpha"])
       # update alpha changes proportionally to the magnitude of the update
@@ -360,8 +359,8 @@ class Preprocessing(object):
 
       x, y, width, height = faces
       cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
-      resized = tf.image.resize(cropped, size=(Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE), align_corners=True)
-      return np.asarray(K.eval(resized))
+      resized = resize(cropped, (Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE))
+      return resized
 
     return np.array([np.asarray(align_img(path_or_img, faces=faces)) for path_or_img in paths_or_imgs])
 
@@ -394,10 +393,10 @@ class Preprocessing(object):
     if not full_overwrite:
       old_embeds = Preprocessing.retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path)
       new_people = [person for person in people if person + "0" not in old_embeds.keys()]
-      new_embeds = Preprocessing.load(facenet.get_facenet(), img_dir, people=new_people)
+      new_embeds = Preprocessing.load(facenet.facenet, img_dir, people=new_people)
       embeds_dict = {**old_embeds, **new_embeds} # combining dicts and overwriting any duplicates with new_embeds
     else:
-      embeds_dict = Preprocessing.load(facenet.get_facenet(), img_dir, people)
+      embeds_dict = Preprocessing.load(facenet.facenet, img_dir, people)
 
     encrypted_data = DataEncryption.encrypt_data(embeds_dict)
 
