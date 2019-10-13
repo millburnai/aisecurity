@@ -2,6 +2,8 @@
 *.pyc
 .idea/
 .DS_STORE
+
+# Hidden files
 _*
 
 # .gitignore exceptions for dev purposes-- will be removed later
@@ -9,6 +11,6 @@ _*
 !_encrypted.json
 !_unknown
 
-!security/_keys
+!aisecurity/security/_keys
 !_embedding_keys.txt
 !_name_keys.txt

@@ -7,7 +7,7 @@ Internal use only-- manages data.
 
 """
 
-from facenet import *
+from aisecurity.facenet import *
 
 def redump(json_file, ignore=None):
   data = Preprocessing.retrieve_embeds(HOME + "/database/_decrypted.json")

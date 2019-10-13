@@ -1,7 +1,7 @@
 
 """
 
-"log.py"
+"aisecurity.log"
 
 MySQL logging handling.
 
@@ -12,7 +12,7 @@ import warnings
 
 import mysql.connector
 
-from extras.paths import HOME
+from aisecurity.extras.paths import HOME
 
 # SETUP
 THRESHOLDS = {

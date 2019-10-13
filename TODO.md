@@ -15,7 +15,7 @@ Ideally, we would be able to run
 
 ```python
 
-from facenet import FaceNet, Preprocessing
+from aisecurity.facenet import FaceNet, Preprocessing
 
 facenet = FaceNet("/path/to/model")
 image_dir = "/path/to/images"

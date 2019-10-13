@@ -27,9 +27,10 @@ from skimage.transform import resize
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
-from extras.paths import HOME
-from security.encryptions import DataEncryption
-from logs import log
+from aisecurity.extras.paths import HOME
+from aisecurity.safeguard.encryptions import DataEncryption
+from aisecurity.logs import log
+
 
 # DECORATORS
 def timer(message="Time elapsed"):
