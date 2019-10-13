@@ -12,7 +12,7 @@ import warnings
 
 import mysql.connector
 
-from extras.paths import Paths
+from extras.paths import HOME
 
 # SETUP
 THRESHOLDS = {
@@ -36,7 +36,7 @@ try:
   database = mysql.connector.connect(
       host="localhost",
       user="root",
-      passwd="Blast314" if "ryan" in Paths.HOME else "KittyCat123",
+      passwd="Blast314" if "ryan" in HOME else "KittyCat123",
       database="LOG"
       )
   cursor = database.cursor()
@@ -50,7 +50,7 @@ def init(flush=False, thresholds=None):
   database.commit()
 
   if flush:
-    instructions = open(Paths.HOME + "/logs/drop.sql", "r")
+    instructions = open(HOME + "/logs/drop.sql", "r")
     for cmd in instructions:
       if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"): # allows for docstrings
         cursor.execute(cmd)

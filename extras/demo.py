@@ -29,23 +29,23 @@ except AttributeError:
 # PATH SETUP
 try:
   # for Pycharm
-  from extras.paths import Paths
+  from extras.paths import HOME
 except ModuleNotFoundError:
   # for terminal
   import sys
-  from paths import Paths
-  sys.path.insert(1, Paths.HOME)
+  from paths import HOME
+  sys.path.insert(1, HOME)
 
 # ACTUAL DEMO
 from facenet import *
 
 cprint("\nLoading facial recognition system", attrs=["bold"], end="")
 cprint("...", attrs=["bold", "blink"])
-facenet = FaceNet(Paths.HOME + "/models/facenet_keras.h5")
+facenet = FaceNet(HOME + "/models/facenet_keras.h5")
 
 cprint("\nLoading encrypted database", attrs=["bold"], end="")
 cprint("...", attrs=["bold", "blink"])
-facenet.set_data(Preprocessing.retrieve_embeds(Paths.HOME + "/database/encrypted.json"))
+facenet.set_data(Preprocessing.retrieve_embeds(HOME + "/database/_encrypted.json"))
 
 input("\nPress ENTER to continue:")
 

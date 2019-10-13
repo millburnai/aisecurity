@@ -27,7 +27,7 @@ from skimage.transform import resize
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
-from extras.paths import Paths
+from extras.paths import HOME
 from security.encryptions import DataEncryption
 from logs import log
 
@@ -80,7 +80,7 @@ class FaceNet(object):
   def _set_knn(self):
     k_nn_label_dict, embeddings = [], []
     for person in self._data.keys():
-      k_nn_label_dict.append(person[:-1])
+      k_nn_label_dict.append(person)
       embeddings.append(self._data[person])
     self.k_nn = neighbors.KNeighborsClassifier(n_neighbors=len(k_nn_label_dict) // len(set(k_nn_label_dict)))
     self.k_nn.fit(embeddings, k_nn_label_dict)
@@ -131,7 +131,7 @@ class FaceNet(object):
     embedding = self.get_embeds(img, faces=faces)
     best_match = self.k_nn.predict(embedding)[0]
 
-    l2_dist = self.l2_dist(embedding, self._data[best_match + "0"])
+    l2_dist = self.l2_dist(embedding, self._data[best_match])
 
     return int(l2_dist <= FaceNet.HYPERPARAMS["alpha"]), best_match, l2_dist
 
@@ -284,7 +284,7 @@ class FaceNet(object):
   def log_activity(is_recognized, best_match, frame, num_faces, log_unknown=True):
     cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
 
-    def get_mode(d): #gets most frequent person in current log
+    def get_mode(d):
       max_key = list(d.keys())[0]
       for key in d:
         if len(d[key]) > len(d[max_key]):
@@ -306,7 +306,7 @@ class FaceNet(object):
 
         # recording unknown images is deprecated and will be removed/changed later
         cv2.imwrite(
-          Paths.HOME + "/database/_unknown/{}.jpg".format(len(os.listdir(Paths.HOME + "/database/_unknown"))),
+          HOME + "/database/_unknown/{}.jpg".format(len(os.listdir(HOME + "/database/_unknown"))),
           frame)
 
   # ADAPTIVE ALPHA
@@ -362,7 +362,7 @@ class Preprocessing(object):
       resized = resize(cropped, (Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE))
       return resized
 
-    return np.array([np.asarray(align_img(path_or_img, faces=faces)) for path_or_img in paths_or_imgs])
+    return np.array([align_img(path_or_img, faces=faces) for path_or_img in paths_or_imgs])
 
   @staticmethod
   def embed(facenet, paths_or_imgs, margin=15, batch_size=1, faces=None):
@@ -377,35 +377,44 @@ class Preprocessing(object):
   def load(facenet, img_dir, people=None):
     if people is None:
       people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
-    data = {}
-    for person in people:
-      person_dir = img_dir + person
-      img_paths = [os.path.join(person_dir, f) for f in os.listdir(person_dir) if not f.endswith(".DS_Store")]
-      embeddings = Preprocessing.embed(facenet, img_paths)
-      for index, path in enumerate(img_paths):
-        data["{}{}".format(person, index)] = embeddings[index]
+    data = {person: Preprocessing.embed(facenet, img_dir + person) for person in people}
     return data
 
   @staticmethod
   @timer(message="Data dumping time")
-  def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False):
-    people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
+  def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, ignore_encrypt=None):
+
+    if ignore_encrypt == "all":
+      ignore_encrypt = ["names", "embeddings"]
+    elif ignore_encrypt is not None:
+      ignore_encrypt = [ignore_encrypt]
+
     if not full_overwrite:
+      people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
       old_embeds = Preprocessing.retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path)
-      new_people = [person for person in people if person + "0" not in old_embeds.keys()]
+
+      new_people = [person for person in people if person not in old_embeds.keys()]
       new_embeds = Preprocessing.load(facenet.facenet, img_dir, people=new_people)
+
       embeds_dict = {**old_embeds, **new_embeds} # combining dicts and overwriting any duplicates with new_embeds
     else:
-      embeds_dict = Preprocessing.load(facenet.facenet, img_dir, people)
+      embeds_dict = Preprocessing.load(facenet.facenet, img_dir)
 
-    encrypted_data = DataEncryption.encrypt_data(embeds_dict)
+    encrypted_data = DataEncryption.encrypt_data(embeds_dict, ignore=ignore_encrypt)
 
     with open(dump_path, "w+") as json_file:
       json.dump(encrypted_data, json_file, indent=4, ensure_ascii=False)
 
   @staticmethod
   @timer(message="Data retrieval time")
-  def retrieve_embeds(path, encrypted=True):
+  def retrieve_embeds(path):
     with open(path, "r") as json_file:
       data = json.load(json_file)
-    return DataEncryption.decrypt_data(data) if encrypted else data
+
+    try: # default case: names are encoded, embeddings aren't
+      return DataEncryption.decrypt_data(data, ignore=["embeddings"])
+    except UnicodeDecodeError: # if names cannot be decoded
+      try:
+        return DataEncryption.decrypt_data(data, ignore=["names"])
+      except TypeError: # if embeddings cannot be decoded
+        return data
