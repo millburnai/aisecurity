@@ -7,7 +7,6 @@ AES encryption for the image database.
 
 """
 
-import os
 import struct
 import subprocess
 import functools
@@ -19,7 +18,6 @@ from Crypto.Random import get_random_bytes
 
 from aisecurity.extras.paths import HOME, KEYS
 
-
 # CONSTANTS
 try:
   _KEY_FILES = json.load(open(KEYS))
@@ -27,9 +25,6 @@ except FileNotFoundError:
   subprocess.call([HOME + "/security/make_keys.sh"])
   _KEY_FILES = json.load(open(KEYS))
 
-print(_KEY_FILES)
-
-NEWLINE = os.linesep.encode("utf8")
 _BIT_ENCRYPTION = 16
 
 # DECORATORS
