@@ -4,8 +4,22 @@
 # args: key_dir (directory at which to create keys-- $HOME implied)
 #       path_to_json (path to json key list file-- $HOME implied)
 
-key_dir="$HOME$1"
-path_to_json="$HOME$2"
+key_dir="$1"
+path_to_json="$2"
+
+if [ ! -d "$key_dir" ] ; then
+  key_dir="$HOME/keys" # default
+else
+  key_dir="$HOME$1"
+fi
+
+if [ ! -d "$path_to_json" ] ; then
+  path_to_json="$HOME/keys/key_file.json" # default
+else
+  path_to_json="$HOME$2"
+fi
+
+echo "$key_dir, $path_to_json"
 
 function mk_key_files {
   # Makes key files
@@ -63,16 +77,7 @@ function update_json {
 }
 
 # make dirs and files
-if [[ -n "$key_dir" ]] ; then
-  mk_keys "$key_dir"
-else
-  mk_keys "$HOME/keys" # if key_dir is not provided, defaults to ~/keys
-fi
+mk_keys "$key_dir"
 
 # update json key file
-if [[ -n "$path_to_json" ]] ; then
-  update_json "$path_to_json"
-  echo "$path_to_json updated"
-else
-  echo "Warning: json file not updated"
-fi
+update_json "$path_to_json"

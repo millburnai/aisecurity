@@ -9,6 +9,7 @@ AES encryption for the image database.
 
 import os
 import struct
+import subprocess
 import functools
 import json
 
@@ -21,10 +22,13 @@ from aisecurity.extras.paths import HOME
 
 # CONSTANTS
 CONFIG = json.load(open(HOME + "/security/config.json"))
+try:
+  _KEY_FILES = json.load(open(os.getenv("HOME") + CONFIG["json_key_file"]))
+except FileNotFoundError:
+  subprocess.call([HOME + "/security/make_keys.sh"])
+  _KEY_FILES = json.load(open(os.getenv("HOME") + CONFIG["json_key_file"]))
 
 NEWLINE = os.linesep.encode("utf8")
-_KEY_FILES = json.load(open(CONFIG["json_key_file"]))
-
 _BIT_ENCRYPTION = 16
 
 # DECORATORS
