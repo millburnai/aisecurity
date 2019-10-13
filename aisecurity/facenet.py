@@ -1,7 +1,7 @@
 
 """
 
-"facenet.py"
+"aisecurity.facenet"
 
 Facial recognition with FaceNet in Keras.
 

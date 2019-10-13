@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# "aisecurity.security.make_keys"
 # Program to create key directory and files
 # args: key_dir (directory at which to create keys-- $HOME implied)
 #       path_to_json (path to json key list file-- $HOME implied)
@@ -14,12 +15,10 @@ else
 fi
 
 if [ ! -d "$path_to_json" ] ; then
-  path_to_json="$HOME/keys/key_file.json" # default
+  path_to_json="$HOME/keys/key_files.json" # default
 else
   path_to_json="$HOME$2"
 fi
-
-echo "$key_dir, $path_to_json"
 
 function mk_key_files {
   # Makes key files

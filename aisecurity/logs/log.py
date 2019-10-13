@@ -1,7 +1,7 @@
 
 """
 
-"aisecurity.log"
+"aisecurity.logs.log"
 
 MySQL logging handling.
 

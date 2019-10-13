@@ -10,3 +10,7 @@ _*
 !_decrypted.json
 !_encrypted.json
 !_unknown
+
+!_data_management.py
+
+!_keys

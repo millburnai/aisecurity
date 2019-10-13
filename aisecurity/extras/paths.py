@@ -1,7 +1,7 @@
 
 """
 
-"paths.py"
+"aisecurity.extras.paths"
 
 Common paths used throughout the repository.
 
