@@ -8,6 +8,8 @@ Common paths used throughout the repository.
 """
 
 import os
+import json
+
 import aisecurity
 
 HOME = os.getenv("HOME")
@@ -20,3 +22,9 @@ else:
     HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "/")
   except AttributeError:
     raise FileNotFoundError("aisecurity repository not found")
+  
+CONFIG = json.load(open(HOME + "/config.json"))
+
+DATABASE = os.getenv("HOME") + CONFIG["database_location"]
+
+KEYS = os.getenv("HOME") + CONFIG["key_location"]

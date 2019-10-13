@@ -17,16 +17,17 @@ import numpy as np
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-from aisecurity.extras.paths import HOME
+from aisecurity.extras.paths import HOME, KEYS
 
 
 # CONSTANTS
-CONFIG = json.load(open(HOME + "/security/config.json"))
 try:
-  _KEY_FILES = json.load(open(os.getenv("HOME") + CONFIG["json_key_file"]))
+  _KEY_FILES = json.load(open(KEYS))
 except FileNotFoundError:
   subprocess.call([HOME + "/security/make_keys.sh"])
-  _KEY_FILES = json.load(open(os.getenv("HOME") + CONFIG["json_key_file"]))
+  _KEY_FILES = json.load(open(KEYS))
+
+print(_KEY_FILES)
 
 NEWLINE = os.linesep.encode("utf8")
 _BIT_ENCRYPTION = 16

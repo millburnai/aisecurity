@@ -30,11 +30,11 @@ if __name__ == "__main__":
   # PATH SETUP
   try:
     # for Pycharm
-    from aisecurity.extras.paths import HOME
+    from aisecurity.extras.paths import HOME, DATABASE
   except ModuleNotFoundError:
     # for terminal
     import sys
-    from paths import HOME
+    from paths import HOME, DATABASE
     sys.path.insert(1, HOME)
 
   # ACTUAL DEMO
@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
   cprint("\nLoading encrypted database", attrs=["bold"], end="")
   cprint("...", attrs=["bold", "blink"])
-  facenet.set_data(Preprocessing.retrieve_embeds(HOME + "/database/_encrypted.json"))
+  facenet.set_data(Preprocessing.retrieve_embeds(DATABASE))
 
   input("\nPress ENTER to continue:")
 
