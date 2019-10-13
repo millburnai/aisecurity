@@ -3,8 +3,11 @@
 .idea/
 .DS_STORE
 
-# Hidden files
+# hidden files
 _*
+
+# make sure "__init__.py"s are not ignored
+!__init__.py
 
 # .gitignore exceptions for dev purposes-- will be removed later
 !_decrypted.json
