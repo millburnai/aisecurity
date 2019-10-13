@@ -6,7 +6,8 @@ _*
 
 # .gitignore exceptions for dev purposes-- will be removed later
 !_processed.json
-!database/_unknown
+!_encrypted.json
+!_unknown
 
 !security/_keys
 !_embedding_keys.txt
