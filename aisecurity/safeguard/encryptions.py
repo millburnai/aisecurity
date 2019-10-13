@@ -1,7 +1,7 @@
 
 """
 
-"encryptions.py"
+"aisecurity.safeguard.encryptions"
 
 AES encryption for the image database.
 
@@ -10,17 +10,20 @@ AES encryption for the image database.
 import os
 import struct
 import functools
+import json
 
 import numpy as np
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-from extras.paths import HOME
+from aisecurity.extras.paths import HOME
+
 
 # CONSTANTS
+CONFIG = json.load(open(HOME + "/safeguard/config.json"))
+
 NEWLINE = os.linesep.encode("utf8")
-_KEY_FILES = {"name": HOME + "/security/_keys/_embedding_keys.txt",
-              "embedding": HOME + "/security/_keys/_name_keys.txt"}
+_KEY_FILES = json.load(open(CONFIG["json_key_file"]))
 
 _BIT_ENCRYPTION = 16
 
@@ -81,13 +84,13 @@ class DataEncryption(object):
     if ignore is None:
       ignore = []
     if decryptable:
-      generate_key("name")
-      generate_key("embedding")
+      generate_key("names")
+      generate_key("embeddings")
 
     encrypted = {}
     for person in data:
-      name_cipher = generate_cipher("name", alloc_mem=decryptable)
-      embedding_cipher = generate_cipher("embedding", alloc_mem=decryptable)
+      name_cipher = generate_cipher("names", alloc_mem=decryptable)
+      embedding_cipher = generate_cipher("embeddings", alloc_mem=decryptable)
 
       encrypted_name, encrypted_embed = person, data[person]
       if "names" not in ignore:
@@ -110,9 +113,9 @@ class DataEncryption(object):
 
       name, embed = encrypted_name, data[encrypted_name]
       if "names" not in ignore:
-        name = decrypt(bytes([ord(c) for c in encrypted_name]), key_type="name", position=nonce_pos).decode("utf8")
+        name = decrypt(bytes([ord(c) for c in encrypted_name]), key_type="names", position=nonce_pos).decode("utf8")
       if "embeddings" not in ignore:
-        byte_embed = decrypt(bytes(data[encrypted_name]), key_type="embedding", position=nonce_pos)
+        byte_embed = decrypt(bytes(data[encrypted_name]), key_type="embeddings", position=nonce_pos)
         embed = np.array(list(struct.unpack("%sd" % (len(byte_embed) // 8), byte_embed)), dtype=np.float32)
         # using double precision (C long doubles not available in Python), hence integer division by 8 (double = 8 bits)
 
