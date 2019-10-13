@@ -5,7 +5,7 @@
 _*
 
 # .gitignore exceptions for dev purposes-- will be removed later
-!_processed.json
+!_decrypted.json
 !_encrypted.json
 !_unknown
 
