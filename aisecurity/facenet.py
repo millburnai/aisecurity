@@ -28,7 +28,7 @@ from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
 from aisecurity.extras.paths import HOME
-from aisecurity.safeguard.encryptions import DataEncryption
+from aisecurity.security.encryptions import DataEncryption
 from aisecurity.logs import log
 
 

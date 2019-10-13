@@ -1,7 +1,7 @@
 
 """
 
-"aisecurity.safeguard.encryptions"
+"aisecurity.security.encryptions"
 
 AES encryption for the image database.
 
@@ -20,7 +20,7 @@ from aisecurity.extras.paths import HOME
 
 
 # CONSTANTS
-CONFIG = json.load(open(HOME + "/safeguard/config.json"))
+CONFIG = json.load(open(HOME + "/security/config.json"))
 
 NEWLINE = os.linesep.encode("utf8")
 _KEY_FILES = json.load(open(CONFIG["json_key_file"]))
