@@ -6,10 +6,11 @@ AES encryption for the image database.
 
 """
 
+import os
+import subprocess
+import struct
 import functools
 import json
-import struct
-import subprocess
 
 import numpy as np
 from Crypto.Cipher import AES
@@ -21,7 +22,8 @@ from aisecurity.extras.paths import HOME, KEY_DIR, KEY_FILE
 # CONSTANTS
 try:
     _KEY_FILES = json.load(open(KEY_FILE))
-except FileNotFoundError:
+    assert os.path.exists(_KEY_FILES["names"]) and os.path.exists(_KEY_FILES["embeddings"])
+except (FileNotFoundError, AssertionError):
     subprocess.call([HOME + "/security/make_keys.sh", KEY_DIR, KEY_FILE])
     _KEY_FILES = json.load(open(KEY_FILE))
 

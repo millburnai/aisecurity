@@ -10,8 +10,8 @@ path_to_json="$2"
 
 if [ ! -d "$key_dir" ] ; then
   # default locations
-  key_dir="$HOME/keys"
-  path_to_json="$HOME/keys/key_files.json"
+  key_dir="$HOME/.aisecurity/keys"
+  path_to_json="$HOME/.aisecurity/keys/keys_file.json"
 fi
 
 function mk_key_files {

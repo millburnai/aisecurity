@@ -309,7 +309,7 @@ class FaceNet(object):
 
                 # recording unknown images is deprecated and will be removed/changed later
                 cv2.imwrite(
-                    HOME + "/database/_unknown/{}.jpg".format(len(os.listdir(HOME + "/database/_unknown"))),
+                    HOME + "/database/unknown/{}.jpg".format(len(os.listdir(HOME + "/database/unknown"))),
                     frame)
 
     # ADAPTIVE ALPHA
