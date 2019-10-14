@@ -4,9 +4,9 @@ AI-driven security system built by CSII AI for Millburn High School.
 
 ## Authors
 
-CSII AI head: Ryan Park
+Project lead: Ryan Park ([@orangese](https://github.com/orangese))
 
-CSII AI VP: Liam Pilarski
+Project VP: Liam Pilarski ([@22pilarskil](https://github.com/22pilarskil))
 
 ## Usage
 
@@ -22,6 +22,8 @@ Ex: `pip3 install "git+https://github.com/orangese/aisecurity.git#egg=aisecurity
 CPU: `pip3 install git+https://github.com/orangese/aisecurity.git#egg=aisecurity[cpu]`
 
 GPU: `pip3 install git+https://github.com/orangese/aisecurity.git#egg=aisecurity[gpu]`
+
+After installing, you might want to change the key location settings in `config.json`, which is installed with the `aisecurity` package.
 
 ### Upgrade
 
