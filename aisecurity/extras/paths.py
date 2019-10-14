@@ -19,7 +19,7 @@ elif os.path.exists(HOME + "/Desktop/aisecurity"):
     HOME += "/Desktop/aisecurity/aisecurity"
 else:
     try:  # for deployment
-        HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "/")
+        HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
     except AttributeError:
         raise FileNotFoundError("aisecurity repository not found")
 

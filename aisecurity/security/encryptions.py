@@ -48,7 +48,6 @@ def generate_key(key_type):
         key = get_random_bytes(_BIT_ENCRYPTION)
         keys.write(key)
 
-
 @require_permission
 def generate_cipher(key_type, alloc_mem):
     key = get_key(key_type)
@@ -65,7 +64,6 @@ def get_key(key_type):
     with open(_KEY_FILES[key_type], "rb") as keys:
         return b"".join(keys.readlines())[:_BIT_ENCRYPTION]
 
-
 @require_permission
 def get_nonce(key_type, position):
     with open(_KEY_FILES[key_type], "rb") as keys:
@@ -78,7 +76,6 @@ def get_nonce(key_type, position):
 def encrypt(data, cipher):
     cipher_text, tag = cipher.encrypt_and_digest(data)
     return cipher_text
-
 
 def decrypt(cipher_text, key_type, position):
     decrypt_cipher = AES.new(get_key(key_type), AES.MODE_EAX, nonce=get_nonce(key_type, position))
@@ -121,7 +118,6 @@ class DataEncryption(object):
 
         decrypted = {}
         for nonce_pos, encrypted_name in enumerate(data):
-
             name, embed = encrypted_name, data[encrypted_name]
             if "names" not in ignore:
                 name = decrypt(bytes([ord(c) for c in encrypted_name]), key_type="names", position=nonce_pos)
