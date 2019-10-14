@@ -9,15 +9,9 @@ key_dir="$1"
 path_to_json="$2"
 
 if [ ! -d "$key_dir" ] ; then
-  key_dir="$HOME/keys" # default
-else
-  key_dir="$HOME$1"
-fi
-
-if [ ! -d "$path_to_json" ] ; then
-  path_to_json="$HOME/keys/key_files.json" # default
-else
-  path_to_json="$HOME$2"
+  # default locations
+  key_dir="$HOME/keys"
+  path_to_json="$HOME/keys/key_files.json"
 fi
 
 function mk_key_files {
@@ -46,7 +40,7 @@ function mk_keys {
   # Makes key files and directory
   # args: dir (directory at which to create keys)
 
-  dir=$1
+  dir=$key_dir
 
   if [ ! -d "$dir" ] ; then
     echo "Creating keys directory at $dir"
@@ -66,12 +60,12 @@ function update_json {
 
   json_path=$path_to_json
 
-  if [ -d "$json_path" ] ; then
+  if [ ! -d "$json_path" ] ; then
     echo "Creating json key file at $json_path"
-    mkdir "$json_path"
+    touch "$json_path"
   fi
 
-  printf '{\n    "names": "%s/name_keys.txt",\n    "embeddings": "%s/embedding_keys.txt"\n}\n' "$key_dir" "$key_dir" \
+  printf '{\n    "names": "%sname_keys.txt",\n    "embeddings": "%sembedding_keys.txt"\n}\n' "$key_dir" "$key_dir" \
   > "$json_path"
 }
 

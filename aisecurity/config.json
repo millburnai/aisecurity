@@ -1,4 +1,5 @@
 {
+    "key_directory": "/PycharmProjects/aisecurity/_local/_keys/",
     "key_location": "/PycharmProjects/aisecurity/_local/_keys/key_files.json",
     "database_location": "/PycharmProjects/aisecurity/_local/_database/encrypted.json"
 }
