@@ -47,7 +47,7 @@ if __name__ == "__main__":
     # ACTUAL DEMO
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
-    facenet = FaceNet(HOME + "/models/facenet_keras.h5")
+    facenet = FaceNet()
 
     cprint("\nLoading encrypted database", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
