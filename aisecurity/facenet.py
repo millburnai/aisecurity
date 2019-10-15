@@ -59,7 +59,8 @@ class FaceNet(object):
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath):
+    def __init__(self, filepath=os.getenv("HOME") + "/.aisecurity/models/ms_celeb_1m.h5"):
+        assert os.path.exists(filepath), "{} not found".format(filepath)
         self.facenet = keras.models.load_model(filepath)
         self._data = None  # must be filled in by user
 
