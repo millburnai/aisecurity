@@ -28,6 +28,14 @@ if [ ! -d "$config_path/database" ] ; then
   touch encrypted.json
 fi
 
+if [ ! -d "$config_path/models" ] ; then
+  cd "$config_path" || echo "Error: unable to access $config_path"
+  mkdir models
+  cd models || echo "Error: unable to access $config_path/models"
+  wget -O "facenet_keras.h5" "https://github.com/orangese/aisecurity/blob/v1.0a/models/ms_celeb_1m.h5" || curl "https://github.com/orangese/aisecurity/blob/v1.0a/models/ms_celeb_1m.h5" -o "facenet_keras.h5"
+fi
+
+
 if [ ! -d "$HOME/.aisecurity/keys" ] ; then
   cd "$config_path" || echo "Error: unable to access $config_path"
   mkdir keys
