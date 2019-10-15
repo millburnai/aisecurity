@@ -13,7 +13,7 @@ else
 fi
 
 cd "$HOME/.aisecurity" || echo "Error: unable to access ~/.aisecurity"
-config_path=$(realpath .)
+config_path=$(realpath .) || config_path=$(pwd )
 
 echo "Adding aisecurity.json to .aisecurity"
 touch "$HOME/.aisecurity/aisecurity.json"
@@ -23,8 +23,9 @@ printf '{\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_f
 
 if [ ! -d "$config_path/database" ] ; then
   mkdir database
-  cd "$HOME/.aisecurity/database" || echo "Error: unable to access ~/.aisecurity/database"
+  cd "$config_path/database" || echo "Error: unable to access $config_path/database"
   mkdir unknown
+  touch encrypted.json
 fi
 
 if [ ! -d "$HOME/.aisecurity/keys" ] ; then

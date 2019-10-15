@@ -31,16 +31,20 @@ if __name__ == "__main__":
     try:
         # for Pycharm
         from aisecurity.extras.paths import HOME, DATABASE
+
     except ModuleNotFoundError:
         # for terminal
         import sys
         from paths import HOME, DATABASE
 
-        sys.path.insert(1, HOME)
+        try:
+            sys.path.insert(1, os.getenv("HOME") + "/PycharmProjects/aisecurity/")
+        except FileNotFoundError:
+            sys.path.insert(1, os.getenv("HOME") + "/Desktop/aisecurity/")
 
-    # ACTUAL DEMO
     from aisecurity.facenet import *
 
+    # ACTUAL DEMO
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
     facenet = FaceNet(HOME + "/models/facenet_keras.h5")
