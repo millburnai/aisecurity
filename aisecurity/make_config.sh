@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# ".aisecurity.create_config"
-# Program to create config file (~/.aisecurity.json)
+# ".aisecurity.make_config"
+# Program to make config file (~/.aisecurity.json)
 
 if [ ! -d "$HOME/.aisecurity" ] ; then
   mkdir "$HOME/.aisecurity"
@@ -18,7 +18,7 @@ config_path=$(realpath .) || config_path=$(pwd )
 echo "Adding aisecurity.json to .aisecurity"
 touch "$HOME/.aisecurity/aisecurity.json"
 
-printf '{\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_file.json",\n    "database_location": "%s/database/encrypted.json"\n}\n' \
+printf '{\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_file.json",\n    "database_location": "%s/database/encrypted.json",\n}\n' \
 "$config_path" "$config_path" "$config_path" > "$config_path/aisecurity.json"
 
 if [ ! -d "$config_path/database" ] ; then

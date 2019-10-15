@@ -64,7 +64,8 @@ def generate_cipher(key_type, alloc_mem):
 @require_permission
 def get_key(key_type):
     with open(_KEY_FILES[key_type], "rb") as keys:
-        return b"".join(keys.readlines())[:_BIT_ENCRYPTION]
+        key = b"".join(keys.readlines())[:_BIT_ENCRYPTION]
+    return key
 
 @require_permission
 def get_nonce(key_type, position):
