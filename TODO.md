@@ -49,6 +49,12 @@ TensorFlow model: https://drive.google.com/file/d/1EXPBSXwTaqrSC0OhUdXNmKSh9qJUQ
 
 AES encryption for JSON image database. 
 
+### [ ] Packaging everything (@orangese)
+
+[x] Make everything installable and configurable with `pip` (@orangese).
+
+[ ] Fix logging in package implementation.
+
 ## Features
 
 ### [ ] Real time facial recognition appearance
