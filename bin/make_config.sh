@@ -13,7 +13,7 @@ else
 fi
 
 cd "$HOME/.aisecurity" || echo "Error: unable to access ~/.aisecurity"
-config_path=$(realpath .) || config_path=$(pwd )
+config_path=$(pwd )
 
 echo "Adding aisecurity.json to .aisecurity"
 touch "$HOME/.aisecurity/aisecurity.json"
@@ -22,6 +22,7 @@ printf '{\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_f
 "$config_path" "$config_path" "$config_path" > "$config_path/aisecurity.json"
 
 if [ ! -d "$config_path/database" ] ; then
+  echo "Making database and unknown directories"
   mkdir database
   cd "$config_path/database" || echo "Error: unable to access $config_path/database"
   mkdir unknown
@@ -29,13 +30,16 @@ if [ ! -d "$config_path/database" ] ; then
 fi
 
 if [ ! -d "$config_path/models" ] ; then
+  echo "Downloading Facenet models"
   cd "$config_path" || echo "Error: unable to access $config_path"
   mkdir models
   cd models || echo "Error: unable to access $config_path/models"
-  wget -O "ms_celeb_1m.h5" "https://github.com/orangese/aisecurity/raw/v1.0a/models/ms_celeb_1m.h5" || \
-  curl "https://github.com/orangese/aisecurity/raw/v1.0a/models/ms_celeb_1m.h5" || echo "File could not be downloaded"
+  wget -O "ms_celeb_1m.h5" "https://github.com/orangese/aisecurity/raw/v1.0a/models/ms_celeb_1m.h5" \
+  || echo "Error: MS-Celeb-1M could not be downloaded"
+fi
 
 if [ ! -d "$HOME/.aisecurity/keys" ] ; then
+  echo "Creating keys directory"
   cd "$config_path" || echo "Error: unable to access $config_path"
   mkdir keys
 fi
