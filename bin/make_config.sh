@@ -18,7 +18,7 @@ config_path=$(realpath .) || config_path=$(pwd )
 echo "Adding aisecurity.json to .aisecurity"
 touch "$HOME/.aisecurity/aisecurity.json"
 
-printf '{\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_file.json",\n    "database_location": "%s/database/encrypted.json",\n}\n' \
+printf '{\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_file.json",\n    "database_location": "%s/database/encrypted.json"\n}\n' \
 "$config_path" "$config_path" "$config_path" > "$config_path/aisecurity.json"
 
 if [ ! -d "$config_path/database" ] ; then
@@ -32,8 +32,8 @@ if [ ! -d "$config_path/models" ] ; then
   cd "$config_path" || echo "Error: unable to access $config_path"
   mkdir models
   cd models || echo "Error: unable to access $config_path/models"
-  wget -O "ms_celeb_1m.h5" "https://github.com/orangese/aisecurity/blob/v1.0a/models/ms_celeb_1m.h5" || curl "https://github.com/orangese/aisecurity/blob/v1.0a/models/ms_celeb_1m.h5" -o "ms_celeb_1m.h5"
-fi
+  wget -O "ms_celeb_1m.h5" "https://github.com/orangese/aisecurity/raw/v1.0a/models/ms_celeb_1m.h5" || \
+  curl "https://github.com/orangese/aisecurity/raw/v1.0a/models/ms_celeb_1m.h5" || echo "File could not be downloaded"
 
 if [ ! -d "$HOME/.aisecurity/keys" ] ; then
   cd "$config_path" || echo "Error: unable to access $config_path"

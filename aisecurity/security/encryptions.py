@@ -24,7 +24,7 @@ try:
     _KEY_FILES = json.load(open(KEY_FILE))
     assert os.path.exists(_KEY_FILES["names"]) and os.path.exists(_KEY_FILES["embeddings"])
 except (FileNotFoundError, AssertionError):
-    subprocess.call([HOME + "/security/make_keys.sh", KEY_DIR, KEY_FILE])
+    subprocess.call(["make_keys.sh", KEY_DIR, KEY_FILE])
     _KEY_FILES = json.load(open(KEY_FILE))
 
 _BIT_ENCRYPTION = 16

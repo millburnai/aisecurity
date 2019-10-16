@@ -6,45 +6,45 @@ Demonstration of facial recognition system.
 
 """
 
-if __name__ == "__main__":
+# SETUP
+import os
 
-    # SETUP
-    import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+# ERROR HANDLING
+import warnings
 
-    # ERROR HANDLING
-    import warnings
+warnings.simplefilter(action="ignore", category=FutureWarning)
+warnings.simplefilter(action="ignore", category=UserWarning)
+warnings.simplefilter(action="ignore", category=RuntimeWarning)
 
-    warnings.simplefilter(action="ignore", category=FutureWarning)
-    warnings.simplefilter(action="ignore", category=UserWarning)
-    warnings.simplefilter(action="ignore", category=RuntimeWarning)
+import tensorflow as tf
 
-    import tensorflow as tf
+try:
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+except AttributeError:
+    tf.logging.set_verbosity(tf.logging.ERROR)
+
+# PATH SETUP
+try:
+    # for Pycharm
+    from aisecurity.extras.paths import HOME, DATABASE
+
+except ModuleNotFoundError:
+    # for terminal
+    import sys
+    from paths import HOME, DATABASE
 
     try:
-        tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-    except AttributeError:
-        tf.logging.set_verbosity(tf.logging.ERROR)
+        sys.path.insert(1, os.getenv("HOME") + "/PycharmProjects/aisecurity/")
+    except FileNotFoundError:
+        sys.path.insert(1, os.getenv("HOME") + "/Desktop/aisecurity/")
 
-    # PATH SETUP
-    try:
-        # for Pycharm
-        from aisecurity.extras.paths import HOME, DATABASE
+from aisecurity.facenet import *
 
-    except ModuleNotFoundError:
-        # for terminal
-        import sys
-        from paths import HOME, DATABASE
 
-        try:
-            sys.path.insert(1, os.getenv("HOME") + "/PycharmProjects/aisecurity/")
-        except FileNotFoundError:
-            sys.path.insert(1, os.getenv("HOME") + "/Desktop/aisecurity/")
-
-    from aisecurity.facenet import *
-
-    # ACTUAL DEMO
+# ACTUAL DEMO
+def demo():
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
     facenet = FaceNet()
@@ -55,4 +55,8 @@ if __name__ == "__main__":
 
     input("\nPress ENTER to continue:")
 
-    facenet.real_time_recognize(use_log=True)
+    facenet.real_time_recognize(use_log=False)
+
+
+if __name__ == "__main__":
+    demo()

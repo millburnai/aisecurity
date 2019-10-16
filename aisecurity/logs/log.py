@@ -50,7 +50,7 @@ def init(flush=False, thresholds=None):
     database.commit()
 
     if flush:
-        instructions = open(HOME + "/logs/drop.sql", "r")
+        instructions = open("drop.sql")  # open(HOME + "/logs/drop.sql", "r")
         for cmd in instructions:
             if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"):
                 cursor.execute(cmd)

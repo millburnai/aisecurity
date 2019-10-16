@@ -1,5 +1,5 @@
 {
-    "key_directory": "/Users/ryan/PycharmProjects/aisecurity/.aisecurity/keys/",
-    "key_location": "/Users/ryan/PycharmProjects/aisecurity/.aisecurity/keys/keys_file.json",
-    "database_location": "/Users/ryan/PycharmProjects/aisecurity/.aisecurity/database/encrypted.json"
+    "key_directory": "/home/ryan/PycharmProjects/aisecurity/.aisecurity/keys/",
+    "key_location": "/home/ryan/PycharmProjects/aisecurity/.aisecurity/keys/keys_file.json",
+    "database_location": "/home/ryan/PycharmProjects/aisecurity/.aisecurity/database/encrypted.json"
 }
