@@ -13,6 +13,7 @@ from termcolor import cprint
 
 
 HOME = os.getenv("HOME")
+CONFIG_HOME = HOME
 os.chdir(HOME)
 
 if os.path.exists(HOME + "/PycharmProjects/aisecurity"):  # for development
@@ -29,17 +30,19 @@ elif os.path.exists(HOME + "/Desktop/aisecurity"):
 else:
     import aisecurity
 
+    CONFIG_HOME += "/.aisecurity"
     HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
-    if not os.path.exists(os.getenv("HOME") + "/.aisecurity/aisecurity.json"):
+    if not os.path.exists(CONFIG_HOME + "/aisecurity.json"):
         subprocess.call(["make_config.sh"])
-    CONFIG = json.load(open(os.getenv("HOME") + "/.aisecurity/aisecurity.json"))
+    CONFIG = json.load(open(CONFIG_HOME + "/aisecurity.json"))
 
 import aisecurity
 
+CONFIG_HOME += "/.aisecurity"
 HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
-if not os.path.exists(os.getenv("HOME") + "/.aisecurity/aisecurity.json"):
+if not os.path.exists(CONFIG_HOME + "/aisecurity.json"):
     subprocess.call(["make_config.sh"])
-CONFIG = json.load(open(os.getenv("HOME") + "/.aisecurity/aisecurity.json"))
+CONFIG = json.load(open(CONFIG_HOME + "/aisecurity.json"))
 
 DATABASE = CONFIG["database_location"]
 

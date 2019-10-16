@@ -43,3 +43,12 @@ if [ ! -d "$HOME/.aisecurity/keys" ] ; then
   cd "$config_path" || echo "Error: unable to access $config_path"
   mkdir keys
 fi
+
+if [ ! -d "$HOME/.aisecurity/bin" ] ; then
+  echo "Creating bin directory"
+  cd "$config_path" || echo "Error: unable to access $config_path"
+  mkdir bin
+  cd "$config_path/bin" || echo "Error: unable to access $config_path/bin"
+  wget -O "drop.sql" "https://github.com/orangese/aisecurity/raw/v1.0a/bin/drop.sql" || \
+  echo "Error: drop.sql could not be downloaded"
+fi

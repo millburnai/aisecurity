@@ -55,7 +55,7 @@ def demo():
 
     input("\nPress ENTER to continue:")
 
-    facenet.real_time_recognize(use_log=False)
+    facenet.real_time_recognize(use_log=True)
 
 
 if __name__ == "__main__":
