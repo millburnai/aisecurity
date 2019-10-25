@@ -6,18 +6,17 @@ AES encryption for the image database.
 
 """
 
-import os
-import subprocess
-import struct
 import functools
 import json
+import os
+import struct
+import subprocess
 
 import numpy as np
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-from aisecurity.extras.paths import HOME, KEY_DIR, KEY_FILE
-
+from aisecurity.extras.paths import KEY_DIR, KEY_FILE
 
 # CONSTANTS
 try:
@@ -50,6 +49,7 @@ def generate_key(key_type):
         key = get_random_bytes(_BIT_ENCRYPTION)
         keys.write(key)
 
+
 @require_permission
 def generate_cipher(key_type, alloc_mem):
     key = get_key(key_type)
@@ -67,6 +67,7 @@ def get_key(key_type):
         key = b"".join(keys.readlines())[:_BIT_ENCRYPTION]
     return key
 
+
 @require_permission
 def get_nonce(key_type, position):
     with open(_KEY_FILES[key_type], "rb") as keys:
@@ -79,6 +80,7 @@ def get_nonce(key_type, position):
 def encrypt(data, cipher):
     cipher_text, tag = cipher.encrypt_and_digest(data)
     return cipher_text
+
 
 def decrypt(cipher_text, key_type, position):
     decrypt_cipher = AES.new(get_key(key_type), AES.MODE_EAX, nonce=get_nonce(key_type, position))

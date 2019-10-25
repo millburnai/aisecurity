@@ -12,6 +12,7 @@ import asyncio
 import functools
 import json
 import os
+import random
 import time
 import warnings
 
@@ -268,6 +269,8 @@ class FaceNet(object):
 
         data = DataEncryption.encrypt_data(self.data, ignore=["embeddings"],
                                            decryptable=False) if encrypted else self.data
+        data = dict(random.shuffle(list(data.items())))
+
         for person in data:
             embed = np.asarray(data[person])
             embed = embed.reshape(*closest_multiples(embed.shape[0]))

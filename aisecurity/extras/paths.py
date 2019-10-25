@@ -9,8 +9,8 @@ Common paths used throughout the repository.
 import json
 import os
 import subprocess
-from termcolor import cprint
 
+from termcolor import cprint
 
 HOME = os.getenv("HOME")
 CONFIG_HOME = HOME
