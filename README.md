@@ -37,4 +37,9 @@ As for the facial recognition algorithm, AISecurity will employ a breakthrough 2
 
 All information recorded through this camera will be logged in a text file. When a person is recognized, the log will automatically update with the timestamp and the person’s name-- the image of the person is not stored, both for privacy and storage concerns. If a person is not recognized, their presence and timestamp is logged accordingly. This log will be stored and encrypted similarly to the people database.
 
-Additionally, the AISecurity system can be readily integrated with the kiosk system. Not only will several members of the kiosk team will be working on this project, AISecurity has been designed in such a way that its incorporation will be seamless.
+
+## Usage
+
+As a demonstration of its capabilities, AISecurity will be first integrated with the kiosk project. A mini-computer called the NVIDIA Jetson Nano will replace the Raspberry Pi in one of the kiosks, providing the necessary computing power to run facial recognition on the kiosk. Integration should be relatively easy because the Jetson Nano and Pi are similar, meaning a swap should be fairly painless.
+
+After successfully completing this demonstration, AISecurity can be moved to other applications if desired.
