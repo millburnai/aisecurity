@@ -61,20 +61,16 @@ def init(flush=False, thresholds=None):
         global THRESHOLDS
         THRESHOLDS = {**THRESHOLDS, **thresholds}  # combining and overwriting THRESHOLDS with thresholds param
 
-
 def get_now(seconds):
     date_and_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(seconds))
     return date_and_time.split(" ")
-
 
 def get_id(name):
     # will be filled in later
     return "00000"
 
-
 def get_percent_diff(best_match):
     return 1.0 - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
-
 
 def update_current_logs(is_recognized, best_match):
     global current_log, num_recognized, num_unknown
@@ -98,8 +94,9 @@ def update_current_logs(is_recognized, best_match):
 
 # LOGGING FUNCTIONS
 def log_person(student_name, times):
+
     add = "INSERT INTO Activity (student_id, student_name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
-        get_id(student_name), student_name, *get_now(sum(times) / len(times)))
+        get_id(student_name), student_name.replace("_", " ").title(), *get_now(sum(times) / len(times)))
     cursor.execute(add)
     database.commit()
 
@@ -108,10 +105,9 @@ def log_person(student_name, times):
 
     flush_current(regular_activity=True)
 
-
-def log_unknown():
+def log_unknown(path_to_img):
     add = "INSERT INTO Unknown (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
-        "<DEPRECATED>", *get_now(time.time()))
+        path_to_img, *get_now(time.time()))
     cursor.execute(add)
     database.commit()
 
@@ -119,7 +115,6 @@ def log_unknown():
     unk_last_logged = time.time()
 
     flush_current(regular_activity=False)
-
 
 def flush_current(regular_activity=True):
     global current_log, num_recognized, num_unknown
