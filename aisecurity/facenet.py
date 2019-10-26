@@ -12,7 +12,6 @@ import asyncio
 import functools
 import json
 import os
-import random
 import time
 import warnings
 
@@ -27,7 +26,7 @@ from skimage.transform import resize
 from sklearn import neighbors
 from termcolor import cprint
 
-from aisecurity.extras.paths import HOME
+from aisecurity.extras.paths import CONFIG_HOME
 from aisecurity.logs import log
 from aisecurity.security.encryptions import DataEncryption
 
@@ -60,10 +59,12 @@ class FaceNet(object):
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=os.getenv("HOME") + "/.aisecurity/models/ms_celeb_1m.h5"):
+    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.h5"):
         assert os.path.exists(filepath), "{} not found".format(filepath)
         self.facenet = keras.models.load_model(filepath)
-        self._data = None  # must be filled in by user
+
+        self.__static_data = None  # must be filled in by user
+        self.__dynamic_data = None  # used for real-time database updating (i.e., for visitors)
 
     # MUTATORS
     def set_data(self, data):
@@ -77,28 +78,37 @@ class FaceNet(object):
                 assert is_vector, "each data[key] must be a vectorized embedding"
             return data
 
-        self._data = check_validity(data)
-        self._set_knn()
+        self.__static_data = check_validity(data)
 
-    def _set_knn(self):
-        k_nn_label_dict, embeddings = [], []
-        for person in self._data.keys():
-            k_nn_label_dict.append(person)
-            embeddings.append(self._data[person])
-        self.k_nn = neighbors.KNeighborsClassifier(n_neighbors=len(k_nn_label_dict) // len(set(k_nn_label_dict)))
-        self.k_nn.fit(embeddings, k_nn_label_dict)
+        self._train_knn(knn_types=["static", "dynamic"])
+
+    def _train_knn(self, knn_types):
+        def knn_factory(data):
+            knn_label_dict, embeddings = [], []
+            for person in data.keys():
+                knn_label_dict.append(person)
+                embeddings.append(data[person])
+            knn = neighbors.KNeighborsClassifier(n_neighbors=len(knn_label_dict) // len(set(knn_label_dict)))
+            knn.fit(embeddings, knn_label_dict)
+            return knn
+
+        if "static" in knn_types and self.__static_data:
+            self.static_knn = knn_factory(self.__static_data)
+        if "dynamic" in knn_types and self.__dynamic_data:
+            self.dynamic_knn = knn_factory(self.__dynamic_data)
+
 
     # RETRIEVERS
     @property
     def data(self):
-        return self._data
+        return self.__static_data
 
-    def get_embeds(self, *args, **kwargs):
+    def get_embeds(self, data, *args, **kwargs):
         embeds = []
         for n in args:
             if isinstance(n, str):
                 try:
-                    n = self._data[n]
+                    n = data[n]
                 except KeyError:
                     n = self.predict([n], margin=self.HYPERPARAMS["margin"], **kwargs)
             elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # n must be a vector
@@ -106,42 +116,36 @@ class FaceNet(object):
             embeds.append(n)
         return tuple(embeds) if len(embeds) > 1 else embeds[0]
 
-    # LOW-LEVEL FUNCTIONS
-    def l2_dist(self, a, b):
-        a, b = self.get_embeds(a, b)
-        return np.linalg.norm(a - b)
-
     def predict(self, paths_or_imgs, *args, **kwargs):
         return Preprocessing.embed(self.facenet, paths_or_imgs, *args, **kwargs)
 
-    # FACIAL COMPARISON
-    def compare(self, a, b, verbose=True):
-        assert self._data, "data must be provided"
-
-        dist = self.l2_dist(a, b)
-        is_same = dist <= FaceNet.HYPERPARAMS["alpha"]
-
-        if verbose:
-            print("L2 distance: {} -> {} and {} are the same person: {}".format(dist, a, b, is_same))
-
-        return int(is_same), dist
-
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
-    def _recognize(self, img, faces=None):
-        assert self._data, "data must be provided"
+    def _recognize(self, img, faces=None, data_types=None):
+        assert self.__static_data or self.__dynamic_data, "data must be provided"
 
-        embedding = self.get_embeds(img, faces=faces)
-        best_match = self.k_nn.predict(embedding)[0]
+        knns, data = [], {}
+        if data_types is None or "static" in data_types:
+            knns.append(self.static_knn)
+            data.update(self.__static_data)
+        if "dynamic" in data_types:
+            knns.append(self.dynamic_knn)
+            data.update(self.__dynamic_data)
 
-        l2_dist = self.l2_dist(embedding, self._data[best_match])
+        embedding = self.get_embeds(data, img, faces=faces)
+        best_matches = []
+        for knn in reversed(knns):
+            pred = knn.predict(embedding)[0]
+            best_matches.append((pred, np.linalg.norm(embedding - data[pred])))
 
-        return int(l2_dist <= FaceNet.HYPERPARAMS["alpha"]), best_match, l2_dist
+        best_match, l2_dist = sorted(best_matches, key=lambda n: n[1])
+
+        return embedding, l2_dist <= FaceNet.HYPERPARAMS["alpha"], best_match, l2_dist
 
     # FACIAL RECOGNITION
     def recognize(self, img, verbose=True):
         # img can be a path, image, database name, or embedding
-        is_recognized, best_match, l2_dist = self._recognize(img)
+        _, is_recognized, best_match, l2_dist = self._recognize(img)
 
         if verbose:
             if is_recognized:
@@ -153,20 +157,19 @@ class FaceNet(object):
         return is_recognized, best_match, l2_dist
 
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, use_log, adaptive_alpha):
+    async def _real_time_recognize(self, width, height, use_log, adaptive_alpha, use_dynamic):
         if use_log:
             log.init(flush=True)
+        if use_dynamic:
+            data_types = ["static", "dynamic"]
+        else:
+            data_types = ["static"]
 
         detector = MTCNN()
         cap = cv2.VideoCapture(0)
 
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-
-        line_thickness = round(1e-6 * width * height + 1.5)
-        radius = round((1e-6 * width * height + 1.5) / 2.)
-        font_size = 4.5e-7 * width * height + 0.5
-        # works for 6.25e4 pixel video cature to 1e6 pixel video capture
 
         missed_frames = 0
         l2_dists = []
@@ -181,33 +184,24 @@ class FaceNet(object):
                 for person in result:
                     # using MTCNN to detect faces
                     face = person["box"]
-                    key_points = person["keypoints"]
-                    x, y, height, width = face
 
                     # facial recognition
                     try:
-                        is_recognized, best_match, l2_dist = self._recognize(frame, faces=face)
+                        embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, data_types)
                         print("L2 distance: {} ({})".format(l2_dist, best_match))
                     except ValueError:
                         print("Image refresh rate too high")
                         continue
 
-                    # draw boxes, lines, and text
-                    color = (0, 255, 0) if is_recognized else (0, 0, 255)  # green if is_recognized else red
+                    if use_dynamic:
+                        if not is_recognized and person["confidence"] >= self.HYPERPARAMS["mtcnn_alpha"]:
+                            self.update_dynamic(embedding)
 
-                    corner = (x - self.HYPERPARAMS["margin"] // 2, y - self.HYPERPARAMS["margin"] // 2)
-                    box = (x + height + self.HYPERPARAMS["margin"] // 2, y + width + self.HYPERPARAMS["margin"] // 2)
-
-                    FaceNet.add_key_points(overlay, key_points, radius, color, line_thickness)
-                    cv2.addWeighted(overlay, 1.0 - self.HYPERPARAMS["clear"], frame, self.HYPERPARAMS["clear"], 0,
-                                    frame)
-
-                    text = best_match if is_recognized else ""
-                    FaceNet.add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
+                    self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match)
 
                     # log activity
                     if use_log:
-                        self.log_activity(is_recognized, best_match, frame, num_faces=len(result), log_unknown=True)
+                        self.log_activity(is_recognized, best_match, frame, log_unknown=True)
 
                     # adaptive recognition threshold
                     if is_recognized and adaptive_alpha:
@@ -238,38 +232,70 @@ class FaceNet(object):
             await recognize_func(*args, **kwargs)
 
         loop = asyncio.new_event_loop()
-        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log, adaptive_alpha=True))
+        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log, adaptive_alpha=True,
+                                             use_dynamic=False))
         loop.run_until_complete(task)
 
-    # DISPLAYING
-    @staticmethod
-    def add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness):
-        cv2.rectangle(frame, corner, box, color, line_thickness)
-        cv2.putText(frame, best_match, corner, cv2.FONT_HERSHEY_SIMPLEX, font_size, color, thickness)
+    # GRAPHICS
+    def add_graphics(self, frame, overlay, person, width, height, is_recognized, best_match):
+        line_thickness = round(1e-6 * width * height + 1.5)
+        radius = round((1e-6 * width * height + 1.5) / 2.)
+        font_size = 4.5e-7 * width * height + 0.5
+        # works for 6.25e4 pixel video cature to 1e6 pixel video capture
 
-    @staticmethod
-    def add_key_points(overlay, key_points, radius, color, line_thickness):
-        cv2.circle(overlay, (key_points["left_eye"]), radius, color, line_thickness)
-        cv2.circle(overlay, (key_points["right_eye"]), radius, color, line_thickness)
-        cv2.circle(overlay, (key_points["nose"]), radius, color, line_thickness)
-        cv2.circle(overlay, (key_points["mouth_left"]), radius, color, line_thickness)
-        cv2.circle(overlay, (key_points["mouth_right"]), radius, color, line_thickness)
+        def get_color(is_recognized, best_match):
+            if not is_recognized:
+                return 0, 0, 255  # red
+            elif "visitor" in best_match:
+                return 128, 0, 128  # purple
+            else:
+                return 0, 255, 0  # green
 
-        cv2.line(overlay, key_points["left_eye"], key_points["nose"], color, radius)
-        cv2.line(overlay, key_points["right_eye"], key_points["nose"], color, radius)
-        cv2.line(overlay, key_points["mouth_left"], key_points["nose"], color, radius)
-        cv2.line(overlay, key_points["mouth_right"], key_points["nose"], color, radius)
+        def add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness):
+            cv2.rectangle(frame, corner, box, color, line_thickness)
+            cv2.putText(frame, best_match, corner, cv2.FONT_HERSHEY_SIMPLEX, font_size, color, thickness)
 
+        def add_key_points(overlay, key_points, radius, color, line_thickness):
+            cv2.circle(overlay, (key_points["left_eye"]), radius, color, line_thickness)
+            cv2.circle(overlay, (key_points["right_eye"]), radius, color, line_thickness)
+            cv2.circle(overlay, (key_points["nose"]), radius, color, line_thickness)
+            cv2.circle(overlay, (key_points["mouth_left"]), radius, color, line_thickness)
+            cv2.circle(overlay, (key_points["mouth_right"]), radius, color, line_thickness)
+
+            cv2.line(overlay, key_points["left_eye"], key_points["nose"], color, radius)
+            cv2.line(overlay, key_points["right_eye"], key_points["nose"], color, radius)
+            cv2.line(overlay, key_points["mouth_left"], key_points["nose"], color, radius)
+            cv2.line(overlay, key_points["mouth_right"], key_points["nose"], color, radius)
+
+        key_points = person["keypoints"]
+        x, y, height, width = person["box"]
+
+        color = get_color(is_recognized, best_match)
+
+        margin = self.HYPERPARAMS["margin"]
+        corner = (x - margin // 2, y - margin // 2)
+        box = (x + height + margin // 2, y + width + margin // 2)
+
+        add_key_points(overlay, key_points, radius, color, line_thickness)
+        clear = self.HYPERPARAMS["clear"]
+        cv2.addWeighted(overlay, 1.0 - clear, frame, clear, 0, frame)
+
+        text = best_match if is_recognized else ""
+        add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
+
+    # DISPLAY
     def show_embeds(self, encrypted=False, single=False):
 
         def closest_multiples(n):
-            if n == 0 or n == 1: return n, n
+            if n == 0 or n == 1:
+                return n, n
             factors = [((i, int(n / i)), (abs(i - int(n / i)))) for i in range(1, n) if n % i == 0]
-            return factors[np.argmin(list(zip(*factors))[1]).item()][0]
+            return sorted(factors, key=lambda n: n[1])[0][0]
 
-        data = DataEncryption.encrypt_data(self.data, ignore=["embeddings"],
-                                           decryptable=False) if encrypted else self.data
-        data = dict(random.shuffle(list(data.items())))
+        if encrypted:
+            data = DataEncryption.encrypt_data(self.data, ignore=["embeddings"], decryptable=False)
+        else:
+            data = self.data
 
         for person in data:
             embed = np.asarray(data[person])
@@ -288,7 +314,7 @@ class FaceNet(object):
 
     # LOGGING
     @staticmethod
-    def log_activity(is_recognized, best_match, frame, num_faces, log_unknown=True):
+    def log_activity(is_recognized, best_match, frame, log_unknown=True):
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
 
         def get_mode(d):
@@ -306,15 +332,15 @@ class FaceNet(object):
                 log.log_person(recognized_person, times=log.current_log[recognized_person])
                 cprint("Regular activity logged", color="green", attrs=["bold"])
 
-        if num_faces < 2 and log_unknown:
-            if log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
-                log.log_unknown()
-                cprint("Unknown activity logged", color="red", attrs=["bold"])
+        if log_unknown and log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
+            path = CONFIG_HOME + "/database/unknown/{}.jpg".format(len(os.listdir(CONFIG_HOME + "/database/unknown")))
+            log.log_unknown(path)
+            # recording unknown images is deprecated and will be removed/changed later
+            cv2.imwrite(path, frame)
+            cprint("Unknown activity logged", color="red", attrs=["bold"])
 
-                # recording unknown images is deprecated and will be removed/changed later
-                cv2.imwrite(
-                    HOME + "/database/unknown/{}.jpg".format(len(os.listdir(HOME + "/database/unknown"))),
-                    frame)
+    def update_dynamic(self, embedding):
+        raise NotImplementedError()
 
     # ADAPTIVE ALPHA
     def update_alpha(self, l2_dists):
