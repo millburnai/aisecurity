@@ -6,7 +6,7 @@ Internal use only-- manages data.
 
 """
 
-from aisecurity.extras.paths import DATABASE
+from aisecurity.extras.paths import DATABASE, HOME
 from aisecurity.facenet import *
 
 

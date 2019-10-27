@@ -6,16 +6,6 @@ Demonstration of facial recognition system.
 
 """
 
-# ARGPARSE
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument("--model", help="name of facenet model")
-args = parser.parse_args()
-
-if args.model is None:
-    args.model = "ms_celeb_1m"  # default (for Pycharm calls)
-
-
 # SETUP
 import os
 
@@ -71,4 +61,17 @@ def demo():
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", help="name of facenet model")
+    parser.add_argument("--path_to_model", help="path to facenet model")
+    args = parser.parse_args()
+
+    # default values (for Pycharm calls, where args are assigned a None value)
+    if args.model is None:
+        args.model = "ms_celeb_1m"
+    if args.path_to_model is None:
+        args.path_to_model = CONFIG_HOME + "/models/{}.h5".format(args.model)
+
     demo()
