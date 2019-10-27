@@ -55,12 +55,10 @@ AES encryption for JSON image database.
 
 [ ] Fix logging in package implementation.
 
-### Real-time database update (@orangese, @22pilarskil)
+### [ ]Real-time dynamic database update
 
 Add new database that contains a real-time log of unknown people who just signed in. This database can also be used for recognition.
 
-## Features
+### [ ] Real-time static database update (?)
 
-### [ ] Real time facial recognition appearance
-
-Make font size, bounding box size, and key point size all relative to the frame size.
+Constant update of static database using pictures that are being taken real-time. Would probably increase accuracy but might be an issue in terms of privacy.
