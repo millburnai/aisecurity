@@ -6,10 +6,21 @@ Demonstration of facial recognition system.
 
 """
 
+# ARGPARSE
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--model", help="name of facenet model")
+args = parser.parse_args()
+
+if args.model is None:
+    args.model = "ms_celeb_1m"  # default (for Pycharm calls)
+
+
 # SETUP
 import os
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
 
 # ERROR HANDLING
 import warnings
@@ -24,6 +35,7 @@ try:
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 except AttributeError:
     tf.logging.set_verbosity(tf.logging.ERROR)
+
 
 # PATH SETUP
 try:
@@ -47,7 +59,7 @@ from aisecurity.facenet import *
 def demo():
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
-    facenet = FaceNet(CONFIG_HOME + "/models/ms_celeb_1m.h5")
+    facenet = FaceNet(CONFIG_HOME + "/models/{}.h5".format(args.model))
 
     cprint("\nLoading encrypted database", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
