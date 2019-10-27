@@ -51,7 +51,7 @@ class FaceNet(object):
 
     # HYPERPARAMETERS
     HYPERPARAMS = {
-        "alpha": 0.8,
+        "alpha": 0.5,
         "margin": 10,
         "clear": 0.5,
         "update_alpha": 5
@@ -226,7 +226,7 @@ class FaceNet(object):
                     log.flush_current()
                 print("No face detected")
 
-            cv2.imshow("CSII AI facial recognition v0.1", frame)
+            cv2.imshow("CSII AI facial recognition v1.0a", frame)
 
             await asyncio.sleep(K.epsilon())
 
