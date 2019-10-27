@@ -27,8 +27,8 @@ from sklearn import neighbors
 from termcolor import cprint
 
 from aisecurity.extras.paths import CONFIG_HOME
-from aisecurity.logs import log
-from aisecurity.security.encryptions import DataEncryption
+from aisecurity import log
+from aisecurity.encryptions import DataEncryption
 
 
 # DECORATORS
@@ -164,16 +164,15 @@ class FaceNet(object):
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, use_log, adaptive_alpha, use_dynamic):
+        data_types = ["static"]
+        if use_dynamic:
+            data_types.append("dynamic")
         if use_log:
             log.init(flush=True)
-        if use_dynamic:
-            data_types = ["static", "dynamic"]
-        else:
-            data_types = ["static"]
 
-        detector = MTCNN()
+        mtcnn = MTCNN()
+
         cap = cv2.VideoCapture(0)
-
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
@@ -182,7 +181,7 @@ class FaceNet(object):
 
         while True:
             _, frame = cap.read()
-            result = detector.detect_faces(frame)
+            result = mtcnn.detect_faces(frame)
 
             if result:
                 overlay = frame.copy()
@@ -194,9 +193,14 @@ class FaceNet(object):
                     # facial recognition
                     try:
                         embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, data_types)
-                        print("L2 distance: {} ({}{})".format(l2_dist, "" if is_recognized else "!", best_match))
-                    except ValueError:
-                        print("Image refresh rate too high")
+                        print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
+                    except ValueError as error:  # error-handling using names is unstable-- change later
+                        if "query data dimension" in str(error):
+                            raise ValueError("Current model incompatible with database")
+                        elif "empty image" in str(error):
+                            print("Image refresh rate too high")
+                        else:
+                            print("Unknown error: " + str(error))
                         continue
 
                     if use_dynamic:
