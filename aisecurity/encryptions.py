@@ -1,6 +1,6 @@
 """
 
-"aisecurity.security.encryptions"
+"aisecurity.encryptions"
 
 AES encryption for the image database.
 
