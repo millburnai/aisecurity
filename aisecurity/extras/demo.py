@@ -47,11 +47,11 @@ from aisecurity.facenet import *
 def demo():
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
-    facenet = FaceNet()
+    facenet = FaceNet(CONFIG_HOME + "/models/ms_celeb_1m.h5")
 
     cprint("\nLoading encrypted database", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
-    facenet.set_data(Preprocessing.retrieve_embeds(DATABASE))
+    facenet.set_data(Preprocessing.retrieve_embeds(DATABASE, encrypted="names"))
 
     input("\nPress ENTER to continue:")
 

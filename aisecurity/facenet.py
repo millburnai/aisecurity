@@ -51,10 +51,15 @@ class FaceNet(object):
 
     # HYPERPARAMETERS
     HYPERPARAMS = {
-        "alpha": 1.0,
+        "alpha": 0.8,
         "margin": 10,
         "clear": 0.5,
         "update_alpha": 5
+    }
+
+    # CONSTANTS
+    CONSTANTS = {
+        "img_size": None,
     }
 
     # INITS
@@ -65,6 +70,8 @@ class FaceNet(object):
 
         self.__static_data = None  # must be filled in by user
         self.__dynamic_data = None  # used for real-time database updating (i.e., for visitors)
+
+        self.CONSTANTS["img_size"] = self.facenet.input_shape[1]
 
     # MUTATORS
     def set_data(self, data):
@@ -80,23 +87,22 @@ class FaceNet(object):
 
         self.__static_data = check_validity(data)
 
-        self._train_knn(knn_types=["static", "dynamic"])
+        try:
+            self._train_knn(knn_types=["static"])
+        except ValueError:
+            raise ValueError("Current model incompatible with database")
 
     def _train_knn(self, knn_types):
         def knn_factory(data):
-            knn_label_dict, embeddings = [], []
-            for person in data.keys():
-                knn_label_dict.append(person)
-                embeddings.append(data[person])
-            knn = neighbors.KNeighborsClassifier(n_neighbors=len(knn_label_dict) // len(set(knn_label_dict)))
-            knn.fit(embeddings, knn_label_dict)
+            names, embeddings = zip(*data.items())
+            knn = neighbors.KNeighborsClassifier(n_neighbors=len(names) // len(set(names)))
+            knn.fit(embeddings, names)
             return knn
 
-        if "static" in knn_types and self.__static_data:
+        if self.__static_data and "static" in knn_types:
             self.static_knn = knn_factory(self.__static_data)
-        if "dynamic" in knn_types and self.__dynamic_data:
+        if self.__dynamic_data and "dynamic" in knn_types:
             self.dynamic_knn = knn_factory(self.__dynamic_data)
-
 
     # RETRIEVERS
     @property
@@ -138,7 +144,7 @@ class FaceNet(object):
             pred = knn.predict(embedding)[0]
             best_matches.append((pred, np.linalg.norm(embedding - data[pred])))
 
-        best_match, l2_dist = sorted(best_matches, key=lambda n: n[1])
+        best_match, l2_dist = sorted(best_matches, key=lambda n: n[1])[0]
 
         return embedding, l2_dist <= FaceNet.HYPERPARAMS["alpha"], best_match, l2_dist
 
@@ -188,14 +194,15 @@ class FaceNet(object):
                     # facial recognition
                     try:
                         embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, data_types)
-                        print("L2 distance: {} ({})".format(l2_dist, best_match))
+                        print("L2 distance: {} ({}{})".format(l2_dist, "" if is_recognized else "!", best_match))
                     except ValueError:
                         print("Image refresh rate too high")
                         continue
 
                     if use_dynamic:
                         if not is_recognized and person["confidence"] >= self.HYPERPARAMS["mtcnn_alpha"]:
-                            self.update_dynamic(embedding)
+                            self.__dynamic_data["visitor_{}".format(len(self.__dynamic_data) + 1)] = embedding
+                            self._train_knn(knn_types=["dynamic"])
 
                     self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match)
 
@@ -226,14 +233,14 @@ class FaceNet(object):
         cv2.destroyAllWindows()
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=500, height=250, use_log=True):
+    def real_time_recognize(self, width=500, height=250, use_log=True, use_dynamic=False):
 
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
         loop = asyncio.new_event_loop()
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log, adaptive_alpha=True,
-                                             use_dynamic=False))
+                                             use_dynamic=use_dynamic))
         loop.run_until_complete(task)
 
     # GRAPHICS
@@ -339,9 +346,6 @@ class FaceNet(object):
             cv2.imwrite(path, frame)
             cprint("Unknown activity logged", color="red", attrs=["bold"])
 
-    def update_dynamic(self, embedding):
-        raise NotImplementedError()
-
     # ADAPTIVE ALPHA
     def update_alpha(self, l2_dists):
         if len(l2_dists) % round(self.HYPERPARAMS["update_alpha"]) == 0:
@@ -356,9 +360,6 @@ class FaceNet(object):
 
 # IMAGE PREPROCESSING
 class Preprocessing(object):
-
-    # HYPERPARAMETERS
-    IMG_SIZE = 160
 
     @staticmethod
     def whiten(x):
@@ -393,7 +394,7 @@ class Preprocessing(object):
 
             x, y, width, height = faces
             cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
-            resized = resize(cropped, (Preprocessing.IMG_SIZE, Preprocessing.IMG_SIZE))
+            resized = resize(cropped, (FaceNet.CONSTANTS["img_size"], FaceNet.CONSTANTS["img_size"]))
             return resized
 
         return np.array([align_img(path_or_img, faces=faces) for path_or_img in paths_or_imgs])
@@ -441,14 +442,15 @@ class Preprocessing(object):
 
     @staticmethod
     @timer(message="Data retrieval time")
-    def retrieve_embeds(path):
+    def retrieve_embeds(path, encrypted=None):
         with open(path, "r") as json_file:
             data = json.load(json_file)
 
-        try:  # default case: names are encoded, embeddings aren't
+        if encrypted == "embeddings":
+            return DataEncryption.decrypt_data(data, ignore=["names"])
+        elif encrypted == "names":
             return DataEncryption.decrypt_data(data, ignore=["embeddings"])
-        except UnicodeDecodeError:  # if names cannot be decoded
-            try:
-                return DataEncryption.decrypt_data(data, ignore=["names"])
-            except TypeError:  # if embeddings cannot be decoded
-                return data
+        elif encrypted == "all":
+            return DataEncryption.decrypt_data(data, ignore=None)
+        else:
+            return data
