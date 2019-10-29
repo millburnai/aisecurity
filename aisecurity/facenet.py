@@ -52,7 +52,8 @@ class FaceNet(object):
 
     # HYPERPARAMETERS
     HYPERPARAMS = {
-        "alpha": 0.5,
+        "alpha": 0.7,
+        "mtcnn_alpha": 0.9,
         "margin": 10,
         "clear": 0.5,
         "update_alpha": 5
@@ -70,7 +71,7 @@ class FaceNet(object):
         self.facenet = keras.models.load_model(filepath)
 
         self.__static_data = None  # must be filled in by user
-        self.__dynamic_data = None  # used for real-time database updating (i.e., for visitors)
+        self.__dynamic_data = {}  # used for real-time database updating (i.e., for visitors)
 
         self.CONSTANTS["img_size"] = self.facenet.input_shape[1]
 
@@ -84,12 +85,14 @@ class FaceNet(object):
                 data[key] = np.asarray(data[key])
                 is_vector = data[key].ndim <= 2 and (1 in data[key].shape or data[key].ndim == 1)
                 assert is_vector, "each data[key] must be a vectorized embedding"
+            del data['ryan_park']
             return data
 
         self.__static_data = check_validity(data)
 
         try:
             self._train_knn(knn_types=["static"])
+            self.dynamic_knn = None
         except ValueError:
             raise ValueError("Current model incompatible with database")
 
@@ -135,7 +138,7 @@ class FaceNet(object):
         if data_types is None or "static" in data_types:
             knns.append(self.static_knn)
             data.update(self.__static_data)
-        if "dynamic" in data_types:
+        if "dynamic" in data_types and self.dynamic_knn and self.__dynamic_data:
             knns.append(self.dynamic_knn)
             data.update(self.__dynamic_data)
 
@@ -204,11 +207,13 @@ class FaceNet(object):
                             print("Unknown error: " + str(error))
                         continue
 
+                    # update dynamic database
                     if use_dynamic:
                         if not is_recognized and person["confidence"] >= self.HYPERPARAMS["mtcnn_alpha"]:
-                            self.__dynamic_data["visitor_{}".format(len(self.__dynamic_data) + 1)] = embedding
+                            self.__dynamic_data["visitor_{}".format(len(self.__dynamic_data) + 1)] = embedding.flatten()
                             self._train_knn(knn_types=["dynamic"])
 
+                    # add graphics
                     self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match)
 
                     # log activity
@@ -225,6 +230,7 @@ class FaceNet(object):
                 if missed_frames > log.THRESHOLDS["missed_frames"]:
                     missed_frames = 0
                     log.flush_current()
+                    l2_dists = []
                 print("No face detected")
 
             cv2.imshow("CSII AI facial recognition v1.0a", frame)
