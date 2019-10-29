@@ -46,10 +46,10 @@ from aisecurity.facenet import *
 
 
 # ACTUAL DEMO
-def demo(path=None):
+def demo(model="ms_celeb_1m", path=None):
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
-    facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.h5".format(args.model))
+    facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.h5".format(model))
 
     cprint("\nLoading encrypted database", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
@@ -74,4 +74,4 @@ if __name__ == "__main__":
     if args.path_to_model is None:
         args.path_to_model = CONFIG_HOME + "/models/{}.h5".format(args.model)
 
-    demo(path=args.path_to_model)
+    demo(model=args.model, path=args.path_to_model)
