@@ -25,6 +25,7 @@ from mtcnn.mtcnn import MTCNN
 from skimage.transform import resize
 from sklearn import neighbors
 from termcolor import cprint
+import tensorflow as tf
 
 from aisecurity.extras.paths import CONFIG_HOME
 from aisecurity import log
@@ -242,8 +243,12 @@ class FaceNet(object):
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
+        config = tf.ConfigProto()
+        config.gpu_options.per_process_gpu_memory_fraction = 0.1
+        K.tensorflow_backend.set_session(tf.Session(config=config))
+
         loop = asyncio.new_event_loop()
-        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log, adaptive_alpha=True,
+        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log, adaptive_alpha=False,
                                              use_dynamic=use_dynamic))
         loop.run_until_complete(task)
 
