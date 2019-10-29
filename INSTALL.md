@@ -24,3 +24,7 @@ After installing, you might want to change the key location settings in `config.
 CPU: `pip3 install --upgrade git+https://github.com/orangese/aisecurity.git#egg=aisecurity[cpu]`
 
 GPU: `pip3 install --upgrade git+https://github.com/orangese/aisecurity.git#egg=aisecurity[gpu]`
+
+## Development
+
+Because the models are stored on Git LFS, cloning or pulling might overwrite the h5 files such that they do not contain a valid `keras` model anymore. Any developments might need to re-download the correct weight files from Github.
