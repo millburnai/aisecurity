@@ -10,7 +10,7 @@ setup(
     author_email="22parkr@millburn.org, 22pilarskil@millburn.org",
     license=None,
     python_requires=">=3.6.0",
-    install_requires=["numpy", "scipy", "keras", "matplotlib", "xlrd", "six", "termcolor", "scikit-learn",
+    install_requires=["numpy", "keras", "matplotlib", "xlrd", "six", "termcolor", "scikit-learn",
                       "scikit-image", "imageio", "mtcnn", "pycryptodome", "mysql-connector-python", "pymysql"],
     packages=find_packages(),
     extras_require={"gpu": ["tensorflow-gpu==1.12.0"], "cpu": ["tensorflow"]},
