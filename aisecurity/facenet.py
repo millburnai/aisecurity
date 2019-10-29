@@ -85,7 +85,6 @@ class FaceNet(object):
                 data[key] = np.asarray(data[key])
                 is_vector = data[key].ndim <= 2 and (1 in data[key].shape or data[key].ndim == 1)
                 assert is_vector, "each data[key] must be a vectorized embedding"
-            del data['ryan_park']
             return data
 
         self.__static_data = check_validity(data)
@@ -249,10 +248,6 @@ class FaceNet(object):
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
-        config = tf.ConfigProto()
-        config.gpu_options.per_process_gpu_memory_fraction = 0.1
-        K.tensorflow_backend.set_session(tf.Session(config=config))
-
         loop = asyncio.new_event_loop()
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log, adaptive_alpha=False,
                                              use_dynamic=use_dynamic))
@@ -269,13 +264,14 @@ class FaceNet(object):
             if not is_recognized:
                 return 0, 0, 255  # red
             elif "visitor" in best_match:
-                return 128, 0, 128  # purple
+                return 218, 112, 214  # purple (actually more of an "orchid")
             else:
                 return 0, 255, 0  # green
 
         def add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness):
             cv2.rectangle(frame, corner, box, color, line_thickness)
-            cv2.putText(frame, best_match, corner, cv2.FONT_HERSHEY_SIMPLEX, font_size, color, thickness)
+            cv2.putText(frame, best_match.replace("_", " ").title(), corner, cv2.FONT_HERSHEY_SIMPLEX, font_size,
+                        color, thickness)
 
         def add_key_points(overlay, key_points, radius, color, line_thickness):
             cv2.circle(overlay, (key_points["left_eye"]), radius, color, line_thickness)
