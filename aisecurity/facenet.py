@@ -22,10 +22,8 @@ import numpy as np
 from imageio import imread
 from keras import backend as K
 from mtcnn.mtcnn import MTCNN
-from skimage.transform import resize
 from sklearn import neighbors
 from termcolor import cprint
-import tensorflow as tf
 
 from aisecurity.extras.paths import CONFIG_HOME
 from aisecurity import log
@@ -412,7 +410,7 @@ class Preprocessing(object):
 
             x, y, width, height = faces
             cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
-            resized = resize(cropped, (FaceNet.CONSTANTS["img_size"], FaceNet.CONSTANTS["img_size"]))
+            resized = cv2.resize(cropped, (FaceNet.CONSTANTS["img_size"], FaceNet.CONSTANTS["img_size"]))
             return resized
 
         return np.array([align_img(path_or_img, faces=faces) for path_or_img in paths_or_imgs])

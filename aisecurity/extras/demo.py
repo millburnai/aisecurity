@@ -46,7 +46,7 @@ from aisecurity.facenet import *
 
 
 # ACTUAL DEMO
-def demo(model="ms_celeb_1m", path=None):
+def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True):
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
     facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.h5".format(model))
@@ -57,7 +57,7 @@ def demo(model="ms_celeb_1m", path=None):
 
     input("\nPress ENTER to continue:")
 
-    facenet.real_time_recognize(use_log=True, use_dynamic=True)
+    facenet.real_time_recognize(use_log=use_log, use_dynamic=use_dynamic)
 
 
 if __name__ == "__main__":
