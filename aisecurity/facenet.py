@@ -53,7 +53,7 @@ class FaceNet(object):
     # HYPERPARAMETERS
     HYPERPARAMS = {
         "alpha": 0.7,
-        "mtcnn_alpha": 0.9,
+        "mtcnn_alpha": 0.95,
         "margin": 10,
         "clear": 0.5,
         "update_alpha": 5
@@ -207,10 +207,8 @@ class FaceNet(object):
                         continue
 
                     # update dynamic database
-                    if use_dynamic:
-                        if not is_recognized and person["confidence"] >= self.HYPERPARAMS["mtcnn_alpha"]:
-                            self.__dynamic_data["visitor_{}".format(len(self.__dynamic_data) + 1)] = embedding.flatten()
-                            self._train_knn(knn_types=["dynamic"])
+                    if use_dynamic and len(l2_dists) >= log.THRESHOLDS["percent_diff"]:
+                        self.dynamic_update(person["confidence"], embedding, l2_dists)
 
                     # add graphics
                     self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match)
@@ -219,10 +217,7 @@ class FaceNet(object):
                     if use_log:
                         self.log_activity(is_recognized, best_match, frame, log_unknown=True)
 
-                    # adaptive recognition threshold
-                    if is_recognized and adaptive_alpha:
-                        l2_dists.append(l2_dist)
-                        l2_dists = self.update_alpha(l2_dists)
+                    l2_dists.append(l2_dist)
 
             else:
                 missed_frames += 1
@@ -359,6 +354,7 @@ class FaceNet(object):
 
     # ADAPTIVE ALPHA
     def update_alpha(self, l2_dists):
+        raise ValueError("update_alpha is deprecated, do not use")
         if len(l2_dists) % round(self.HYPERPARAMS["update_alpha"]) == 0:
             updated = 0.9 * self.HYPERPARAMS["alpha"] + 0.1 * (sum(l2_dists) / len(l2_dists) + 0.3)
             # alpha is a weighted average of the previous alpha and the new alpha
@@ -367,6 +363,17 @@ class FaceNet(object):
             self.HYPERPARAMS["alpha"] = updated
             l2_dists = []
         return l2_dists
+
+    # DYNAMIC DATABASE
+    def dynamic_update(self, confidence, embedding, l2_dists):
+        if confidence > self.HYPERPARAMS["mtcnn_alpha"]:
+            previous_frames = l2_dists[:-log.num_unknown]
+            filtered = list(filter(lambda x: x >= self.HYPERPARAMS["alpha"], previous_frames))
+            mostly_unknown = len(filtered) / len(previous_frames) < log.THRESHOLDS["percent_diff"]
+
+            if mostly_unknown and np.std(filtered) <= log.THRESHOLDS["percent_diff"]:
+                self.__dynamic_data["visitor_{}".format(len(self.__dynamic_data) + 1)] = embedding.flatten()
+                self._train_knn(knn_types=["dynamic"])
 
 
 # IMAGE PREPROCESSING
