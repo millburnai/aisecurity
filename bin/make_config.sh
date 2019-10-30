@@ -34,8 +34,10 @@ if [ ! -d "$config_path/models" ] ; then
   cd "$config_path" || echo "Error: unable to access $config_path"
   mkdir models
   cd models || echo "Error: unable to access $config_path/models"
-  wget -O "ms_celeb_1m.h5" "https://github.com/orangese/aisecurity/raw/v1.0a/models/ms_celeb_1m.h5" \
-  || echo "Error: MS-Celeb-1M could not be downloaded"
+  wget -O "ms_celeb_1m.h5" "https://drive.google.com/uc?export=download&id=1e2S1lPVscLYUpsEPP4BP-x5btHOfNtfJ" \
+  || echo "Error: MS-Celeb-1M model could not be downloaded"
+  wget -O "vgg_face_2.h5" "https://drive.google.com/uc?export=download&id=1_HrwcVG41qCi2x7MI8CLMtu_mzi4WxE_" \
+  || echo "Error: VGGFace2 could not be downloaded"
 fi
 
 if [ ! -d "$HOME/.aisecurity/keys" ] ; then
