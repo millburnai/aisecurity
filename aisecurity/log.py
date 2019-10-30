@@ -41,7 +41,7 @@ try:
     )
     cursor = database.cursor()
 
-except mysql.connector.errors.DatabaseError:
+except (mysql.connector.errors.DatabaseError, mysql.connector.errors.InterfaceError):
     warnings.warn("Database credentials missing or incorrect")
 
 
