@@ -1,8 +1,14 @@
+# paths-- must be imported before anything else
+from .extras.paths import *
+
 from . import encryptions
 from . import extras
 from . import facenet
 from . import log
-from .extras.paths import HOME
+from . import preprocessing
 
-# importable from root
+# also importable from root
 from .facenet import FaceNet
+
+__version__ = "1.0a"
+__authors__ = ["Ryan Park", "Liam Pilarski"]

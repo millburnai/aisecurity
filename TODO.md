@@ -37,7 +37,7 @@ It would be great if someone could convert the TensorFlow FaceNet model into a K
 
 TensorFlow model: https://drive.google.com/file/d/1EXPBSXwTaqrSC0OhUdXNmKSh9qJUQ55-/view
 
-### - [ ] Database appearance log
+### [ ] Database log
 
 [x] Log appearances of people and the corresponding time in a database during real time facial recognition. 
 
@@ -49,16 +49,16 @@ TensorFlow model: https://drive.google.com/file/d/1EXPBSXwTaqrSC0OhUdXNmKSh9qJUQ
 
 AES encryption for JSON image database. 
 
-### [ ] Packaging everything (@orangese)
+### [x] Packaging everything (@orangese)
 
 [x] Make everything installable and configurable with `pip` (@orangese).
 
-[ ] Fix logging in package implementation.
-
 ### [ ] Real-time dynamic database update
 
-Add new database that contains a real-time log of unknown people who just signed in. This database can also be used for recognition.
+[x] Add new database that contains a real-time log of unknown people who just signed in. This database can also be used for recognition.
 
 ### [ ] Real-time static database update (?)
 
-Constant update of static database using pictures that are being taken real-time. Would probably increase accuracy but might be an issue in terms of privacy.
+[ ] Constant update of static database using pictures that are being taken real-time. Would probably increase accuracy but might be an issue in terms of privacy.
+
+[ ] Integrate with dynamic database (less of a privacy issue)

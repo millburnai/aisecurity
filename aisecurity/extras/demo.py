@@ -51,7 +51,7 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True):
 
     cprint("\nLoading encrypted database", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
-    facenet.set_data(Preprocessing.retrieve_embeds(DATABASE, encrypted="names"))
+    facenet.set_data(retrieve_embeds(DATABASE, encrypted="names"))
 
     input("\nPress ENTER to continue:")
 

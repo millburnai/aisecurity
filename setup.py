@@ -14,6 +14,5 @@ setup(
                       "imageio", "mtcnn", "pycryptodome", "mysql-connector-python", "pymysql"],
     packages=find_packages(),
     extras_require={"gpu": ["tensorflow-gpu==1.12.0"], "cpu": ["tensorflow"]},
-    scripts=["bin/make_config.sh", "bin/make_keys.sh"],
     zip_safe=False
 )
