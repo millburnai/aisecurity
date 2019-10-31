@@ -16,19 +16,18 @@ from aisecurity.extras.paths import HOME, CONFIG_HOME
 
 # SETUP
 THRESHOLDS = {
-    "num_recognized": 3,
-    "num_unknown": 3,
-    "percent_diff": 0.2,
+    "num_recognized": 5,
+    "num_unknown": 5,
+    "percent_diff": 0.1,
     "cooldown": 10.0,
-    "time_since_previous": 3.0,
     "missed_frames": 10
 }
 
 num_recognized = 0
 num_unknown = 0
 
-last_logged = time.time() - THRESHOLDS["num_recognized"] + 0.1  # don't log for first 0.1s- it's just warming up then
-unk_last_logged = time.time() - THRESHOLDS["num_unknown"] + 0.1
+last_logged = time.time() - THRESHOLDS["cooldown"] + 0.1  # don't log for first 0.1s- it's just warming up then
+unk_last_logged = time.time() - THRESHOLDS["cooldown"] + 0.1
 
 current_log = {}
 

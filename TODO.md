@@ -55,7 +55,7 @@ AES encryption for JSON image database.
 
 [ ] Fix logging in package implementation.
 
-### [ ]Real-time dynamic database update
+### [ ] Real-time dynamic database update
 
 Add new database that contains a real-time log of unknown people who just signed in. This database can also be used for recognition.
 

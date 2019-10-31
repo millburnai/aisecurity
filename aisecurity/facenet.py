@@ -50,7 +50,7 @@ class FaceNet(object):
 
     # HYPERPARAMETERS
     HYPERPARAMS = {
-        "alpha": 0.7,
+        "alpha": 0.65,
         "mtcnn_alpha": 0.95,
         "margin": 10,
         "clear": 0.5,
@@ -83,6 +83,7 @@ class FaceNet(object):
                 data[key] = np.asarray(data[key])
                 is_vector = data[key].ndim <= 2 and (1 in data[key].shape or data[key].ndim == 1)
                 assert is_vector, "each data[key] must be a vectorized embedding"
+            del data['ryan_park']
             return data
 
         self.__static_data = check_validity(data)
@@ -164,7 +165,7 @@ class FaceNet(object):
         return is_recognized, best_match, l2_dist
 
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, use_log, adaptive_alpha, use_dynamic):
+    async def _real_time_recognize(self, width, height, use_log, use_dynamic):
         data_types = ["static"]
         if use_dynamic:
             data_types.append("dynamic")
@@ -195,17 +196,17 @@ class FaceNet(object):
                     try:
                         embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, data_types)
                         print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
-                    except ValueError as error:  # error-handling using names is unstable-- change later
+                    except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                         if "query data dimension" in str(error):
                             raise ValueError("Current model incompatible with database")
-                        elif "empty image" in str(error):
+                        elif "empty" in str(error):
                             print("Image refresh rate too high")
                         else:
                             print("Unknown error: " + str(error))
                         continue
 
                     # update dynamic database
-                    if use_dynamic and len(l2_dists) >= log.THRESHOLDS["percent_diff"]:
+                    if use_dynamic and len(l2_dists) >= log.THRESHOLDS["num_unknown"]:
                         self.dynamic_update(person["confidence"], embedding, l2_dists)
 
                     # add graphics
@@ -242,7 +243,7 @@ class FaceNet(object):
             await recognize_func(*args, **kwargs)
 
         loop = asyncio.new_event_loop()
-        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log, adaptive_alpha=False,
+        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log,
                                              use_dynamic=use_dynamic))
         loop.run_until_complete(task)
 
@@ -350,28 +351,18 @@ class FaceNet(object):
             cv2.imwrite(path, frame)
             cprint("Unknown activity logged", color="red", attrs=["bold"])
 
-    # ADAPTIVE ALPHA
-    def update_alpha(self, l2_dists):
-        raise ValueError("update_alpha is deprecated, do not use")
-        if len(l2_dists) % round(self.HYPERPARAMS["update_alpha"]) == 0:
-            updated = 0.9 * self.HYPERPARAMS["alpha"] + 0.1 * (sum(l2_dists) / len(l2_dists) + 0.3)
-            # alpha is a weighted average of the previous alpha and the new alpha
-            self.HYPERPARAMS["update_alpha"] *= 1 + (updated / self.HYPERPARAMS["alpha"])
-            # update alpha changes proportionally to the magnitude of the update
-            self.HYPERPARAMS["alpha"] = updated
-            l2_dists = []
-        return l2_dists
-
     # DYNAMIC DATABASE
     def dynamic_update(self, confidence, embedding, l2_dists):
-        if confidence > self.HYPERPARAMS["mtcnn_alpha"]:
-            previous_frames = l2_dists[:-log.num_unknown]
-            filtered = list(filter(lambda x: x >= self.HYPERPARAMS["alpha"], previous_frames))
-            mostly_unknown = len(filtered) / len(previous_frames) < log.THRESHOLDS["percent_diff"]
+        previous_frames = l2_dists[-log.THRESHOLDS["num_unknown"]:]
+        filtered = list(filter(lambda x: x > self.HYPERPARAMS["alpha"], previous_frames))
 
-            if mostly_unknown and np.std(filtered) <= log.THRESHOLDS["percent_diff"]:
+        if confidence > self.HYPERPARAMS["mtcnn_alpha"] and len(filtered) > 0:
+            mostly_unknown = len(filtered) / len(previous_frames) > 1. - log.THRESHOLDS["percent_diff"]
+
+            if mostly_unknown and np.std(filtered) <= log.THRESHOLDS["percent_diff"] / 2:
                 self.__dynamic_data["visitor_{}".format(len(self.__dynamic_data) + 1)] = embedding.flatten()
                 self._train_knn(knn_types=["dynamic"])
+                log.flush_current()
 
 
 # IMAGE PREPROCESSING
