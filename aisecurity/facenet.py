@@ -25,9 +25,9 @@ from mtcnn.mtcnn import MTCNN
 from sklearn import neighbors
 from termcolor import cprint
 
-from aisecurity.extras.paths import CONFIG_HOME
 from aisecurity import log
 from aisecurity.encryptions import DataEncryption
+from aisecurity.extras.paths import CONFIG_HOME
 
 
 # DECORATORS
@@ -52,15 +52,15 @@ class FaceNet(object):
     HYPERPARAMS = {
         "alpha": 0.65,
         "mtcnn_alpha": 0.95,
-        "margin": 10,
-        "clear": 0.5,
-        "update_alpha": 5
+        "margin": 10
     }
+
 
     # CONSTANTS
     CONSTANTS = {
         "img_size": None,
     }
+
 
     # INITS
     @timer(message="Model load time")
@@ -72,6 +72,7 @@ class FaceNet(object):
         self.__dynamic_data = {}  # used for real-time database updating (i.e., for visitors)
 
         self.CONSTANTS["img_size"] = self.facenet.input_shape[1]
+
 
     # MUTATORS
     def set_data(self, data):
@@ -106,6 +107,7 @@ class FaceNet(object):
         if self.__dynamic_data and "dynamic" in knn_types:
             self.dynamic_knn = knn_factory(self.__dynamic_data)
 
+
     # RETRIEVERS
     @property
     def data(self):
@@ -126,6 +128,7 @@ class FaceNet(object):
 
     def predict(self, paths_or_imgs, *args, **kwargs):
         return Preprocessing.embed(self.facenet, paths_or_imgs, *args, **kwargs)
+
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
@@ -163,6 +166,7 @@ class FaceNet(object):
                     best_match, l2_dist))
 
         return is_recognized, best_match, l2_dist
+
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, use_log, use_dynamic):
@@ -247,11 +251,13 @@ class FaceNet(object):
                                              use_dynamic=use_dynamic))
         loop.run_until_complete(task)
 
+
     # GRAPHICS
     def add_graphics(self, frame, overlay, person, width, height, is_recognized, best_match):
         line_thickness = round(1e-6 * width * height + 1.5)
         radius = round((1e-6 * width * height + 1.5) / 2.)
         font_size = 4.5e-7 * width * height + 0.5
+
         # works for 6.25e4 pixel video cature to 1e6 pixel video capture
 
         def get_color(is_recognized, best_match):
@@ -289,8 +295,7 @@ class FaceNet(object):
         box = (x + height + margin // 2, y + width + margin // 2)
 
         add_key_points(overlay, key_points, radius, color, line_thickness)
-        clear = self.HYPERPARAMS["clear"]
-        cv2.addWeighted(overlay, 1.0 - clear, frame, clear, 0, frame)
+        cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
 
         text = best_match if is_recognized else ""
         add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
@@ -323,6 +328,7 @@ class FaceNet(object):
 
             if single and person == list(data.keys())[0]:
                 break
+
 
     # LOGGING
     @staticmethod
@@ -368,19 +374,11 @@ class FaceNet(object):
 # IMAGE PREPROCESSING
 class Preprocessing(object):
 
+    # BASE
     @staticmethod
     def whiten(x):
-        if x.ndim == 4:
-            axis = (1, 2, 3)
-            size = x[0].size
-        elif x.ndim == 3:
-            axis = (0, 1, 2)
-            size = x.size
-        else:
-            raise ValueError("x must have either 3 or 4 dimensions")
-
-        std_adj = np.maximum(np.std(x, axis=axis, keepdims=True), 1.0 / np.sqrt(size))
-        whitened = (x - np.mean(x, axis=axis, keepdims=True)) / std_adj
+        std_adj = np.maximum(np.std(x, axis=(0, 1, 2), keepdims=True), 1.0 / np.sqrt(x.size))
+        whitened = (x - np.mean(x, axis=(0, 1, 2), keepdims=True)) / std_adj
         return whitened
 
     @staticmethod
@@ -407,13 +405,17 @@ class Preprocessing(object):
         return np.array([align_img(path_or_img, faces=faces) for path_or_img in paths_or_imgs])
 
     @staticmethod
-    def embed(facenet, paths_or_imgs, margin=15, batch_size=1, faces=None):
-        aligned_imgs = Preprocessing.whiten(Preprocessing.align_imgs(paths_or_imgs, margin, faces=faces))
-        raw_embeddings = facenet.predict(aligned_imgs, batch_size=batch_size)
+    def embed(facenet, paths_or_imgs, margin=FaceNet.HYPERPARAMS["margin"], faces=None):
         l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
+
+        aligned_imgs = Preprocessing.whiten(Preprocessing.align_imgs(paths_or_imgs, margin, faces=faces))
+        raw_embeddings = facenet.predict(aligned_imgs)
         normalized_embeddings = l2_normalize(raw_embeddings)
+
         return normalized_embeddings
 
+
+    # LOADING
     @staticmethod
     @timer(message="Data preprocessing time")
     def load(facenet, img_dir, people=None):

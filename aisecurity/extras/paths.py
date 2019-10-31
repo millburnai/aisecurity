@@ -10,14 +10,10 @@ import json
 import os
 import subprocess
 
-from termcolor import cprint
-
-HOME, CONFIG_HOME = os.getenv("HOME"), os.getenv("HOME")
-os.chdir(HOME)
-
 import aisecurity
 
-CONFIG_HOME += "/.aisecurity"
+
+CONFIG_HOME = os.getenv("HOME") + "/.aisecurity"
 HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
 if not os.path.exists(CONFIG_HOME + "/aisecurity.json"):
     subprocess.call(["make_config.sh"])

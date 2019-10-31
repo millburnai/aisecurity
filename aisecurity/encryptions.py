@@ -18,6 +18,7 @@ from Crypto.Random import get_random_bytes
 
 from aisecurity.extras.paths import KEY_DIR, KEY_FILE
 
+
 # CONSTANTS
 try:
     _KEY_FILES = json.load(open(KEY_FILE))

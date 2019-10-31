@@ -11,7 +11,6 @@ import os
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-
 # ERROR HANDLING
 import warnings
 
@@ -25,7 +24,6 @@ try:
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 except AttributeError:
     tf.logging.set_verbosity(tf.logging.ERROR)
-
 
 # PATH SETUP
 try:
