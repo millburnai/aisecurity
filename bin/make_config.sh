@@ -26,7 +26,7 @@ if [ ! -d "$config_path/database" ] ; then
   mkdir database
   cd "$config_path/database" || echo "Error: unable to access $config_path/database"
   mkdir unknown
-  wget -O "encrypted.json" "https://www.dropbox.com/s/4k11f5c7yhvbc6b/encrypted.json?dl=1" || \
+  wget -O "encrypted.json" "https://www.dropbox.com/s/80xgr7zuybbhydu/encrypted.json?dl=1" || \
   echo "Error: unable to download encrypted.json"
 fi
 
@@ -52,6 +52,6 @@ if [ ! -d "$HOME/.aisecurity/bin" ] ; then
   cd "$config_path" || echo "Error: unable to access $config_path"
   mkdir bin
   cd "$config_path/bin" || echo "Error: unable to access $config_path/bin"
-  wget -O "drop.sql" "https://github.com/orangese/aisecurity/raw/v1.0a/bin/drop.sql" || \
+  wget -O "drop.sql" "https://github.com/orangese/aisecurity/raw/tensorrt/bin/drop.sql" || \
   echo "Error: drop.sql could not be downloaded"
 fi
