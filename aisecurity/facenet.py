@@ -11,7 +11,7 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 import asyncio
 import warnings
 
-import keras
+import tensorflow as tf
 import matplotlib.pyplot as plt
 from sklearn import neighbors
 from termcolor import cprint
@@ -32,16 +32,46 @@ class FaceNet(object):
     }
 
 
+    # CONSTANTS
+    CONSTANTS = {
+        "ms_celeb_1m": {
+            "inputs": ["input_1"],
+            "outputs": ["Bottleneck_BatchNorm/batchnorm/add_1"]
+        },
+        "vgg_face_2": {
+            "inputs": ["base_input"],
+            "outputs": ["classifier_low_dim/Softmax"]
+        }
+    }
+
+
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.h5"):
+    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m_trt.h5"):
         assert os.path.exists(filepath), "{} not found".format(filepath)
-        self.facenet = keras.models.load_model(filepath)
 
+        # get frozen graph
+        trt_graph = self.get_frozen_graph(filepath)
+
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        self.sess = tf.Session(config=config)
+
+        tf.import_graph_def(trt_graph, name="")
+
+        # inputs/outputs
+        self.input_name, self.output_name = None, None
+        for model in self.CONSTANTS:
+            if model in filepath:
+                self.input_name = self.CONSTANTS[model]["inputs"][0] + ":0"
+                self.output_name = self.CONSTANTS[model]["outputs"][0] + ":0"
+        assert self.input_name and self.output_name, "{} not a supported model".format(filepath)
+
+        CONSTANTS["img_size"] = self.get_input_shape(trt_graph)[0]
+
+        # data init
         self.__static_data = None  # must be filled in by user
         self.__dynamic_data = {}  # used for real-time database updating (i.e., for visitors)
-
-        CONSTANTS["img_size"] = self.facenet.input_shape[1]
 
 
     # MUTATORS
@@ -82,6 +112,20 @@ class FaceNet(object):
     def data(self):
         return self.__static_data
 
+    @staticmethod
+    def get_frozen_graph(path):
+        with tf.gfile.FastGFile(path, "rb") as graph_file:
+            graph_def = tf.GraphDef()
+            graph_def.ParseFromString(graph_file.read())
+        return graph_def
+
+    @staticmethod
+    def get_input_shape(graph):
+        for node in graph.node:
+            if "input" in node.name:
+                size = node.attr["shape"].shape
+                return tuple(size.dim[i].size for i in range(1, 4))
+
     def get_embeds(self, data, *args, **kwargs):
         embeds = []
         for n in args:
@@ -96,7 +140,8 @@ class FaceNet(object):
         return embeds if len(embeds) > 1 else embeds[0]
 
     def predict(self, paths_or_imgs, *args, **kwargs):
-        return embed(self.facenet, paths_or_imgs, *args, **kwargs)
+        output_tensor = self.sess.graph.get_tensor_by_name(self.output_name)
+        return embed(self.sess, paths_or_imgs, self.input_name, output_tensor, *args, **kwargs)
 
 
     # FACIAL RECOGNITION HELPER

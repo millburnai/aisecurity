@@ -73,11 +73,11 @@ def align_imgs(paths_or_imgs, margin, faces=None):
     return np.array([align_img(path_or_img, faces=faces) for path_or_img in paths_or_imgs])
 
 
-def embed(facenet, paths_or_imgs, margin=CONSTANTS["margin"], faces=None):
+def embed(sess, paths_or_imgs, input_name, output_tensor, margin=CONSTANTS["margin"], faces=None):
     l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
 
     aligned_imgs = whiten(align_imgs(paths_or_imgs, margin, faces=faces))
-    raw_embeddings = facenet.predict(aligned_imgs)
+    raw_embeddings = sess.run(output_tensor, {input_name: aligned_imgs})
     normalized_embeddings = l2_normalize(raw_embeddings)
 
     return normalized_embeddings
@@ -88,7 +88,7 @@ def embed(facenet, paths_or_imgs, margin=CONSTANTS["margin"], faces=None):
 def load(facenet, img_dir, people=None):
     if people is None:
         people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
-    data = {person: embed(facenet, img_dir + person) for person in people}
+    data = {person: facenet.predict(img_dir + person) for person in people}
     return data
 
 
@@ -105,11 +105,11 @@ def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=
         old_embeds = retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path)
 
         new_people = [person for person in people if person not in old_embeds.keys()]
-        new_embeds = load(facenet.facenet, img_dir, people=new_people)
+        new_embeds = load(facenet, img_dir, people=new_people)
 
         embeds_dict = {**old_embeds, **new_embeds}  # combining dicts and overwriting any duplicates with new_embeds
     else:
-        embeds_dict = load(facenet.facenet, img_dir)
+        embeds_dict = load(facenet, img_dir)
 
     encrypted_data = DataEncryption.encrypt_data(embeds_dict, ignore=ignore_encrypt)
 
