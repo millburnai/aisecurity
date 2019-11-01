@@ -26,7 +26,8 @@ if [ ! -d "$config_path/database" ] ; then
   mkdir database
   cd "$config_path/database" || echo "Error: unable to access $config_path/database"
   mkdir unknown
-  touch encrypted.json
+  wget -O "encrypted.json" "https://www.dropbox.com/s/80xgr7zuybbhydu/encrypted.json?dl=1" || \
+  echo "Error: unable to access encrypted.json"
 fi
 
 if [ ! -d "$config_path/models" ] ; then
