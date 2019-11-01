@@ -13,18 +13,18 @@
 If you're using MacOS Catalina (and the `zsh` shell), you must put quotations around the installation link
 in order for it to work.
 
-CPU: `pip3 install git+https://github.com/orangese/aisecurity.git#egg=aisecurity[cpu]`
+CPU: `pip3 install git+https://github.com/orangese/aisecurity/tree/keras`
 
-GPU: `pip3 install git+https://github.com/orangese/aisecurity.git#egg=aisecurity[gpu]`
+GPU: `pip3 install git+https://github.com/orangese/aisecurity.git`
 
 After installing, you might want to change the key location settings in `config.json`, which is installed with the `aisecurity` package.
 
 ## Upgrade
 
-CPU: `pip3 install --upgrade git+https://github.com/orangese/aisecurity.git#egg=aisecurity[cpu]`
+CPU: `pip3 install --upgrade git+https://github.com/orangese/tree/keras`
 
-GPU: `pip3 install --upgrade git+https://github.com/orangese/aisecurity.git#egg=aisecurity[gpu]`
+GPU: `pip3 install --upgrade git+https://github.com/orangese/aisecurity.git`
 
 ## Development
 
-Because the models are stored on Git LFS, cloning or pulling might overwrite the h5 files such that they do not contain a valid `keras` model anymore. Any developments might need to re-download the correct weight files from [this Google Drive folder](https://drive.google.com/open?id=1dlc_ewXtGftcZvZ7axusWcYfYyDj6kbM).
+Because the models are stored on Git LFS, cloning or pulling might overwrite the h5 files such that they do not contain a valid `keras` model anymore. Any developments might need to re-download the correct weight files from [this Dropbox folder](https://www.dropbox.com/sh/k9ci2nphj7i7dde/AACaQuxUJ6GoPHFxW6FtJlZca?dl=0).
