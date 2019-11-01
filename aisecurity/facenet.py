@@ -11,7 +11,6 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 import asyncio
 import warnings
 
-import tensorflow as tf
 import matplotlib.pyplot as plt
 from sklearn import neighbors
 from termcolor import cprint

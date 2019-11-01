@@ -12,7 +12,6 @@ import subprocess
 
 import aisecurity
 
-
 CONFIG_HOME = os.getenv("HOME") + "/.aisecurity"
 HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
 if not os.path.exists(CONFIG_HOME + "/aisecurity.json"):
