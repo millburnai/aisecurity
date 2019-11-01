@@ -44,7 +44,7 @@ from aisecurity.facenet import *
 
 
 # ACTUAL DEMO
-def demo(model="ms_celeb_1m_trt", path=None, use_log=True, use_dynamic=True):
+def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True):
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
     facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.pb".format(model))
@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     # default values (for Pycharm calls, where args are assigned a None value)
     if args.model is None:
-        args.model = "ms_celeb_1m_trt"
+        args.model = "ms_celeb_1m"
     if args.path_to_model is None:
         args.path_to_model = CONFIG_HOME + "/models/{}.pb".format(args.model)
 

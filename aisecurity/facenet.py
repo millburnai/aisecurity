@@ -46,7 +46,7 @@ class FaceNet(object):
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m_trt.h5"):
+    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.pb"):
         assert os.path.exists(filepath), "{} not found".format(filepath)
 
         # get frozen graph

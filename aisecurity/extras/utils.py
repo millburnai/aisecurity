@@ -77,6 +77,3 @@ def write_inference_graph(frozen_graph, output_names, save_dir, save_name):
 
 if __name__ == "__main__":
     print("Nothing for now!")
-    # frozen, (inputs, outputs) = freeze_graph("/home/ryan/.aisecurity/models/vgg_face_2.h5",
-    #                                          "/home/ryan/scratchpad/models")
-    # write_inference_graph(frozen, outputs, "/home/ryan/scratchpad/models", "frozen_vgg_face_2.h5")

@@ -26,7 +26,8 @@ if [ ! -d "$config_path/database" ] ; then
   mkdir database
   cd "$config_path/database" || echo "Error: unable to access $config_path/database"
   mkdir unknown
-  touch encrypted.json
+  wget -O "encrypted.json" "https://www.dropbox.com/s/4k11f5c7yhvbc6b/encrypted.json?dl=1" || \
+  echo "Error: unable to download encrypted.json"
 fi
 
 if [ ! -d "$config_path/models" ] ; then
@@ -34,10 +35,10 @@ if [ ! -d "$config_path/models" ] ; then
   cd "$config_path" || echo "Error: unable to access $config_path"
   mkdir models
   cd models || echo "Error: unable to access $config_path/models"
-  wget -O "ms_celeb_1m.h5" "https://drive.google.com/uc?export=download&id=1e2S1lPVscLYUpsEPP4BP-x5btHOfNtfJ" \
+  wget -O "ms_celeb_1m.pb" "https://www.dropbox.com/s/ua0hhioidnhpd90/ms_celeb_1m.pb?dl=1" \
   || echo "Error: MS-Celeb-1M model could not be downloaded"
-  wget -O "vgg_face_2.h5" "https://drive.google.com/uc?export=download&id=1_HrwcVG41qCi2x7MI8CLMtu_mzi4WxE_" \
-  || echo "Error: VGGFace2 could not be downloaded"
+  wget -O "vgg_face_2.pb" "https://www.dropbox.com/s/rixgtj6pjs9r9ob/vgg_face_2.pb?dl=1" \
+  || echo "Error: VGGFace2 model could not be downloaded"
 fi
 
 if [ ! -d "$HOME/.aisecurity/keys" ] ; then

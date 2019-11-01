@@ -21,14 +21,16 @@ function mk_key_files {
   key_loc=$1
 
   if [ ! -d "$key_loc/name_keys.txt" ] ; then
-    touch name_keys.txt
+    wget -O "name_keys.txt" "https://www.dropbox.com/s/j46rq05i92ip4rq/name_keys.txt?dl=1" || \
+    echo "name_keys.txt could not be accessed"
     echo "name_keys.txt created in $key_loc"
   else
     echo "name_keys.txt already exists in $key_loc"
   fi
 
   if [ ! -d "$key_loc/embedding_keys.txt" ] ; then
-    touch embedding_keys.txt
+    wget -O "embedding_keys.txt" "https://www.dropbox.com/s/wlxykht47j3zfpg/embedding_keys.txt?dl=1" || \
+    echo "embedding_keys.txt could not be accessed"
     echo "embedding_keys.txt created in $key_loc"
   else
     echo "embedding_keys.txt already exists in $key_loc"
