@@ -45,7 +45,7 @@ def timer(message="Time elapsed"):
 
 # BASE FUNCTIONS
 def whiten(x):
-    std_adj = np.maximum(np.std(x, axis=(0, 1, 2), keepdims=True), 1.0 / np.sqrt(x.size))
+    std_adj = np.maximum(np.std(x, axis=(0, 1, 2), keepdims=True), 1. / np.sqrt(x.size))
     whitened = (x - np.mean(x, axis=(0, 1, 2), keepdims=True)) / std_adj
     return whitened
 
