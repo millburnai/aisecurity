@@ -21,9 +21,7 @@ In addition to Millburn’s cybersecurity system, AISecurity has an internal thr
 
 The combination of these three security measures means that nobody will be able to view the student or faculty images. There are no exceptions to this rule: it is not mathematically possible to view the original image of anybody in the database. Additionally, during the use of AISecurity, none of the images used for recognition will be stored, ensuring maximum privacy. In reality, there should be little to no privacy concerns, since the reference database is impossible to access and real-time images are not stored.
 
-
-![](https://github.com/orangese/aisecurity/raw/v1.0a/.aisecurity/database/data_example.png)
-
+![](https://www.dropbox.com/s/m4xohkuszqhbdru/data_example.png?dl=1)
 
 Above is an example of an encrypted entry in our database.
 

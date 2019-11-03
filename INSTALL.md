@@ -2,29 +2,31 @@
 
 ## Prerequisites
 
-1. `wget` must be installed, preferably using `brew` (install `brew` with `/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"`). `wget` can be installed using `brew install wget` and is pre-installed on Linux systems.
+1. Python >= 3.5.0
 
-2. For GPU usage, `CUDA==9.0` and `CuDNN==7.4.1` must be installed.
+2. `wget` must be installed, preferably using `brew` (install `brew` with `/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"`). `wget` can be installed using `brew install wget` and is pre-installed on Linux systems.
 
-3. MySQL Community Server must be downloaded (see https://dev.mysql.com/downloads/mysql/).
+3. For GPU usage, `CUDA==9.0` and `CuDNN==7.4.1` must be installed.
+
+4. `mysql-connector-python`, `pymysql`, and MySQL Community Server must be downloaded (see https://dev.mysql.com/downloads/mysql/) in order to use MySQL logging functions.
 
 ## Installation
 
-If you're using MacOS Catalina (and the `zsh` shell), you must put quotations around the installation link
-in order for it to work.
+Note that TensorFlow 2.0 is not yet supported because the `mtcnn` package does not support it yet.
 
-CPU: `pip3 install git+https://github.com/orangese/aisecurity.git#egg=aisecurity[cpu]`
+Keras version: `python3 -m pip install "git+https://github.com/orangese/aisecurity.git@keras"`
 
-GPU: `pip3 install git+https://github.com/orangese/aisecurity.git#egg=aisecurity[gpu]`
+TF-TRT version: `python3 -m pip install "git+https://github.com/orangese/aisecurity.git@tf-trt"`
 
 After installing, you might want to change the key location settings in `config.json`, which is installed with the `aisecurity` package.
 
 ## Upgrade
 
-CPU: `pip3 install --upgrade git+https://github.com/orangese/aisecurity.git#egg=aisecurity[cpu]`
+Keras version: `python3 -m pip install --upgrade "git+https://github.com/orangese/aisecurity.git@keras"`
 
-GPU: `pip3 install --upgrade git+https://github.com/orangese/aisecurity.git#egg=aisecurity[gpu]`
+TF-TRT version: `python3 -m pip install --upgrade "git+https://github.com/orangese/aisecurity.git@tf-trt"`
 
-## Development
+## FaceNet weight files
 
-Because the models are stored on Git LFS, cloning or pulling might overwrite the h5 files such that they do not contain a valid `keras` model anymore. Any developments might need to re-download the correct weight files from [this Google Drive folder](https://drive.google.com/open?id=1dlc_ewXtGftcZvZ7axusWcYfYyDj6kbM).
+All weight files (.h5 and .pb models) are available in this [Dropbox folder](https://www.dropbox.com/sh/k9ci2nphj7i7dde/AACaQuxUJ6GoPHFxW6FtJlZca?dl=0). Please cite this repository if using them.
+
