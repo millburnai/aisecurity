@@ -2,7 +2,7 @@
 
 "aisecurity.facenet"
 
-Facial recognition with FaceNet in Keras.
+Facial recognition with FaceNet in Tensorflow-TensorRT (TF-TRT).
 
 Paper: https://arxiv.org/pdf/1503.03832.pdf
 
@@ -27,7 +27,7 @@ class FaceNet(object):
     # HYPERPARAMETERS
     HYPERPARAMS = {
         "alpha": 0.65,
-        "mtcnn_alpha": 0.95
+        "mtcnn_alpha": 0.99
     }
 
 
@@ -46,10 +46,17 @@ class FaceNet(object):
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.pb"):
+    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.pb", input_name=None, output_name=None):
         assert os.path.exists(filepath), "{} not found".format(filepath)
 
-        # get frozen graph
+        # get frozen graph info and set sess
+        self._sess_init(filepath, input_name, output_name)
+
+        # data init
+        self.__static_db = None  # must be filled in by user
+        self.__dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
+
+    def _sess_init(self, filepath, input_name, output_name):
         trt_graph = self.get_frozen_graph(filepath)
 
         config = tf.ConfigProto()
@@ -58,19 +65,22 @@ class FaceNet(object):
 
         tf.import_graph_def(trt_graph, name="")
 
-        # inputs/outputs
+        self._io_tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
+
+        self.facenet = self.sess.graph
+        CONSTANTS["img_size"] = tuple(self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3])
+
+    def _io_tensor_init(self, model_name, input_name, output_name):
         self.input_name, self.output_name = None, None
         for model in self.CONSTANTS:
-            if model in filepath:
+            if model in model_name:
                 self.input_name = self.CONSTANTS[model]["inputs"][0] + ":0"
                 self.output_name = self.CONSTANTS[model]["outputs"][0] + ":0"
-        assert self.input_name and self.output_name, "{} not a supported model".format(filepath)
-
-        CONSTANTS["img_size"] = self.get_input_shape(trt_graph)[0]
-
-        # data init
-        self.__static_data = None  # must be filled in by user
-        self.__dynamic_data = {}  # used for real-time database updating (i.e., for visitors)
+        if not self.input_name:
+            self.input_name = input_name
+        elif not self.output_name:
+            self.output_name = output_name
+        assert self.input_name and self.output_name, "I/O tensors for {} not detected or provided".format(model_name)
 
 
     # MUTATORS
@@ -85,7 +95,7 @@ class FaceNet(object):
                 assert is_vector, "each data[key] must be a vectorized embedding"
             return data
 
-        self.__static_data = check_validity(data)
+        self.__static_db = check_validity(data)
 
         try:
             self._train_knn(knn_types=["static"])
@@ -100,16 +110,16 @@ class FaceNet(object):
             knn.fit(embeddings, names)
             return knn
 
-        if self.__static_data and "static" in knn_types:
-            self.static_knn = knn_factory(self.__static_data)
-        if self.__dynamic_data and "dynamic" in knn_types:
-            self.dynamic_knn = knn_factory(self.__dynamic_data)
+        if self.__static_db and "static" in knn_types:
+            self.static_knn = knn_factory(self.__static_db)
+        if self.__dynamic_db and "dynamic" in knn_types:
+            self.dynamic_knn = knn_factory(self.__dynamic_db)
 
 
     # RETRIEVERS
     @property
     def data(self):
-        return self.__static_data
+        return self.__static_db
 
     @staticmethod
     def get_frozen_graph(path):
@@ -117,13 +127,6 @@ class FaceNet(object):
             graph_def = tf.GraphDef()
             graph_def.ParseFromString(graph_file.read())
         return graph_def
-
-    @staticmethod
-    def get_input_shape(graph):
-        for node in graph.node:
-            if "input" in node.name:
-                size = node.attr["shape"].shape
-                return tuple(size.dim[i].size for i in range(1, 4))
 
     def get_embeds(self, data, *args, **kwargs):
         embeds = []
@@ -139,32 +142,36 @@ class FaceNet(object):
         return embeds if len(embeds) > 1 else embeds[0]
 
     def predict(self, paths_or_imgs, *args, **kwargs):
-        output_tensor = self.sess.graph.get_tensor_by_name(self.output_name)
+        output_tensor = self.facenet.get_tensor_by_name(self.output_name)
         return embed(self.sess, paths_or_imgs, self.input_name, output_tensor, *args, **kwargs)
 
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
-    def _recognize(self, img, faces=None, data_types=None):
-        assert self.__static_data or self.__dynamic_data, "data must be provided"
+    def _recognize(self, img, faces=None, db_types=None):
+        assert self.__static_db or self.__dynamic_db, "data must be provided"
+
+        start = time.time()
 
         knns, data = [], {}
-        if data_types is None or "static" in data_types:
+        if db_types is None or "static" in db_types:
             knns.append(self.static_knn)
-            data.update(self.__static_data)
-        if "dynamic" in data_types and self.dynamic_knn and self.__dynamic_data:
+            data.update(self.__static_db)
+        if "dynamic" in db_types and self.dynamic_knn and self.__dynamic_db:
             knns.append(self.dynamic_knn)
-            data.update(self.__dynamic_data)
+            data.update(self.__dynamic_db)
 
         embedding = self.get_embeds(data, img, faces=faces)
         best_matches = []
         for knn in reversed(knns):
             pred = knn.predict(embedding)[0]
             best_matches.append((pred, np.linalg.norm(embedding - data[pred])))
-
         best_match, l2_dist = sorted(best_matches, key=lambda n: n[1])[0]
+        is_recognized = l2_dist <= FaceNet.HYPERPARAMS["alpha"]
 
-        return embedding, l2_dist <= FaceNet.HYPERPARAMS["alpha"], best_match, l2_dist
+        elapsed = time.time() - start
+        
+        return embedding, is_recognized, best_match, l2_dist, elapsed
 
     # FACIAL RECOGNITION
     def recognize(self, img, verbose=True):
@@ -183,13 +190,13 @@ class FaceNet(object):
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, use_log, use_dynamic):
-        data_types = ["static"]
+        db_types = ["static"]
         if use_dynamic:
-            data_types.append("dynamic")
+            db_types.append("dynamic")
         if use_log:
             log.init(flush=True)
 
-        mtcnn = MTCNN()
+        mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
 
         cap = cv2.VideoCapture(0)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
@@ -211,7 +218,7 @@ class FaceNet(object):
 
                     # facial recognition
                     try:
-                        embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, data_types)
+                        embedding, is_recognized, best_match, l2_dist, elapsed = self._recognize(frame, face, db_types)
                         print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
                     except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                         if "query data dimension" in str(error):
@@ -222,18 +229,19 @@ class FaceNet(object):
                             print("Unknown error: " + str(error))
                         continue
 
-                    # update dynamic database
-                    if use_dynamic and len(l2_dists) >= log.THRESHOLDS["num_unknown"]:
-                        self.dynamic_update(person["confidence"], embedding, l2_dists)
+                    if person["confidence"] >= self.HYPERPARAMS["mtcnn_alpha"]:
+                        # add graphics
+                        self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match)
 
-                    # add graphics
-                    self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match)
+                        # update dynamic database
+                        if use_dynamic:
+                            self.dynamic_update(embedding, l2_dists, elapsed)
 
-                    # log activity
-                    if use_log:
-                        self.log_activity(is_recognized, best_match, frame, log_unknown=True)
+                        # log activity
+                        if use_log:
+                            self.log_activity(is_recognized, best_match, frame, elapsed, log_unknown=True)
 
-                    l2_dists.append(l2_dist)
+                        l2_dists.append(l2_dist)
 
             else:
                 missed_frames += 1
@@ -245,7 +253,7 @@ class FaceNet(object):
 
             cv2.imshow("AI Security v1.0a", frame)
 
-            await asyncio.sleep(K.epsilon())
+            await asyncio.sleep(1e-6)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
@@ -345,7 +353,10 @@ class FaceNet(object):
 
     # LOGGING
     @staticmethod
-    def log_activity(is_recognized, best_match, frame, log_unknown=True):
+    def log_activity(is_recognized, best_match, frame, elapsed, log_unknown=True):
+        if elapsed > 1.:
+            return None
+
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
 
         def get_mode(d):
@@ -372,14 +383,17 @@ class FaceNet(object):
             cprint("Unknown activity logged", color="red", attrs=["bold"])
 
     # DYNAMIC DATABASE
-    def dynamic_update(self, confidence, embedding, l2_dists):
+    def dynamic_update(self, embedding, l2_dists, elapsed):
+        if elapsed > 1.0:
+            return None
+
         previous_frames = l2_dists[-log.THRESHOLDS["num_unknown"]:]
         filtered = list(filter(lambda x: x > self.HYPERPARAMS["alpha"], previous_frames))
 
-        if confidence > self.HYPERPARAMS["mtcnn_alpha"] and len(filtered) > 0:
-            mostly_unknown = len(filtered) / len(previous_frames) > 1. - log.THRESHOLDS["percent_diff"]
+        if len(l2_dists) >= log.THRESHOLDS["num_unknown"] and len(filtered) > 0:
+            mostly_unknown = len(filtered) / len(previous_frames) >= 1. - log.THRESHOLDS["percent_diff"]
 
-            if mostly_unknown and np.std(filtered) <= log.THRESHOLDS["percent_diff"] / 2:
-                self.__dynamic_data["visitor_{}".format(len(self.__dynamic_data) + 1)] = embedding.flatten()
+            if mostly_unknown and np.std(filtered) <= log.THRESHOLDS["percent_diff"] / 2.:
+                self.__dynamic_db["visitor_{}".format(len(self.__dynamic_db) + 1)] = embedding.flatten()
                 self._train_knn(knn_types=["dynamic"])
                 log.flush_current()
