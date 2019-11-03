@@ -9,11 +9,10 @@ setup(
     author="Ryan Park, Liam Pilarski",
     author_email="22parkr@millburn.org, 22pilarskil@millburn.org",
     license=None,
-    python_requires=">=3.6.0",
-    install_requires=["numpy", "keras", "matplotlib", "termcolor", "scikit-learn",
-                      "imageio", "mtcnn", "pycryptodome", "mysql-connector-python", "pymysql"],
+    python_requires=">=3.5.0",
+    install_requires=["numpy", "matplotlib", "termcolor", "scikit-learn", "imageio", "mtcnn", "pycryptodome",
+                      "tensorflow<=1.15.0"],
     packages=find_packages(),
-    extras_require={"gpu": ["tensorflow-gpu==1.12.0"], "cpu": ["tensorflow"]},
     scripts=["bin/make_config.sh", "bin/make_keys.sh"],
     zip_safe=False
 )

@@ -29,7 +29,6 @@ except AttributeError:
 try:
     # for Pycharm
     from aisecurity.extras.paths import HOME, DATABASE
-
 except ModuleNotFoundError:
     # for terminal
     import sys

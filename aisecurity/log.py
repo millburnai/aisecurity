@@ -13,12 +13,13 @@ import mysql.connector
 
 from aisecurity.extras.paths import HOME, CONFIG_HOME
 
+
 # SETUP
 THRESHOLDS = {
     "num_recognized": 5,
     "num_unknown": 5,
     "percent_diff": 0.1,
-    "cooldown": 10.0,
+    "cooldown": 10.,
     "missed_frames": 10
 }
 
@@ -71,7 +72,7 @@ def get_id(name):
 
 
 def get_percent_diff(best_match):
-    return 1.0 - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
+    return 1. - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
 
 
 def update_current_logs(is_recognized, best_match):

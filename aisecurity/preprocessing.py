@@ -13,22 +13,22 @@ import os
 import cv2
 import numpy as np
 from imageio import imread
-from keras import backend as K
 from mtcnn.mtcnn import MTCNN
 
 from aisecurity.encryptions import DataEncryption
 from aisecurity.extras.utils import *
 
+
 # CONSTANTS
 CONSTANTS = {
     "margin": 10,
-    "img_size": None
+    "img_size": (None, None)
 }
 
 
 # BASE FUNCTIONS
 def whiten(x):
-    std_adj = np.maximum(np.std(x, axis=(0, 1, 2), keepdims=True), 1.0 / np.sqrt(x.size))
+    std_adj = np.maximum(np.std(x, axis=(0, 1, 2), keepdims=True), 1. / np.sqrt(x.size))
     whitened = (x - np.mean(x, axis=(0, 1, 2), keepdims=True)) / std_adj
     return whitened
 
@@ -50,14 +50,14 @@ def align_imgs(paths_or_imgs, margin, faces=None):
 
         x, y, width, height = faces
         cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
-        resized = cv2.resize(cropped, (CONSTANTS["img_size"], CONSTANTS["img_size"]))
+        resized = cv2.resize(cropped, CONSTANTS["img_size"])
         return resized
 
     return np.array([align_img(path_or_img, faces=faces) for path_or_img in paths_or_imgs])
 
 
 def embed(sess, paths_or_imgs, input_name, output_tensor, margin=CONSTANTS["margin"], faces=None):
-    l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
+    l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6))
 
     aligned_imgs = whiten(align_imgs(paths_or_imgs, margin, faces=faces))
     raw_embeddings = sess.run(output_tensor, {input_name: aligned_imgs})
