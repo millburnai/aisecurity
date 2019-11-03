@@ -14,6 +14,8 @@ import mysql.connector
 from aisecurity.extras.paths import HOME, CONFIG_HOME
 
 
+warnings.warn("logging with MySQL is deprecated and will be removed in later versions", DeprecationWarning)
+
 # SETUP
 THRESHOLDS = {
     "num_recognized": 5,
