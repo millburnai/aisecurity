@@ -140,7 +140,7 @@ class FaceNet(object):
         return is_recognized, best_match, l2_dist
 
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, use_log, use_dynamic):
+    async def _real_time_recognize(self, width, height, use_log, use_dynamic, using_picamera):
         db_types = ["static"]
         if use_dynamic:
             db_types.append("dynamic")
@@ -149,7 +149,7 @@ class FaceNet(object):
 
         mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
 
-        cap = cv2.VideoCapture(0)
+        cap = self.get_video_cap(is_picamera=using_picamera)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
@@ -202,9 +202,9 @@ class FaceNet(object):
                     l2_dists = []
                 print("No face detected")
 
-            cv2.imshow("AI Security v0.9a", frame)
+            cv2.imshow("AI Security v1.0a", frame)
 
-            await asyncio.sleep(K.epsilon())
+            await asyncio.sleep(1e-6)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
@@ -213,17 +213,32 @@ class FaceNet(object):
         cv2.destroyAllWindows()
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=500, height=250, use_log=True, use_dynamic=False):
-
+    def real_time_recognize(self, width=500, height=250, use_log=True, use_dynamic=False, using_picamera=False):
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
         loop = asyncio.new_event_loop()
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log,
-                                             use_dynamic=use_dynamic))
+                                             use_dynamic=use_dynamic, using_picamera=using_picamera))
         loop.run_until_complete(task)
 
     # GRAPHICS
+    @staticmethod
+    def get_video_cap(is_picamera):
+        def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=1280, display_height=720,
+                                framerate=60, flip_method=0):
+            return (
+                "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
+                " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
+                " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
+                % (capture_width, capture_height, framerate, flip_method, display_width, display_height)
+            )
+
+        if is_picamera:
+            return cv2.VideoCapture(_gstreamer_pipeline(), cv2.CAP_GSTREAMER)
+        else:
+            return cv2.VideoCapture(0)
+
     @staticmethod
     def add_graphics(frame, overlay, person, width, height, is_recognized, best_match):
         line_thickness = round(1e-6 * width * height + 1.5)
