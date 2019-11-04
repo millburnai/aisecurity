@@ -11,7 +11,7 @@ setup(
     license=None,
     python_requires=">=3.5.0",
     install_requires=["numpy", "keras", "matplotlib", "termcolor", "scikit-learn",
-                      "imageio", "mtcnn", "pycryptodome", "tensorflow<=1.15.0"],
+                      "imageio", "mtcnn", "pycryptodome", "tensorflow<=1.14.0"],
     packages=find_packages(),
     zip_safe=False
 )
