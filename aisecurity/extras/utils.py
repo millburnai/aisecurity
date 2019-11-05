@@ -32,7 +32,7 @@ def timer(message="Time elapsed"):
 
 # KERAS TO TF
 @timer("Freezing time")
-def freeze_graph(path_to_keras_model, save_dir, save_name="frozen_graph.pb"):
+def freeze_graph(path_to_keras_model, save_dir, save_name="frozen_graph.h5"):
 
     tf.keras.backend.clear_session()
 
