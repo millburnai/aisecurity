@@ -7,7 +7,8 @@ Demonstration of facial recognition system.
 """
 
 
-def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, verbose=False, using_picamera=False):
+def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_picam=False, use_graphics=True,
+         verbose=False):
 
     # default arg values (for Pycharm, where args.* default to None)
     if model is None:
@@ -16,6 +17,10 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, verbose
         use_log = True
     if use_dynamic is None:
         use_dynamic = True
+    if use_picam is None:
+        use_picam = False
+    if use_graphics is None:
+        use_graphics = True
     if verbose is None:
         verbose = False
 
@@ -67,16 +72,22 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, verbose
 
     input("\nPress ENTER to continue:")
 
-    facenet.real_time_recognize(use_log=use_log, use_dynamic=use_dynamic, using_picamera=using_picamera)
+    facenet.real_time_recognize(use_log=use_log, use_dynamic=use_dynamic, use_picam=use_picam,
+                                use_graphics=use_graphics)
 
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output")
     parser.add_argument("--model", help="name of facenet model")
     parser.add_argument("--path_to_model", help="path to facenet model")
+    parser.add_argument("--use_log", help="(boolean) use MySQL logging")
+    parser.add_argument("--use_dynamic", help="(boolean) use dynamic logging")
+    parser.add_argument("--use_picam", help="(boolean) use Picamera")
+    parser.add_argument("--use_graphics", help="(boolean) display graphics")
+    parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output")
     args = parser.parse_args()
 
-    demo(model=args.model, path=args.path_to_model, verbose=args.verbose)
+    demo(model=args.model, path=args.path_to_model, use_log=args.use_log, use_dynamic=args.use_dynamic,
+         use_picam=args.use_picam, use_graphics=args.use_picam, verbose=args.verbose)
