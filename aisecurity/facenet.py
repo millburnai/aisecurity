@@ -136,7 +136,7 @@ class FaceNet(object):
         return is_recognized, best_match, l2_dist
 
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_graphics, use_picam):
+    async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics):
         db_types = ["static"]
         if use_dynamic:
             db_types.append("dynamic")
@@ -145,7 +145,7 @@ class FaceNet(object):
 
         mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
 
-        cap = self.get_video_cap(use_picam=use_picam)
+        cap = self.get_video_cap(picamera=use_picam)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
@@ -186,7 +186,7 @@ class FaceNet(object):
                     if use_graphics:
                         self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match)
 
-                    if time.time() - start > 5.:  # 10-second delay before logging starts
+                    if time.time() - start > 5.:  # wait 5 seconds before logging starts
 
                         # update dynamic database
                         if use_dynamic:
@@ -196,7 +196,7 @@ class FaceNet(object):
                         if use_log:
                             self.log_activity(is_recognized, best_match, frame, log_unknown=True)
 
-                    l2_dists.append(l2_dist)
+                        l2_dists.append(l2_dist)
 
             else:
                 missed_frames += 1
@@ -217,8 +217,8 @@ class FaceNet(object):
         cv2.destroyAllWindows()
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=500, height=250, use_log=True, use_dynamic=False, use_graphics=True,
-                            use_picam=False):
+    def real_time_recognize(self, width=500, height=250, use_log=True, use_dynamic=False, use_picam=False,
+                            use_graphics=True):
 
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
@@ -229,10 +229,9 @@ class FaceNet(object):
                                              use_picam=use_picam))
         loop.run_until_complete(task)
 
-
     # GRAPHICS
     @staticmethod
-    def get_video_cap(use_picam):
+    def get_video_cap(picamera):
         def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=1280, display_height=720,
                                 framerate=60, flip_method=0):
             return (
@@ -242,7 +241,7 @@ class FaceNet(object):
                     % (capture_width, capture_height, framerate, flip_method, display_width, display_height)
             )
 
-        if use_picam:
+        if picamera:
             return cv2.VideoCapture(_gstreamer_pipeline(), cv2.CAP_GSTREAMER)
         else:
             return cv2.VideoCapture(0)
@@ -294,7 +293,6 @@ class FaceNet(object):
 
         text = best_match if is_recognized else ""
         add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
-
 
     # DISPLAY
     def show_embeds(self, encrypted=False, single=False):
