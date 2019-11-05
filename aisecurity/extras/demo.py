@@ -62,6 +62,7 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_pic
     from aisecurity.facenet import FaceNet, retrieve_embeds, cprint
     from aisecurity.extras.paths import DATABASE, CONFIG_HOME
 
+
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
     facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.pb".format(model))
@@ -80,6 +81,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output")
     parser.add_argument("--model", help="name of facenet model")
     parser.add_argument("--path_to_model", help="path to facenet model")
     parser.add_argument("--use_log", help="(boolean) use MySQL logging")
@@ -91,3 +93,4 @@ if __name__ == "__main__":
 
     demo(model=args.model, path=args.path_to_model, use_log=args.use_log, use_dynamic=args.use_dynamic,
          use_picam=args.use_picam, use_graphics=args.use_picam, verbose=args.verbose)
+
