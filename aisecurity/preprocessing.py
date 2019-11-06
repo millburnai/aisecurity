@@ -11,7 +11,6 @@ import json
 import os
 
 import cv2
-import numpy as np
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
@@ -22,7 +21,11 @@ from aisecurity.extras.utils import *
 # CONSTANTS
 CONSTANTS = {
     "margin": 10,
-    "img_size": (None, None)
+    "img_size":
+        {
+            "ms_celeb_1m": (3, 160, 160),
+            "vgg_face_2": (3, 224, 224)
+        }
 }
 
 
@@ -57,6 +60,7 @@ def align_imgs(paths_or_imgs, margin, faces=None):
 
 
 def embed(sess, paths_or_imgs, input_name, output_tensor, margin=CONSTANTS["margin"], faces=None):
+
     l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6))
 
     aligned_imgs = whiten(align_imgs(paths_or_imgs, margin, faces=faces))

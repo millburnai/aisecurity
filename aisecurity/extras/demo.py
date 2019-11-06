@@ -59,7 +59,8 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, verbose
 
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
-    facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.pb".format(model))
+    # facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.pb".format(model))
+    facenet = FaceNet("/home/ryan/scratchpad/aisecurity/models/frozen.uff")
 
     cprint("\nLoading encrypted database", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])

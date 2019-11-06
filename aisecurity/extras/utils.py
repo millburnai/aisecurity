@@ -51,7 +51,9 @@ class CudaEngine(object):
     # CUDA MANAGEMENT
     def build_cuda_engine(self, input_name, input_shape, output_name):
 
-        with trt.Builder(self.CONSTANTS["trt_logger"]) as builder, builder.create_network() as network, trt.UffParser() as parser:
+        with trt.Builder(self.CONSTANTS["trt_logger"]) as builder, builder.create_network() as network, \
+            trt.UffParser() as parser:
+
             builder.max_batch_size = self.CONSTANTS["max_batch_size"]
             builder.max_workspace_size = self.CONSTANTS["max_workspace_size"]
 

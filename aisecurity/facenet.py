@@ -12,8 +12,11 @@ import asyncio
 import warnings
 
 import matplotlib.pyplot as plt
+import pycuda.driver as cuda
+import pycuda.autoinit
 from sklearn import neighbors
 from termcolor import cprint
+import tensorrt as trt
 
 from aisecurity import log
 from aisecurity.extras.paths import CONFIG_HOME
@@ -40,47 +43,71 @@ class FaceNet(object):
         "vgg_face_2": {
             "inputs": ["base_input"],
             "outputs": ["classifier_low_dim/Softmax"]
-        }
+        },
+        "trt_logger": trt.Logger(trt.Logger.WARNING),
+        "dtype": trt.float16,
+        "max_batch_size": 1,
+        "max_workspace_size": 1 << 20,
     }
 
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.pb", input_name=None, output_name=None):
+    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.pb", input_name=None, output_name=None,
+                 input_shape=None):
         assert os.path.exists(filepath), "{} not found".format(filepath)
 
         # get frozen graph info and set sess
-        self._sess_init(filepath, input_name, output_name)
+        self._build_cuda_engine(filepath, input_name, output_name, input_shape)
+        self._malloc_gpu()
 
         # data init
         self.__static_db = None  # must be filled in by user
         self.__dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
 
-    def _sess_init(self, filepath, input_name, output_name):
-        trt_graph = self.get_frozen_graph(filepath)
+    def _build_cuda_engine(self, filepath, input_name, output_name, input_shape):
+        self.input_name, self.output_name, self.input_shape = input_name, output_name, input_shape
+        if self.input_shape and self.output_name and self.input_shape:
+            return None
 
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        self.sess = tf.Session(config=config)
+        self._io_tensor_init(filepath, input_name, output_name)
+        self._input_shape_init(filepath)
 
-        tf.import_graph_def(trt_graph, name="")
+        with trt.Builder(self.CONSTANTS["trt_logger"]) as builder, builder.create_network() as network, \
+            trt.UffParser() as parser:
 
-        self._io_tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
+            builder.max_batch_size = self.CONSTANTS["max_batch_size"]
+            builder.max_workspace_size = self.CONSTANTS["max_workspace_size"]
 
-        self.facenet = self.sess.graph
-        CONSTANTS["img_size"] = tuple(self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3])
+            if self.CONSTANTS["dtype"] == trt.float16:
+                builder.fp16_mode = True
 
-    def _io_tensor_init(self, model_name, input_name, output_name):
+            parser.register_input(self.input_name, self.input_shape)
+            parser.register_output(self.output_name)
+
+            parser.parse(filepath, network, self.CONSTANTS["dtype"])
+
+            self.network = network
+            self.config = builder.create_builder_config()
+
+            self.engine = builder.build_cuda_engine(network)
+
+    def _io_tensor_init(self, filepath, input_name, output_name):
         self.input_name, self.output_name = None, None
         for model in self.CONSTANTS:
-            if model in model_name:
-                self.input_name = self.CONSTANTS[model]["inputs"][0] + ":0"
-                self.output_name = self.CONSTANTS[model]["outputs"][0] + ":0"
+            if model in filepath:
+                self.input_name = self.CONSTANTS[model]["inputs"][0]
+                self.output_name = self.CONSTANTS[model]["outputs"][0]
         if not self.input_name:
             self.input_name = input_name
         elif not self.output_name:
             self.output_name = output_name
-        assert self.input_name and self.output_name, "I/O tensors for {} not detected or provided".format(model_name)
+        assert self.input_name and self.output_name, "I/O tensors for {} not detected or provided".format(filepath)
+
+    def _input_shape_init(self, filepath):
+        for model in CONSTANTS["img_size"]:
+            if model in filepath:
+                self.input_shape = CONSTANTS["img_size"][model]
 
 
     # MUTATORS
@@ -121,13 +148,6 @@ class FaceNet(object):
     def data(self):
         return self.__static_db
 
-    @staticmethod
-    def get_frozen_graph(path):
-        with tf.gfile.FastGFile(path, "rb") as graph_file:
-            graph_def = tf.GraphDef()
-            graph_def.ParseFromString(graph_file.read())
-        return graph_def
-
     def get_embeds(self, data, *args, **kwargs):
         embeds = []
         for n in args:
@@ -142,8 +162,7 @@ class FaceNet(object):
         return embeds if len(embeds) > 1 else embeds[0]
 
     def predict(self, paths_or_imgs, *args, **kwargs):
-        output_tensor = self.facenet.get_tensor_by_name(self.output_name)
-        return embed(self.sess, paths_or_imgs, self.input_name, output_tensor, *args, **kwargs)
+        return embed(paths_or_imgs, *args, **kwargs)
 
 
     # FACIAL RECOGNITION HELPER
@@ -337,7 +356,26 @@ class FaceNet(object):
         text = best_match if is_recognized else ""
         add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
 
+
     # DISPLAY
+    def summary(self):
+        for i in range(self.network.num_layers):
+            layer = self.network.get_layer(i)
+
+            print("\nLAYER {}".format(i))
+            print("===========================================")
+
+            layer_input = layer.get_input(0)
+            if layer_input:
+                print("\tInput Name:  {}".format(layer_input.name))
+                print("\tInput Shape: {}".format(layer_input.shape))
+
+            layer_output = layer.get_output(0)
+            if layer_output:
+                print("\tOutput Name:  {}".format(layer_output.name))
+                print("\tOutput Shape: {}".format(layer_output.shape))
+            print("===========================================")
+
     def show_embeds(self, encrypted=False, single=False):
 
         def closest_multiples(n):
@@ -413,3 +451,20 @@ class FaceNet(object):
                 self.__dynamic_db["visitor_{}".format(len(self.__dynamic_db) + 1)] = embedding.flatten()
                 self._train_knn(knn_types=["dynamic"])
                 log.flush_current()
+
+    # MEMORY ALLOCATION
+    def _malloc_gpu(self):
+        # determine dimensions and create page-locked memory buffers (i.e. won't be swapped to disk) to hold host i/o
+        self.h_input = cuda.pagelocked_empty(
+            trt.volume(self.engine.get_binding_shape(0)),
+            dtype=self.CONSTANTS["dtype"])
+        self.h_output = cuda.pagelocked_empty(
+            trt.volume(self.engine.get_binding_shape(1)),
+            dtype=self.CONSTANTS["dtype"])
+
+        # allocate device memory for inputs and outputs
+        self.d_input = cuda.mem_alloc(self.h_input.nbytes)
+        self.d_output = cuda.mem_alloc(self.h_output.nbytes)
+
+        # create execution context
+        self.context = self.engine.create_execution_context()
