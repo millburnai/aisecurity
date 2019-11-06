@@ -7,12 +7,14 @@ Data utils and assorted functions.
 
 """
 
+
 import functools
 import time
 
-import tensorflow as tf
-import tensorflow.contrib.tensorrt as trt
-from tensorflow.python.framework import graph_io
+import numpy as np
+import pycuda.driver as cuda
+import pycuda.autoinit
+import tensorrt as trt
 
 
 # DECORATORS
@@ -30,49 +32,84 @@ def timer(message="Time elapsed"):
     return _timer
 
 
-# KERAS TO TF
-@timer("Freezing time")
-def freeze_graph(path_to_keras_model, save_dir, save_name="frozen_graph.pb"):
+class CudaEngine(object):
 
-    tf.keras.backend.clear_session()
-
-    def _freeze_graph(graph, session, output):
-        with graph.as_default():
-            variable = tf.graph_util.remove_training_nodes(graph.as_graph_def())
-            frozen = tf.graph_util.convert_variables_to_constants(session, variable, output)
-            return frozen
-
-    tf.keras.backend.set_learning_phase(0)
-
-    model = tf.keras.models.load_model(path_to_keras_model)
-
-    session = tf.keras.backend.get_session()
-
-    input_names = [layer.op.name for layer in model.inputs]
-    output_names = [layer.op.name for layer in model.outputs]
-
-    frozen_graph = _freeze_graph(session.graph, session, output_names)
-    graph_io.write_graph(frozen_graph, save_dir, save_name, as_text=False)
-
-    return frozen_graph, (input_names, output_names)
+    # CONSTANTS
+    CONSTANTS = {
+        "trt_logger": trt.Logger(trt.Logger.WARNING),
+        "dtype": trt.float16,
+        "max_batch_size": 1,
+        "max_workspace_size": 1 << 20,
+    }
 
 
-# TF TO TENSORRT
-@timer("Inference time")
-def write_inference_graph(frozen_graph, output_names, save_dir, save_name):
+    # INITS
+    def __init__(self, model_file, **kwargs):
+        self.model_file = model_file
+        self.CONSTANTS = {**self.CONSTANTS, **kwargs}
 
-    trt_graph = trt.create_inference_graph(
-        input_graph_def=frozen_graph,
-        outputs=output_names,
-        max_batch_size=1,
-        max_workspace_size_bytes=1 << 25,
-        precision_mode="FP16",
-        minimum_segment_size=50
-    )
+    # CUDA MANAGEMENT
+    def build_cuda_engine(self, input_name, input_shape, output_name):
 
-    graph_io.write_graph(trt_graph, save_dir, save_name, as_text=False)
+        with trt.Builder(self.CONSTANTS["trt_logger"]) as builder, builder.create_network() as network, trt.UffParser() as parser:
+            builder.max_batch_size = self.CONSTANTS["max_batch_size"]
+            builder.max_workspace_size = self.CONSTANTS["max_workspace_size"]
 
-    return trt_graph
+            if self.CONSTANTS["dtype"] == trt.float16:
+                builder.fp16_mode = True
+
+            parser.register_input(input_name, input_shape)
+            parser.register_output(output_name)
+
+            parser.parse(self.model_file, network, self.CONSTANTS["dtype"])
+
+            self.network = network
+            self.config = builder.create_builder_config()
+
+            self.engine = builder.build_cuda_engine(network)
+
+    # MEMORY ALLOCATION
+    def _malloc(self):
+        # determine dimensions and create page-locked memory buffers (i.e. won't be swapped to disk) to hold host i/o
+        h_input = cuda.pagelocked_empty(trt.volume(self.engine.get_binding_shape(0)), dtype=self.CONSTANTS["dtype"])
+        h_output = cuda.pagelocked_empty(trt.volume(self.engine.get_binding_shape(1)), dtype=self.CONSTANTS["dtype"])
+
+        # allocate device memory for inputs and outputs
+        d_input = cuda.mem_alloc(h_input.nbytes)
+        d_output = cuda.mem_alloc(h_output.nbytes)
+
+        return h_input, d_input, h_output, d_output
+
+    # INFERENCE
+    def predict(self, img):
+        h_input, d_input, h_output, d_output = self._malloc()
+        np.copyto(h_input, img)
+
+        with self.engine.create_execution_context() as context:
+            cuda.memcpy_htod(d_input, h_input)
+            context.execute(batch_size=1, bindings=[int(d_input), int(d_output)])
+            cuda.memcpy_dtoh(h_output, d_output)
+
+            return h_output
+
+    # DISPLAY
+    def summary(self):
+        for i in range(self.network.num_layers):
+            layer = self.network.get_layer(i)
+
+            print("\nLAYER {}".format(i))
+            print("===========================================")
+
+            layer_input = layer.get_input(0)
+            if layer_input:
+                print("\tInput Name:  {}".format(layer_input.name))
+                print("\tInput Shape: {}".format(layer_input.shape))
+
+            layer_output = layer.get_output(0)
+            if layer_output:
+                print("\tOutput Name:  {}".format(layer_output.name))
+                print("\tOutput Shape: {}".format(layer_output.shape))
+            print("===========================================")
 
 
 if __name__ == "__main__":
