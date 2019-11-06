@@ -7,8 +7,10 @@ Preprocessing and data handling for FaceNet.
 
 """
 
+import functools
 import json
 import os
+import time
 
 import cv2
 import numpy as np
@@ -16,7 +18,6 @@ from imageio import imread
 from mtcnn.mtcnn import MTCNN
 
 from aisecurity.encryptions import DataEncryption
-from aisecurity.extras.utils import *
 
 
 # CONSTANTS
@@ -24,6 +25,20 @@ CONSTANTS = {
     "margin": 10,
     "img_size": (None, None)
 }
+
+# DECORATORS
+def timer(message="Time elapsed"):
+    def _timer(func):
+        @functools.wraps(func)
+        def _func(*args, **kwargs):
+            start = time.time()
+            result = func(*args, **kwargs)
+            print("{}: {}s".format(message, round(time.time() - start, 3)))
+            return result
+
+        return _func
+
+    return _timer
 
 
 # BASE FUNCTIONS
