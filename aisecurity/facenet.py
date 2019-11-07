@@ -28,7 +28,7 @@ class FaceNet(object):
 
     # HYPERPARAMETERS
     HYPERPARAMS = {
-        "alpha": 0.65,
+        "alpha": 0.8,
         "mtcnn_alpha": 0.99
     }
 
@@ -42,7 +42,7 @@ class FaceNet(object):
         self.__static_db = None  # must be filled in by user
         self.__dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
 
-        CONSTANTS["img_size"] = self.facenet.input_shape[1]
+        CONSTANTS["img_size"] = (self.facenet.input_shape[1], self.facenet.input_shape[1])
 
 
     # MUTATORS
