@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="aisecurity",
-    version="1.0a",
+    version="0.0a",
     description="CSII AI facial recognition.",
     long_description=open("README.md").read(),
     url="https://github.com/orangese/aisecurity",

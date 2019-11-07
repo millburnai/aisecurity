@@ -10,5 +10,5 @@ from . import preprocessing
 # also importable from root
 from .facenet import FaceNet
 
-__version__ = "1.0a"
+__version__ = "0.0a"
 __authors__ = ["Ryan Park", "Liam Pilarski"]

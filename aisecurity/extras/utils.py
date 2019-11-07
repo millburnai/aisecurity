@@ -45,6 +45,14 @@ class CudaEngineManager(object):
     def __init__(self, **kwargs):
         self.CONSTANTS = {**self.CONSTANTS, **kwargs}
 
+        self.builder = trt.Builder(CudaEngineManager.CONSTANTS["trt_logger"])
+        self.builder.max_batch_size = CudaEngineManager.CONSTANTS["max_batch_size"]
+        self.builder.max_workspace_size = CudaEngineManager.CONSTANTS["max_workspace_size"]
+
+        if self.CONSTANTS["dtype"] == trt.float16:
+            self.builder.fp16_mode = True
+
+        self.network = self.builder.create_network()
 
     # CUDA ENGINE MANAGEMENT
     def read_cuda_engine(self, engine_file):
@@ -53,18 +61,8 @@ class CudaEngineManager(object):
 
     def write_cuda_engine(self, target_file, uff_file, input_name, input_shape, output_name):
 
-        @timer("Workspace building time")
-        def build(builder):
-            builder.max_batch_size = self.CONSTANTS["max_batch_size"]
-            builder.max_workspace_size = self.CONSTANTS["max_workspace_size"]
-
-            if self.CONSTANTS["dtype"] == trt.float16:
-                builder.fp16_mode = True
-
-            return builder
-
         @timer("Model parsing time")
-        def parse(uff_file, network, input_name, input_shape, output_name):
+        def parse(parser, uff_file, network, input_name, input_shape, output_name):
             parser.register_input(input_name, input_shape)
             parser.register_output(output_name)
 
@@ -74,24 +72,23 @@ class CudaEngineManager(object):
 
         @timer("Engine building time")
         def build_engine(builder, network):
-            return builder.build_cuda_engine(network).serialize()
+            return builder.build_cuda_engine(network)
 
         @timer("Engine serializing time")
         def serialize_engine(engine):
             return engine.serialize()
 
-        with trt.Builder(self.CONSTANTS["trt_logger"]) as builder, builder.create_network() as network, \
-            trt.UffParser() as parser:
+        self.parser = parse(trt.UffParser(), uff_file, self.network, input_name, input_shape, output_name)
 
-            self.builder = build(builder)
+        self.engine = serialize_engine(build_engine(self.builder, self.network))
 
-            self.parser = parse(uff_file, network, input_name, input_shape, output_name)
-
-            self.engine = serialize_engine(build_engine(builder, builder.create_network()))
-
-            with open(target_file, "wb") as file:
-                file.write(self.engine)
+        with open(target_file, "wb") as file:
+            file.write(self.engine)
 
 
 if __name__ == "__main__":
     print("Nothing for now!")
+    c = CudaEngineManager()
+    c.write_cuda_engine("/home/ryan/scratchpad/aisecurity/models/test.engine",
+                        "/home/ryan/scratchpad/aisecurity/models/ms_celeb_1m.uff",
+                        "input_1", (3, 160, 160), "Bottleneck_BatchNorm/batchnorm/add_1")

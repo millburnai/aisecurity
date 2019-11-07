@@ -41,6 +41,7 @@ class FaceNet(object):
         }
     }
 
+
     # INITS
     @timer(message="Model load time")
     def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.engine", input_name=None, output_name=None,
@@ -64,6 +65,7 @@ class FaceNet(object):
         self.engine_manager.read_cuda_engine(filepath)
 
         self.engine = self.engine_manager.engine
+        self.network = self.engine_manager.network
 
         self._io_tensor_init(filepath, input_name, output_name)
         self._input_shape_init(filepath, input_shape=input_shape)
@@ -87,6 +89,7 @@ class FaceNet(object):
                 self.input_shape = CONSTANTS["img_size"][model]
         if input_shape:
             self.input_shape = input_shape
+
 
     # MUTATORS
     def set_data(self, data):
@@ -140,10 +143,14 @@ class FaceNet(object):
         return embeds if len(embeds) > 1 else embeds[0]
 
     def predict(self, paths_or_imgs, margin=10, faces=None):
-        l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6))
-        aligned_imgs = whiten(align_imgs(self.model_name, paths_or_imgs, margin, faces=faces)).ravel()
+        def bufferize(arr):
+            arr = arr.astype(trt.nptype(CudaEngineManager.CONSTANTS["dtype"]))
+            return arr.transpose(0, 3, 1, 2).ravel()
 
-        np.copyto(self.h_input, aligned_imgs)
+        l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6))
+        aligned_imgs = whiten(align_imgs(self.model_name, paths_or_imgs, margin, faces=faces))
+
+        np.copyto(self.h_input, bufferize(aligned_imgs))
 
         cuda.memcpy_htod(self.d_input, self.h_input)
         self.context.execute(batch_size=1, bindings=[int(self.d_input), int(self.d_output)])
@@ -152,6 +159,7 @@ class FaceNet(object):
         normalized_embeddings = l2_normalize(self.h_output)
 
         return normalized_embeddings
+
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
@@ -222,19 +230,19 @@ class FaceNet(object):
                     face = person["box"]
 
                     # facial recognition
-                    # try:
-                    embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, db_types)
-                    print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
-                        # if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
-                        #     continue
-                    # except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
-                    #     if "query data dimension" in str(error):
-                    #         raise ValueError("Current model incompatible with database")
-                    #     elif "empty" in str(error):
-                    #         print("Image refresh rate too high")
-                    #     else:
-                    #         print("Unknown error: " + str(error))
-                    #     continue
+                    try:
+                        embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, db_types)
+                        print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
+                        if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
+                            continue
+                    except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+                        if "query data dimension" in str(error):
+                            raise ValueError("Current model incompatible with database")
+                        elif "empty" in str(error):
+                            print("Image refresh rate too high")
+                        else:
+                            print("Unknown error: " + str(error))
+                        continue
 
                     # add graphics
                     if use_graphics:
