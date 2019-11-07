@@ -12,6 +12,7 @@ import asyncio
 import warnings
 
 import keras
+from keras import backend as K
 import matplotlib.pyplot as plt
 from sklearn import neighbors
 from termcolor import cprint
@@ -95,8 +96,15 @@ class FaceNet(object):
             embeds.append(n)
         return embeds if len(embeds) > 1 else embeds[0]
 
-    def predict(self, paths_or_imgs, *args, **kwargs):
-        return embed(self.facenet, paths_or_imgs, *args, **kwargs)
+    def predict(self, paths_or_imgs, margin=CONSTANTS["margin"], faces=None):
+        l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
+
+        aligned_imgs = whiten(align_imgs(paths_or_imgs, margin, faces=faces))
+        raw_embeddings = self.facenet.predict(aligned_imgs)
+        normalized_embeddings = l2_normalize(raw_embeddings)
+
+        return normalized_embeddings
+
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
@@ -134,6 +142,7 @@ class FaceNet(object):
                     best_match, l2_dist))
 
         return is_recognized, best_match, l2_dist
+
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics):
@@ -229,6 +238,7 @@ class FaceNet(object):
                                              use_picam=use_picam))
         loop.run_until_complete(task)
 
+
     # GRAPHICS
     @staticmethod
     def get_video_cap(picamera):
@@ -305,6 +315,7 @@ class FaceNet(object):
         text = best_match if is_recognized else ""
         add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
 
+
     # DISPLAY
     def show_embeds(self, encrypted=False, single=False):
         assert self.data, "data must be provided to show embeddings"
@@ -335,6 +346,7 @@ class FaceNet(object):
             if single and person == list(data.keys())[0]:
                 break
 
+
     # LOGGING
     @staticmethod
     def log_activity(is_recognized, best_match, frame, log_unknown=True):
@@ -364,6 +376,7 @@ class FaceNet(object):
             # recording unknown images is deprecated and will be removed/changed later
             cv2.imwrite(path, frame)
             cprint("Unknown activity logged", color="red", attrs=["bold"])
+
 
     # DYNAMIC DATABASE
     def dynamic_update(self, embedding, l2_dists):

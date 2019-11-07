@@ -71,16 +71,6 @@ def align_imgs(paths_or_imgs, margin, faces=None):
     return np.array([align_img(path_or_img, faces=faces) for path_or_img in paths_or_imgs])
 
 
-def embed(sess, paths_or_imgs, input_name, output_tensor, margin=CONSTANTS["margin"], faces=None):
-    l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6))
-
-    aligned_imgs = whiten(align_imgs(paths_or_imgs, margin, faces=faces))
-    raw_embeddings = sess.run(output_tensor, {input_name: aligned_imgs})
-    normalized_embeddings = l2_normalize(raw_embeddings)
-
-    return normalized_embeddings
-
-
 # LOADING
 @timer(message="Data preprocessing time")
 def load(facenet, img_dir, people=None):
