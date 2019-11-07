@@ -44,7 +44,7 @@ def align_imgs(model, paths_or_imgs, margin, faces=None):
         try:
             img = imread(path_or_img)
         except OSError:  # if img is embedding
-            img = cv2.cvtColor(path_or_img, cv2.COLOR_RGB2BGR)
+            img = path_or_img
 
         if not faces:
             found = detector.detect_faces(img)

@@ -169,7 +169,7 @@ class FaceNet(object):
         embedding = self.get_embeds(data, img, faces=faces)
         best_matches = []
         for knn in reversed(knns):
-            pred = knn.predict(embedding)[0]
+            pred = knn.predict(embedding.reshape(1, -1))[0]
             best_matches.append((pred, np.linalg.norm(embedding - data[pred])))
         best_match, l2_dist = sorted(best_matches, key=lambda n: n[1])[0]
         is_recognized = l2_dist <= FaceNet.HYPERPARAMS["alpha"]
