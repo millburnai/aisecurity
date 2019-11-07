@@ -1,11 +1,7 @@
 """
-
 "aisecurity.facenet"
-
 Facial recognition with FaceNet in Tensorflow-TensorRT (TF-TRT).
-
 Paper: https://arxiv.org/pdf/1503.03832.pdf
-
 """
 
 import asyncio
@@ -16,7 +12,6 @@ import pycuda.driver as cuda
 import pycuda.autoinit
 from sklearn import neighbors
 from termcolor import cprint
-import tensorrt as trt
 
 from aisecurity import log
 from aisecurity.extras.paths import CONFIG_HOME
@@ -29,7 +24,7 @@ class FaceNet(object):
 
     # HYPERPARAMETERS
     HYPERPARAMS = {
-        "alpha": 0.65,
+        "alpha": 0.7,
         "mtcnn_alpha": 0.99
     }
 
@@ -43,59 +38,41 @@ class FaceNet(object):
         "vgg_face_2": {
             "inputs": ["base_input"],
             "outputs": ["classifier_low_dim/Softmax"]
-        },
-        "trt_logger": trt.Logger(trt.Logger.WARNING),
-        "dtype": trt.float16,
-        "max_batch_size": 1,
-        "max_workspace_size": 1 << 20,
+        }
     }
-
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.pb", input_name=None, output_name=None,
+    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.engine", input_name=None, output_name=None,
                  input_shape=None):
         assert os.path.exists(filepath), "{} not found".format(filepath)
+        assert filepath.endswith(".engine"), "convert {} to a serialized engine before usage".format(filepath)
 
-        # get frozen graph info and set sess
+        # allocate memory
         self._build_cuda_engine(filepath, input_name, output_name, input_shape)
-        self._malloc_gpu()
+        self._allocate_buffers()
+
+        # setting constants
+        CONSTANTS["model"] = self.model_name
 
         # data init
         self.__static_db = None  # must be filled in by user
         self.__dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
 
     def _build_cuda_engine(self, filepath, input_name, output_name, input_shape):
-        self.input_name, self.output_name, self.input_shape = input_name, output_name, input_shape
-        if self.input_shape and self.output_name and self.input_shape:
-            return None
+        self.engine_manager = CudaEngineManager()
+        self.engine_manager.read_cuda_engine(filepath)
+
+        self.engine = self.engine_manager.engine
 
         self._io_tensor_init(filepath, input_name, output_name)
-        self._input_shape_init(filepath)
-
-        with trt.Builder(self.CONSTANTS["trt_logger"]) as builder, builder.create_network() as network, \
-            trt.UffParser() as parser:
-
-            builder.max_batch_size = self.CONSTANTS["max_batch_size"]
-            builder.max_workspace_size = self.CONSTANTS["max_workspace_size"]
-
-            if self.CONSTANTS["dtype"] == trt.float16:
-                builder.fp16_mode = True
-
-            parser.register_input(self.input_name, self.input_shape)
-            parser.register_output(self.output_name)
-
-            parser.parse(filepath, network, self.CONSTANTS["dtype"])
-
-            self.network = network
-            self.config = builder.create_builder_config()
-
-            self.engine = builder.build_cuda_engine(network)
+        self._input_shape_init(filepath, input_shape=input_shape)
 
     def _io_tensor_init(self, filepath, input_name, output_name):
         self.input_name, self.output_name = None, None
         for model in self.CONSTANTS:
             if model in filepath:
+                self.model_name = model
                 self.input_name = self.CONSTANTS[model]["inputs"][0]
                 self.output_name = self.CONSTANTS[model]["outputs"][0]
         if not self.input_name:
@@ -104,11 +81,12 @@ class FaceNet(object):
             self.output_name = output_name
         assert self.input_name and self.output_name, "I/O tensors for {} not detected or provided".format(filepath)
 
-    def _input_shape_init(self, filepath):
+    def _input_shape_init(self, filepath, input_shape=None):
         for model in CONSTANTS["img_size"]:
             if model in filepath:
                 self.input_shape = CONSTANTS["img_size"][model]
-
+        if input_shape:
+            self.input_shape = input_shape
 
     # MUTATORS
     def set_data(self, data):
@@ -161,16 +139,24 @@ class FaceNet(object):
             embeds.append(n)
         return embeds if len(embeds) > 1 else embeds[0]
 
-    def predict(self, paths_or_imgs, *args, **kwargs):
-        return embed(paths_or_imgs, *args, **kwargs)
+    def predict(self, paths_or_imgs, margin=10, faces=None):
+        l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6))
+        aligned_imgs = whiten(align_imgs(self.model_name, paths_or_imgs, margin, faces=faces)).ravel()
 
+        np.copyto(self.h_input, aligned_imgs)
+
+        cuda.memcpy_htod(self.d_input, self.h_input)
+        self.context.execute(batch_size=1, bindings=[int(self.d_input), int(self.d_output)])
+        cuda.memcpy_dtoh(self.h_output, self.d_output)
+
+        normalized_embeddings = l2_normalize(self.h_output)
+
+        return normalized_embeddings
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
     def _recognize(self, img, faces=None, db_types=None):
         assert self.__static_db or self.__dynamic_db, "data must be provided"
-
-        start = time.time()
 
         knns, data = [], {}
         if db_types is None or "static" in db_types:
@@ -188,9 +174,7 @@ class FaceNet(object):
         best_match, l2_dist = sorted(best_matches, key=lambda n: n[1])[0]
         is_recognized = l2_dist <= FaceNet.HYPERPARAMS["alpha"]
 
-        elapsed = time.time() - start
-        
-        return embedding, is_recognized, best_match, l2_dist, elapsed
+        return embedding, is_recognized, best_match, l2_dist
 
     # FACIAL RECOGNITION
     def recognize(self, img, verbose=True):
@@ -208,7 +192,7 @@ class FaceNet(object):
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, use_log, use_dynamic, using_picamera):
+    async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics):
         db_types = ["static"]
         if use_dynamic:
             db_types.append("dynamic")
@@ -217,12 +201,14 @@ class FaceNet(object):
 
         mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
 
-        cap = self.get_video_cap(is_picamera=using_picamera)
+        cap = self.get_video_cap(picamera=use_picam)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
         missed_frames = 0
         l2_dists = []
+
+        start = time.time()
 
         while True:
             _, frame = cap.read()
@@ -236,29 +222,33 @@ class FaceNet(object):
                     face = person["box"]
 
                     # facial recognition
-                    try:
-                        embedding, is_recognized, best_match, l2_dist, elapsed = self._recognize(frame, face, db_types)
-                        print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
-                    except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
-                        if "query data dimension" in str(error):
-                            raise ValueError("Current model incompatible with database")
-                        elif "empty" in str(error):
-                            print("Image refresh rate too high")
-                        else:
-                            print("Unknown error: " + str(error))
-                        continue
+                    # try:
+                    embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, db_types)
+                    print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
+                        # if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
+                        #     continue
+                    # except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+                    #     if "query data dimension" in str(error):
+                    #         raise ValueError("Current model incompatible with database")
+                    #     elif "empty" in str(error):
+                    #         print("Image refresh rate too high")
+                    #     else:
+                    #         print("Unknown error: " + str(error))
+                    #     continue
 
-                    if person["confidence"] >= self.HYPERPARAMS["mtcnn_alpha"]:
-                        # add graphics
+                    # add graphics
+                    if use_graphics:
                         self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match)
+
+                    if time.time() - start > 5.:  # wait 5 seconds before logging starts
 
                         # update dynamic database
                         if use_dynamic:
-                            self.dynamic_update(embedding, l2_dists, elapsed)
+                            self.dynamic_update(embedding, l2_dists)
 
                         # log activity
                         if use_log:
-                            self.log_activity(is_recognized, best_match, frame, elapsed, log_unknown=True)
+                            self.log_activity(is_recognized, best_match, frame, log_unknown=True)
 
                         l2_dists.append(l2_dist)
 
@@ -281,20 +271,21 @@ class FaceNet(object):
         cv2.destroyAllWindows()
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=500, height=250, use_log=True, use_dynamic=False, using_picamera=False):
+    def real_time_recognize(self, width=500, height=250, use_log=True, use_dynamic=False, use_picam=False,
+                            use_graphics=True):
 
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
         loop = asyncio.new_event_loop()
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log,
-                                             use_dynamic=use_dynamic, using_picamera=using_picamera))
+                                             use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics))
         loop.run_until_complete(task)
 
 
     # GRAPHICS
     @staticmethod
-    def get_video_cap(is_picamera):
+    def get_video_cap(picamera):
         def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=1280, display_height=720,
                                 framerate=60, flip_method=0):
             return (
@@ -304,7 +295,7 @@ class FaceNet(object):
                 % (capture_width, capture_height, framerate, flip_method, display_width,display_height)
             )
 
-        if is_picamera:
+        if picamera:
             return cv2.VideoCapture(_gstreamer_pipeline(), cv2.CAP_GSTREAMER)
         else:
             return cv2.VideoCapture(0)
@@ -356,7 +347,6 @@ class FaceNet(object):
         text = best_match if is_recognized else ""
         add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
 
-
     # DISPLAY
     def summary(self):
         for i in range(self.network.num_layers):
@@ -376,7 +366,9 @@ class FaceNet(object):
                 print("\tOutput Shape: {}".format(layer_output.shape))
             print("===========================================")
 
+
     def show_embeds(self, encrypted=False, single=False):
+        assert self.data, "data must be provided to show embeddings"
 
         def closest_multiples(n):
             if n == 0 or n == 1:
@@ -407,9 +399,7 @@ class FaceNet(object):
 
     # LOGGING
     @staticmethod
-    def log_activity(is_recognized, best_match, frame, elapsed, log_unknown=True):
-        if elapsed > 1.:
-            return None
+    def log_activity(is_recognized, best_match, frame, log_unknown=True):
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
 
@@ -437,10 +427,7 @@ class FaceNet(object):
             cprint("Unknown activity logged", color="red", attrs=["bold"])
 
     # DYNAMIC DATABASE
-    def dynamic_update(self, embedding, l2_dists, elapsed):
-        if elapsed > 1.0:
-            return None
-
+    def dynamic_update(self, embedding, l2_dists):
         previous_frames = l2_dists[-log.THRESHOLDS["num_unknown"]:]
         filtered = list(filter(lambda x: x > self.HYPERPARAMS["alpha"], previous_frames))
 
@@ -452,15 +439,16 @@ class FaceNet(object):
                 self._train_knn(knn_types=["dynamic"])
                 log.flush_current()
 
+
     # MEMORY ALLOCATION
-    def _malloc_gpu(self):
+    def _allocate_buffers(self):
         # determine dimensions and create page-locked memory buffers (i.e. won't be swapped to disk) to hold host i/o
         self.h_input = cuda.pagelocked_empty(
             trt.volume(self.engine.get_binding_shape(0)),
-            dtype=self.CONSTANTS["dtype"])
+            dtype=trt.nptype(self.engine_manager.CONSTANTS["dtype"]))
         self.h_output = cuda.pagelocked_empty(
             trt.volume(self.engine.get_binding_shape(1)),
-            dtype=self.CONSTANTS["dtype"])
+            dtype=trt.nptype(self.engine_manager.CONSTANTS["dtype"]))
 
         # allocate device memory for inputs and outputs
         self.d_input = cuda.mem_alloc(self.h_input.nbytes)

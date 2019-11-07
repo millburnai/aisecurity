@@ -13,6 +13,7 @@ import os
 import cv2
 from imageio import imread
 from mtcnn.mtcnn import MTCNN
+import numpy as np
 
 from aisecurity.encryptions import DataEncryption
 from aisecurity.extras.utils import *
@@ -25,7 +26,7 @@ CONSTANTS = {
         {
             "ms_celeb_1m": (3, 160, 160),
             "vgg_face_2": (3, 224, 224)
-        }
+        },
 }
 
 
@@ -35,16 +36,15 @@ def whiten(x):
     whitened = (x - np.mean(x, axis=(0, 1, 2), keepdims=True)) / std_adj
     return whitened
 
-
-def align_imgs(paths_or_imgs, margin, faces=None):
+def align_imgs(model, paths_or_imgs, margin, faces=None):
     if not faces:
         detector = MTCNN()
 
-    def align_img(path_or_img, faces=None):
+    def align_img(model, path_or_img, faces=None):
         try:
             img = imread(path_or_img)
         except OSError:  # if img is embedding
-            img = path_or_img
+            img = cv2.cvtColor(path_or_img, cv2.COLOR_RGB2BGR)
 
         if not faces:
             found = detector.detect_faces(img)
@@ -53,21 +53,10 @@ def align_imgs(paths_or_imgs, margin, faces=None):
 
         x, y, width, height = faces
         cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
-        resized = cv2.resize(cropped, CONSTANTS["img_size"])
+        resized = cv2.resize(cropped, CONSTANTS["img_size"][model][1:])
         return resized
 
-    return np.array([align_img(path_or_img, faces=faces) for path_or_img in paths_or_imgs])
-
-
-def embed(sess, paths_or_imgs, input_name, output_tensor, margin=CONSTANTS["margin"], faces=None):
-
-    l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6))
-
-    aligned_imgs = whiten(align_imgs(paths_or_imgs, margin, faces=faces))
-    raw_embeddings = sess.run(output_tensor, {input_name: aligned_imgs})
-    normalized_embeddings = l2_normalize(raw_embeddings)
-
-    return normalized_embeddings
+    return np.array([align_img(model, path_or_img, faces=faces) for path_or_img in paths_or_imgs])
 
 
 # LOADING

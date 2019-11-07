@@ -11,9 +11,6 @@ Data utils and assorted functions.
 import functools
 import time
 
-import numpy as np
-import pycuda.driver as cuda
-import pycuda.autoinit
 import tensorrt as trt
 
 
@@ -32,7 +29,8 @@ def timer(message="Time elapsed"):
     return _timer
 
 
-class CudaEngine(object):
+# CUDA ENGINE MANAGER
+class CudaEngineManager(object):
 
     # CONSTANTS
     CONSTANTS = {
@@ -44,74 +42,55 @@ class CudaEngine(object):
 
 
     # INITS
-    def __init__(self, model_file, **kwargs):
-        self.model_file = model_file
+    def __init__(self, **kwargs):
         self.CONSTANTS = {**self.CONSTANTS, **kwargs}
 
-    # CUDA MANAGEMENT
-    def build_cuda_engine(self, input_name, input_shape, output_name):
 
-        with trt.Builder(self.CONSTANTS["trt_logger"]) as builder, builder.create_network() as network, \
-            trt.UffParser() as parser:
+    # CUDA ENGINE MANAGEMENT
+    def read_cuda_engine(self, engine_file):
+        with open(engine_file, "rb") as file, trt.Runtime(self.CONSTANTS["trt_logger"]) as runtime:
+            self.engine = runtime.deserialize_cuda_engine(file.read())
 
+    def write_cuda_engine(self, target_file, uff_file, input_name, input_shape, output_name):
+
+        @timer("Workspace building time")
+        def build(builder):
             builder.max_batch_size = self.CONSTANTS["max_batch_size"]
             builder.max_workspace_size = self.CONSTANTS["max_workspace_size"]
 
             if self.CONSTANTS["dtype"] == trt.float16:
                 builder.fp16_mode = True
 
+            return builder
+
+        @timer("Model parsing time")
+        def parse(uff_file, network, input_name, input_shape, output_name):
             parser.register_input(input_name, input_shape)
             parser.register_output(output_name)
 
-            parser.parse(self.model_file, network, self.CONSTANTS["dtype"])
+            parser.parse(uff_file, network, self.CONSTANTS["dtype"])
 
-            self.network = network
-            self.config = builder.create_builder_config()
+            return parser
 
-            self.engine = builder.build_cuda_engine(network)
+        @timer("Engine building time")
+        def build_engine(builder, network):
+            return builder.build_cuda_engine(network).serialize()
 
-    # MEMORY ALLOCATION
-    def _malloc(self):
-        # determine dimensions and create page-locked memory buffers (i.e. won't be swapped to disk) to hold host i/o
-        h_input = cuda.pagelocked_empty(trt.volume(self.engine.get_binding_shape(0)), dtype=self.CONSTANTS["dtype"])
-        h_output = cuda.pagelocked_empty(trt.volume(self.engine.get_binding_shape(1)), dtype=self.CONSTANTS["dtype"])
+        @timer("Engine serializing time")
+        def serialize_engine(engine):
+            return engine.serialize()
 
-        # allocate device memory for inputs and outputs
-        d_input = cuda.mem_alloc(h_input.nbytes)
-        d_output = cuda.mem_alloc(h_output.nbytes)
+        with trt.Builder(self.CONSTANTS["trt_logger"]) as builder, builder.create_network() as network, \
+            trt.UffParser() as parser:
 
-        return h_input, d_input, h_output, d_output
+            self.builder = build(builder)
 
-    # INFERENCE
-    def predict(self, img):
-        h_input, d_input, h_output, d_output = self._malloc()
-        np.copyto(h_input, img)
+            self.parser = parse(uff_file, network, input_name, input_shape, output_name)
 
-        with self.engine.create_execution_context() as context:
-            cuda.memcpy_htod(d_input, h_input)
-            context.execute(batch_size=1, bindings=[int(d_input), int(d_output)])
-            cuda.memcpy_dtoh(h_output, d_output)
+            self.engine = serialize_engine(build_engine(builder, builder.create_network()))
 
-            return h_output
-
-    # DISPLAY
-    def summary(self):
-        for i in range(self.network.num_layers):
-            layer = self.network.get_layer(i)
-
-            print("\nLAYER {}".format(i))
-            print("===========================================")
-
-            layer_input = layer.get_input(0)
-            if layer_input:
-                print("\tInput Name:  {}".format(layer_input.name))
-                print("\tInput Shape: {}".format(layer_input.shape))
-
-            layer_output = layer.get_output(0)
-            if layer_output:
-                print("\tOutput Name:  {}".format(layer_output.name))
-                print("\tOutput Shape: {}".format(layer_output.shape))
-            print("===========================================")
+            with open(target_file, "wb") as file:
+                file.write(self.engine)
 
 
 if __name__ == "__main__":
