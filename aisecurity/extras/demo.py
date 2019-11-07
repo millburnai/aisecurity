@@ -81,7 +81,6 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output")
     parser.add_argument("--model", help="name of facenet model")
     parser.add_argument("--path_to_model", help="path to facenet model")
     parser.add_argument("--use_log", help="(boolean) use MySQL logging")
