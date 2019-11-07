@@ -18,6 +18,8 @@ Keras version: `python3 -m pip install "git+https://github.com/orangese/aisecuri
 
 TF-TRT version: `python3 -m pip install "git+https://github.com/orangese/aisecurity.git@tf-trt"`
 
+Pure TensorRT version [__unstable__]: `python3 -m pip install "git+https://github.com/orangese/aisecurity.git@tensorrt"`
+
 After installing, you might want to change the key location settings in `config.json`, which is installed with the `aisecurity` package.
 
 ## Upgrade
@@ -25,6 +27,9 @@ After installing, you might want to change the key location settings in `config.
 Keras version: `python3 -m pip install --upgrade "git+https://github.com/orangese/aisecurity.git@keras"`
 
 TF-TRT version: `python3 -m pip install --upgrade "git+https://github.com/orangese/aisecurity.git@tf-trt"`
+
+Pure TensorRT version [__unstable__]: `python3 -m pip install --upgrade "git+https://github.com/orangese/aisecurity.git@tensorrt"`
+
 
 ## FaceNet weight files
 
