@@ -1,7 +1,10 @@
 """
+
 "aisecurity.facenet"
-Facial recognition with FaceNet in Tensorflow-TensorRT (TF-TRT).
+
+Facial recognition with FaceNet in NVIDIA's TensorRT 6.0.1.5.
 Paper: https://arxiv.org/pdf/1503.03832.pdf
+
 """
 
 import asyncio
