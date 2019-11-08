@@ -70,7 +70,8 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_pic
 
     input("\nPress ENTER to continue:")
 
-    facenet.real_time_recognize(use_log, use_dynamic, use_picam, use_graphics)
+    facenet.real_time_recognize(use_log=use_log, use_dynamic=use_dynamic, use_picam=use_picam,
+                                use_graphics=use_graphics)
 
 
 if __name__ == "__main__":
