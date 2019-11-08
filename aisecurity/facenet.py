@@ -210,12 +210,9 @@ class FaceNet(object):
             db_types.append("dynamic")
         if use_log:
             log.init(flush=True)
-        if not align:
+        if align:
             mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face must fill at least 1/3 of the video capture
-
-        align = False  # for now, MTCNN cannot be used
-        use_graphics = False
-        warnings.warn("Unstable: MTCNN cannot be run on tensorrt version")
+            warnings.warn("Unstable: MTCNN breaks tensorrt version")  # for now, MTCNN should not be used
 
         cap = self.get_video_cap(picamera=use_picam)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
@@ -228,7 +225,7 @@ class FaceNet(object):
 
         while True:
             _, frame = cap.read()
-            if not align:
+            if align:
                 result = mtcnn.detect_faces(frame)
             else:
                 result = [{"box": 0, "confidence": 1.0, "keypoints": None}]
@@ -298,7 +295,7 @@ class FaceNet(object):
 
         loop = asyncio.new_event_loop()
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log, use_dynamic, use_picam,
-                                             use_graphics, align))
+                                             use_graphics if align else False, align))
         loop.run_until_complete(task)
 
 
