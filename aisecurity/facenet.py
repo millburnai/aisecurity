@@ -49,12 +49,14 @@ class FaceNet(object):
         assert os.path.exists(filepath), "{} not found".format(filepath)
         assert filepath.endswith(".engine"), "convert {} to a serialized engine before usage".format(filepath)
 
-        # allocate memory
+        # build engine
         self._build_cuda_engine(filepath, input_name, output_name, input_shape)
+
+        # allocate memory
         self._allocate_buffers()
 
         # setting constants
-        CONSTANTS["model"] = self.model_name
+        CONSTANTS["model"] = "ms_celeb_1m"# self.model_name
 
         # data init
         self.__static_db = None  # must be filled in by user
@@ -69,6 +71,7 @@ class FaceNet(object):
 
         self._io_tensor_init(filepath, input_name, output_name)
         self._input_shape_init(filepath, input_shape=input_shape)
+
 
     def _io_tensor_init(self, filepath, input_name, output_name):
         self.input_name, self.output_name = None, None
@@ -143,14 +146,15 @@ class FaceNet(object):
         return embeds if len(embeds) > 1 else embeds[0]
 
     def predict(self, paths_or_imgs, margin=10, faces=None):
-        def bufferize(arr):
+        def buffer_ready(arr):
             arr = arr.astype(trt.nptype(CudaEngineManager.CONSTANTS["dtype"]))
-            return arr.transpose(0, 3, 1, 2).ravel()
+            arr = arr.transpose(0, 3, 1, 2).ravel()
+            return arr
 
         l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6))
         aligned_imgs = whiten(align_imgs(self.model_name, paths_or_imgs, margin, faces=faces))
 
-        np.copyto(self.h_input, bufferize(aligned_imgs))
+        np.copyto(self.h_input, buffer_ready(aligned_imgs))
 
         cuda.memcpy_htod(self.d_input, self.h_input)
         self.context.execute(batch_size=1, bindings=[int(self.d_input), int(self.d_output)])
@@ -200,14 +204,18 @@ class FaceNet(object):
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics):
+    async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics, align):
         db_types = ["static"]
         if use_dynamic:
             db_types.append("dynamic")
         if use_log:
             log.init(flush=True)
+        if not align:
+            mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face must fill at least 1/3 of the video capture
 
-        mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
+        align = False  # for now, MTCNN cannot be used
+        use_graphics = False
+        warnings.warn("Unstable: MTCNN cannot be run on tensorrt version")
 
         cap = self.get_video_cap(picamera=use_picam)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
@@ -220,14 +228,17 @@ class FaceNet(object):
 
         while True:
             _, frame = cap.read()
-            result = mtcnn.detect_faces(frame)
+            if not align:
+                result = mtcnn.detect_faces(frame)
+            else:
+                result = [{"box": 0, "confidence": 1.0, "keypoints": None}]
 
             if result:
                 overlay = frame.copy()
 
                 for person in result:
                     # using MTCNN to detect faces
-                    face = person["box"]
+                    face = person["box"] if person["box"] else -1
 
                     # facial recognition
                     try:
@@ -241,7 +252,7 @@ class FaceNet(object):
                         elif "empty" in str(error):
                             print("Image refresh rate too high")
                         else:
-                            print("Unknown error: " + str(error))
+                            raise error
                         continue
 
                     # add graphics
@@ -279,15 +290,15 @@ class FaceNet(object):
         cv2.destroyAllWindows()
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=500, height=250, use_log=True, use_dynamic=False, use_picam=False,
-                            use_graphics=True):
+    def real_time_recognize(self, width=500, height=500, use_log=True, use_dynamic=False, use_picam=False,
+                            use_graphics=True, align=True):
 
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
         loop = asyncio.new_event_loop()
-        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log,
-                                             use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics))
+        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log, use_dynamic, use_picam,
+                                             use_graphics, align))
         loop.run_until_complete(task)
 
 
@@ -349,11 +360,14 @@ class FaceNet(object):
         corner = (x - margin // 2, y - margin // 2)
         box = (x + height + margin // 2, y + width + margin // 2)
 
+
         add_key_points(overlay, key_points, radius, color, line_thickness)
+
         cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
 
         text = best_match if is_recognized else ""
         add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
+
 
     # DISPLAY
     def summary(self):
@@ -373,7 +387,6 @@ class FaceNet(object):
                 print("\tOutput Name:  {}".format(layer_output.name))
                 print("\tOutput Shape: {}".format(layer_output.shape))
             print("===========================================")
-
 
     def show_embeds(self, encrypted=False, single=False):
         assert self.data, "data must be provided to show embeddings"
@@ -433,6 +446,7 @@ class FaceNet(object):
             # recording unknown images is deprecated and will be removed/changed later
             cv2.imwrite(path, frame)
             cprint("Unknown activity logged", color="red", attrs=["bold"])
+
 
     # DYNAMIC DATABASE
     def dynamic_update(self, embedding, l2_dists):

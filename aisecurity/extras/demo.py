@@ -5,7 +5,7 @@ Demonstration of facial recognition system.
 
 
 def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_picam=False, use_graphics=True,
-         verbose=False):
+         align=True, verbose=False):
 
     # default arg values (for Pycharm, where args.* default to None)
     if model is None:
@@ -18,6 +18,8 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_pic
         use_picam = False
     if use_graphics is None:
         use_graphics = True
+    if align is None:
+        align = True
     if verbose is None:
         verbose = False
 
@@ -62,7 +64,7 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_pic
 
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
-    facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.pb".format(model))
+    facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.engine".format(model))
 
     cprint("\nLoading encrypted database", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
@@ -70,21 +72,29 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_pic
 
     input("\nPress ENTER to continue:")
 
-    facenet.real_time_recognize(use_log=use_log, use_dynamic=use_dynamic, use_picam=use_picam,
-                                use_graphics=use_graphics)
+    facenet.real_time_recognize(use_log, use_dynamic, use_picam, align)
 
 
 if __name__ == "__main__":
+    def to_bool(string):
+        if string.lower() in ("yes", "true", "t", "y", "1"):
+            return True
+        elif string.lower() in ("no", "false", "f", "n", "0"):
+            return False
+        else:
+            raise argparse.ArgumentTypeError('Boolean value expected.')
+
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", help="name of facenet model")
-    parser.add_argument("--path_to_model", help="path to facenet model")
-    parser.add_argument("--use_log", help="(boolean) use MySQL logging")
-    parser.add_argument("--use_dynamic", help="(boolean) use dynamic logging")
-    parser.add_argument("--use_picam", help="(boolean) use Picamera")
-    parser.add_argument("--use_graphics", help="(boolean) display graphics")
-    parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output")
+    parser.add_argument("--model", help="name of facenet model", type=str)
+    parser.add_argument("--path_to_model", help="path to facenet model", type=str)
+    parser.add_argument("--use_log", help="(boolean) use MySQL logging", type=to_bool)
+    parser.add_argument("--use_dynamic", help="(boolean) use dynamic logging", type=to_bool)
+    parser.add_argument("--use_picam", help="(boolean) use Picamera", type=to_bool)
+    parser.add_argument("--use_graphics", help="(boolean) display graphics", type=to_bool)
+    parser.add_argument("--align", help="(boolean) align using MTCNN", type=to_bool)
+    parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output", type=to_bool)
     args = parser.parse_args()
 
     demo(model=args.model, path=args.path_to_model, use_log=args.use_log, use_dynamic=args.use_dynamic,

@@ -37,7 +37,7 @@ class CudaEngineManager(object):
     # CONSTANTS
     CONSTANTS = {
         "trt_logger": trt.Logger(trt.Logger.WARNING),
-        "dtype": trt.float16,
+        "dtype": trt.float32,
         "max_batch_size": 1,
         "max_workspace_size": 1 << 20,
     }
@@ -61,7 +61,7 @@ class CudaEngineManager(object):
         with open(engine_file, "rb") as file, trt.Runtime(self.CONSTANTS["trt_logger"]) as runtime:
             self.engine = runtime.deserialize_cuda_engine(file.read())
 
-    def write_cuda_engine(self, target_file, uff_file, input_name, input_shape, output_name):
+    def write_cuda_engine(self, uff_file, target_file, input_name, input_shape, output_name):
 
         @timer("Model parsing time")
         def parse(parser, uff_file, network, input_name, input_shape, output_name):
@@ -87,9 +87,9 @@ class CudaEngineManager(object):
         with open(target_file, "wb") as file:
             file.write(self.engine)
 
-# FREEZE GRAPH
+# FREEZE KERAS MODEL AS FROZEN GRAPH
 @timer("Freezing time")
-def freeze_graph(path_to_model, save_dir=None, save_name="frozen_graph.pb"):
+def keras_to_frozen(path_to_model, save_dir=None, save_name="frozen_graph.pb"):
 
     tf.keras.backend.clear_session()
 
@@ -103,16 +103,6 @@ def freeze_graph(path_to_model, save_dir=None, save_name="frozen_graph.pb"):
 
     if path_to_model.endswith(".h5"):
         model = tf.keras.models.load_model(path_to_model)
-    elif path_to_model.endswith(".pb"):
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        with tf.Session(config=config) as sess:
-            with tf.gfile.FastGFile(path_to_model, "rb") as graph_file:
-                graph_def = tf.GraphDef()
-                graph_def.ParseFromString(graph_file.read())
-                sess.graph.as_default()
-                tf.import_graph_def(graph_def, name="")
-                model = sess.graph
     else:
         raise ValueError("{} must be a .h5 or a .pb file")
 
@@ -130,11 +120,8 @@ def freeze_graph(path_to_model, save_dir=None, save_name="frozen_graph.pb"):
 
 
 if __name__ == "__main__":
-    freeze_graph("/home/ryan/scratchpad/aisecurity/models/sandberg.pb",
-                 save_dir="/home/ryan/scratchpad/aisecurity/models",
-                 save_name="frozen_sandberg.pb")
     print("Nothing for now!")
     c = CudaEngineManager()
-    c.write_cuda_engine("/home/ryan/scratchpad/aisecurity/models/test.engine",
-                        "/home/ryan/scratchpad/aisecurity/models/ms_celeb_1m.uff",
+    c.write_cuda_engine("/home/ryan/scratchpad/aisecurity/models/frozen_death.uff",
+                        "/home/ryan/scratchpad/aisecurity/models/okboomer.engine",
                         "input_1", (3, 160, 160), "Bottleneck_BatchNorm/batchnorm/add_1")

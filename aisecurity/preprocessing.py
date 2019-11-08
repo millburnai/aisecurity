@@ -37,7 +37,7 @@ def whiten(x):
     return whitened
 
 def align_imgs(model, paths_or_imgs, margin, faces=None):
-    if not faces:
+    if not faces and faces != -1:
         detector = MTCNN()
 
     def align_img(model, path_or_img, faces=None):
@@ -46,14 +46,16 @@ def align_imgs(model, paths_or_imgs, margin, faces=None):
         except OSError:  # if img is embedding
             img = path_or_img
 
-        if not faces:
-            found = detector.detect_faces(img)
-            assert len(found) != 0, "face was not found in {}".format(path_or_img)
-            faces = found[0]["box"]
+        if faces != -1:
+            if not faces:
+                found = detector.detect_faces(img)
+                assert len(found) != 0, "face was not found in {}".format(path_or_img)
+                faces = found[0]["box"]
 
-        x, y, width, height = faces
-        cropped = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
-        resized = cv2.resize(cropped, CONSTANTS["img_size"][model][1:])
+            x, y, width, height = faces
+            img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
+
+        resized = cv2.resize(img, CONSTANTS["img_size"][model][1:])
         return resized
 
     return np.array([align_img(model, path_or_img, faces=faces) for path_or_img in paths_or_imgs])
