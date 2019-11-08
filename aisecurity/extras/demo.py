@@ -77,15 +77,15 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_pic
 
 
 if __name__ == "__main__":
+    import argparse
+
     def to_bool(string):
         if string.lower() in ("yes", "true", "t", "y", "1"):
             return True
         elif string.lower() in ("no", "false", "f", "n", "0"):
             return False
         else:
-            raise argparse.ArgumentTypeError('Boolean value expected.')
-
-    import argparse
+            raise argparse.ArgumentTypeError("boolean value expected")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", help="name of facenet model", type=str)
