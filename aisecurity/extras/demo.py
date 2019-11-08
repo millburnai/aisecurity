@@ -72,7 +72,8 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_pic
 
     input("\nPress ENTER to continue:")
 
-    facenet.real_time_recognize(use_log, use_dynamic, use_picam, align)
+    facenet.real_time_recognize(use_log=use_log, use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics,
+                                align=align)
 
 
 if __name__ == "__main__":
@@ -98,4 +99,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     demo(model=args.model, path=args.path_to_model, use_log=args.use_log, use_dynamic=args.use_dynamic,
-         use_picam=args.use_picam, use_graphics=args.use_picam, verbose=args.verbose)
+         use_picam=args.use_picam, use_graphics=args.use_picam, align=args.align, verbose=args.verbose)
