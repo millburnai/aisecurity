@@ -160,7 +160,3 @@ class GraphConverter(object):
 
 if __name__ == "__main__":
     print("Nothing for now!")
-    c = CudaEngineManager()
-    c.write_cuda_engine("/home/ryan/scratchpad/aisecurity/models/frozen_death.uff",
-                        "/home/ryan/scratchpad/aisecurity/models/okboomer.engine",
-                        "input_1", (3, 160, 160), "Bottleneck_BatchNorm/batchnorm/add_1")

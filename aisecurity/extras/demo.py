@@ -1,3 +1,4 @@
+
 """
 
 "aisecurity.extras.demo"
@@ -63,7 +64,6 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_pic
 
     from aisecurity.facenet import FaceNet, retrieve_embeds, cprint
     from aisecurity.extras.paths import DATABASE, CONFIG_HOME
-
 
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
