@@ -208,19 +208,16 @@ class FaceNet(object):
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics, align):
+    async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics):
         db_types = ["static"]
         if use_dynamic:
             db_types.append("dynamic")
         if use_log:
             log.init(flush=True)
-        if align:
-            mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face must fill at least 1/3 of the video capture
-            warnings.warn("Unstable: MTCNN breaks tensorrt version")  # for now, MTCNN should not be used
 
-        cap = self.get_video_cap(picamera=use_picam)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
+
+        cap = self.get_video_cap(width, height, picamera=use_picam)
 
         missed_frames = 0
         l2_dists = []
@@ -229,25 +226,24 @@ class FaceNet(object):
 
         while True:
             _, frame = cap.read()
-            if align:
-                result = mtcnn.detect_faces(frame)
-            else:
-                result = [{"box": 0, "confidence": 1.0, "keypoints": None}]
+            result = mtcnn.detect_faces(frame)
 
             if result:
                 overlay = frame.copy()
 
                 for person in result:
                     # using MTCNN to detect faces
-                    face = person["box"] if person["box"] else -1
+                    face = person["box"]
 
                     # facial recognition
                     try:
                         embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, db_types)
-                        print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
+                        print(
+                            "L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
                         if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
                             continue
-                    except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+                    except (
+                    ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                         if "query data dimension" in str(error):
                             raise ValueError("Current model incompatible with database")
                         elif "empty" in str(error):
@@ -291,17 +287,17 @@ class FaceNet(object):
         cv2.destroyAllWindows()
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=500, height=500, use_log=True, use_dynamic=False, use_picam=False,
-                            use_graphics=True, align=True):
+    def real_time_recognize(self, width=500, height=250, use_log=True, use_dynamic=False, use_picam=False,
+                            use_graphics=True):
 
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
         loop = asyncio.new_event_loop()
-        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log, use_dynamic, use_picam,
-                                             use_graphics if align else False, align))
+        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log,
+                                             use_dynamic=use_dynamic, use_graphics=use_graphics,
+                                             use_picam=use_picam))
         loop.run_until_complete(task)
-
 
     # GRAPHICS
     @staticmethod
@@ -322,7 +318,10 @@ class FaceNet(object):
                 cv2.CAP_GSTREAMER
             )
         else:
-            return cv2.VideoCapture(0)
+            cap = cv2.VideoCapture(0)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            return cap
 
     @staticmethod
     def add_graphics(frame, overlay, person, width, height, is_recognized, best_match):
