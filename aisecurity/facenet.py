@@ -155,8 +155,6 @@ class FaceNet(object):
         mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
 
         cap = self.get_video_cap(width, height, picamera=use_picam)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
         missed_frames = 0
         l2_dists = []
@@ -181,14 +179,13 @@ class FaceNet(object):
                             "L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
                         if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
                             continue
-                    except (
-                    ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+                    except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                         if "query data dimension" in str(error):
                             raise ValueError("Current model incompatible with database")
                         elif "empty" in str(error):
                             print("Image refresh rate too high")
                         else:
-                            print("Unknown error: " + str(error))
+                            raise error
                         continue
 
                     # add graphics
@@ -258,7 +255,10 @@ class FaceNet(object):
                 cv2.CAP_GSTREAMER
             )
         else:
-            return cv2.VideoCapture(0)
+            cap = cv2.VideoCapture(0)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            return cap
 
     @staticmethod
     def add_graphics(frame, overlay, person, width, height, is_recognized, best_match):
