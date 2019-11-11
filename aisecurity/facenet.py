@@ -154,7 +154,7 @@ class FaceNet(object):
 
         mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
 
-        cap = self.get_video_cap(picamera=use_picam)
+        cap = self.get_video_cap(width, height, picamera=use_picam)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
