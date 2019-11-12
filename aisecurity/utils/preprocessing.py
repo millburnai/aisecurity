@@ -51,8 +51,9 @@ def align_imgs(paths_or_imgs, margin, faces=None):
     def align_img(path_or_img, faces=None):
         try:
             img = imread(path_or_img)
-        except OSError:  # if img is embedding
+        except OSError:  # if img is actually image
             img = path_or_img
+        print(type(img))
 
         if not faces:
             found = detector.detect_faces(img)
