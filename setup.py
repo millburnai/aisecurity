@@ -6,11 +6,11 @@ setup(
     description="CSII AI facial recognition.",
     long_description=open("README.md").read(),
     url="https://github.com/orangese/aisecurity",
-    author="Ryan Park, Liam Pilarski",
-    author_email="22parkr@millburn.org, 22pilarskil@millburn.org",
+    author="Ryan Park"
+    author_email="22parkr@millburn.org"
     license=None,
     python_requires=">=3.5.0",
-    install_requires=["numpy", "keras", "matplotlib", "termcolor", "scikit-learn", "imageio", "mtcnn", "pycryptodome"],
+    install_requires=["numpy", "matplotlib", "termcolor", "scikit-learn", "imageio", "mtcnn", "pycryptodome"],
     scripts=["bin/make_config.sh", "bin/make_keys.sh"],
     packages=find_packages(),
     zip_safe=False
