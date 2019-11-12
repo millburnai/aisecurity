@@ -183,7 +183,7 @@ class FaceNet(object):
                     except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                         if "query data dimension" in str(error):
                             raise ValueError("Current model incompatible with database")
-                        elif "empty" in str(error):
+                        elif "empty" in str(error) or "cv2" in str(error):
                             print("Image refresh rate too high")
                         else:
                             raise error
