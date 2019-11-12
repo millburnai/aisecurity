@@ -224,7 +224,7 @@ class FaceNet(object):
         cv2.destroyAllWindows()
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=500, height=250, use_log=True, use_dynamic=False, use_picam=False,
+    def real_time_recognize(self, width=640, height=360, use_log=True, use_dynamic=False, use_picam=False,
                             use_graphics=True):
 
         async def async_helper(recognize_func, *args, **kwargs):
@@ -240,7 +240,7 @@ class FaceNet(object):
     # GRAPHICS
     @staticmethod
     def get_video_cap(width, height, picamera):
-        def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=1280, display_height=720,
+        def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=640, display_height=360,
                                 framerate=30, flip_method=0):
             return (
                     "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
@@ -250,11 +250,7 @@ class FaceNet(object):
             )
 
         if picamera:
-            return cv2.VideoCapture(
-                _gstreamer_pipeline(
-                    capture_width=width, capture_height=height, display_width=width, display_height=height),
-                cv2.CAP_GSTREAMER
-            )
+            return cv2.VideoCapture(_gstreamer_pipeline(display_width=width, display_height=height), cv2.CAP_GSTREAMER)
         else:
             cap = cv2.VideoCapture(0)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
