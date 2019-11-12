@@ -10,7 +10,7 @@ setup(
     author_email="22parkr@millburn.org",
     license=None,
     python_requires=">=3.5.0",
-    install_requires=["numpy", "matplotlib", "termcolor", "scikit-learn", "imageio", "mtcnn", "pycryptodome"],
+    install_requires=["numpy", "matplotlib", "termcolor", "scikit-learn", "mtcnn", "pycryptodome"],
     scripts=["bin/make_config.sh", "bin/make_keys.sh"],
     packages=find_packages(),
     zip_safe=False
