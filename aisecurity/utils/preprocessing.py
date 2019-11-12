@@ -50,7 +50,7 @@ def align_imgs(paths_or_imgs, margin, faces=None):
     def align_img(path_or_img, faces=None):
         try:
             img = cv2.imread(path_or_img).astype(np.uint8)
-        except SystemError:  # if img is actually image
+        except (SystemError, TypeError):  # if img is actually image
             img = path_or_img.astype(np.uint8)
 
         # print(img.shape)
