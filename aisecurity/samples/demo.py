@@ -1,6 +1,7 @@
 """
 
-"aisecurity.extras.demo"
+"aisecurity.samples.demo"
+
 Demonstration of facial recognition system.
 
 """
@@ -43,23 +44,9 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_pic
         except AttributeError:
             tf.logging.set_verbosity(tf.logging.ERROR)
 
-        # PATH SETUP
-        try:
-            # for Pycharm
-            from aisecurity.extras.paths import HOME, DATABASE
-
-        except ModuleNotFoundError:
-            # for terminal
-            import sys
-            from paths import HOME, DATABASE
-
-            try:
-                sys.path.insert(1, os.getenv("HOME") + "/PycharmProjects/aisecurity/")
-            except FileNotFoundError:
-                sys.path.insert(1, os.getenv("HOME") + "/Desktop/aisecurity/")
 
     from aisecurity.facenet import FaceNet, retrieve_embeds, cprint
-    from aisecurity.extras.paths import DATABASE, CONFIG_HOME
+    from aisecurity.utils.paths import DATABASE, CONFIG_HOME
 
 
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")

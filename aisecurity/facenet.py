@@ -17,9 +17,10 @@ import matplotlib.pyplot as plt
 from sklearn import neighbors
 from termcolor import cprint
 
-from aisecurity import log
-from aisecurity.extras.paths import CONFIG_HOME
-from aisecurity.preprocessing import *
+from aisecurity.logging import log
+from aisecurity.utils.paths import CONFIG_HOME
+from aisecurity.utils.preprocessing import *
+from aisecurity.utils.dataflow import *
 
 
 # FACENET

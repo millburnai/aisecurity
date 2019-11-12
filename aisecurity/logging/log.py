@@ -1,6 +1,6 @@
 """
 
-"aisecurity.log"
+"aisecurity.logging.log"
 
 MySQL logging handling.
 
@@ -11,7 +11,7 @@ import warnings
 
 import mysql.connector
 
-from aisecurity.extras.paths import HOME, CONFIG_HOME
+from aisecurity.utils.paths import HOME, CONFIG_HOME
 
 
 warnings.warn("logging with MySQL is deprecated and will be removed in later versions", DeprecationWarning)

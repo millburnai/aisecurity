@@ -1,6 +1,6 @@
 """
 
-"aisecurity.extras.paths"
+"aisecurity.samples.paths"
 
 Common paths used throughout the repository.
 

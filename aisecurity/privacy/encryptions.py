@@ -1,6 +1,6 @@
 """
 
-"aisecurity.encryptions"
+"aisecurity.privacy.encryptions"
 
 AES encryption for the image database.
 
@@ -16,7 +16,7 @@ import numpy as np
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-from aisecurity.extras.paths import KEY_DIR, KEY_FILE
+from aisecurity.utils.paths import KEY_DIR, KEY_FILE
 
 
 # CONSTANTS
