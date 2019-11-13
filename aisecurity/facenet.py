@@ -144,7 +144,6 @@ class FaceNet(object):
 
         return is_recognized, best_match, l2_dist
 
-
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics, framerate):
         db_types = ["static"]
@@ -173,18 +172,23 @@ class FaceNet(object):
                     # using MTCNN to detect faces
                     face = person["box"]
 
+                    if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
+                        print("Face poorly detected")
+                        continue
+
                     # facial recognition
                     try:
                         embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, db_types)
                         print(
                             "L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
-                        if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
-                            continue
-                    except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+                    except (
+                    ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                         if "query data dimension" in str(error):
                             raise ValueError("Current model incompatible with database")
-                        elif "empty" in str(error) or "opencv" in str(error):
+                        elif "empty" in str(error):
                             print("Image refresh rate too high")
+                        elif "opencv" in str(error):
+                            print("Failed to capture frame")
                         else:
                             raise error
                         continue
@@ -225,8 +229,7 @@ class FaceNet(object):
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, use_log=True, use_dynamic=False, use_picam=False,
-                            use_graphics=True, framerate=20):
-
+                            framerate=20, use_graphics=True):
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
@@ -236,17 +239,16 @@ class FaceNet(object):
                                              use_picam=use_picam, framerate=framerate))
         loop.run_until_complete(task)
 
-
     # GRAPHICS
     @staticmethod
-    def get_video_cap(width, height, framerate, picamera):
+    def get_video_cap(width, height, picamera, framerate):
         def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=640, display_height=360,
                                 framerate=20, flip_method=0):
             return (
-                    "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
-                    " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
-                    " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
-                    % (capture_width, capture_height, framerate, flip_method, display_width, display_height)
+                "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
+                " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
+                " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
+                % (capture_width, capture_height, framerate, flip_method, display_width, display_height)
             )
 
         if picamera:
