@@ -164,7 +164,7 @@ class FaceNet(object):
         missed_frames = 0
         l2_dists = []
 
-        start = time.time()
+        frames = 0
 
         while True:
             _, frame = cap.read()
@@ -207,7 +207,7 @@ class FaceNet(object):
                     self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match,
                                       resize)
 
-                if time.time() - start > 5.:  # wait 5 seconds before logging starts
+                if frames > 5:  # wait 5 frames before logging starts
 
                     # update dynamic database
                     if use_dynamic:
@@ -231,6 +231,8 @@ class FaceNet(object):
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
+
+            frames += 1
 
             await asyncio.sleep(1e-6)
 
@@ -367,28 +369,21 @@ class FaceNet(object):
     def log_activity(is_recognized, best_match, frame, log_unknown=True):
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
-
-        def get_mode(d):
-            max_key = list(d.keys())[0]
-            for key in d:
-                if len(d[key]) > len(d[max_key]):
-                    max_key = key
-            return max_key
+        mode = lambda d: max(d.keys(), key=lambda key: d[key])
 
         log.update_current_logs(is_recognized, best_match)
 
         if log.num_recognized >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.last_logged):
             if log.get_percent_diff(best_match) <= log.THRESHOLDS["percent_diff"]:
-                recognized_person = get_mode(log.current_log)
+                recognized_person = mode(log.current_log)
                 log.log_person(recognized_person, times=log.current_log[recognized_person])
                 cprint("Regular activity logged", color="green", attrs=["bold"])
 
         if log_unknown and log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
-            path = CONFIG_HOME + "/database/unknown/{}.jpg".format(
-                len(os.listdir(CONFIG_HOME + "/database/unknown")))
+            path = CONFIG_HOME + "/database/unknown/{}.jpg".format(len(os.listdir(CONFIG_HOME + "/database/unknown")))
             log.log_unknown(path)
 
-            # recording unknown images is deprecated and will be removed/changed later
+            warnings.warn("recording unknown images in user directory is deprecated and will be changed later")
             cv2.imwrite(path, frame)
             cprint("Unknown activity logged", color="red", attrs=["bold"])
 

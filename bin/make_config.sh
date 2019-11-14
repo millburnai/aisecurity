@@ -18,7 +18,7 @@ config_path=$(pwd )
 echo "Adding aisecurity.json to .aisecurity"
 touch "$HOME/.aisecurity/aisecurity.json"
 
-printf '{\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_file.json",\n    "database_location": "%s/database/encrypted.json"\n}\n' \
+printf '{\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_file.json",\n    "database_location": "%s/database/encrypted.json",\n    "mysql_user": "root",\n    "mysql_password": "root"\n}\n' \
 "$config_path" "$config_path" "$config_path" > "$config_path/aisecurity.json"
 
 if [ ! -d "$config_path/database" ] ; then

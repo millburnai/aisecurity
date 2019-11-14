@@ -53,14 +53,6 @@ def align_imgs(paths_or_imgs, margin, faces=None):
         except (SystemError, TypeError):  # if img is actually image
             img = path_or_img.astype(np.uint8)
 
-        # print(img.shape)
-        # height, width, channels = img.shape
-        # scale_factor = CONSTANTS["img_size"][0] / ((height + width) / 2)
-        # img = cv2.resize(img, (0, 0), fx=scale_factor, fy=scale_factor)
-        #
-        # plt.imshow(img); plt.show()
-        # print(img.shape)
-
         if not faces:
             found = detector.detect_faces(img)
             assert len(found) != 0, "face was not found in {}".format(path_or_img)

@@ -11,7 +11,7 @@ import warnings
 
 import mysql.connector
 
-from aisecurity.utils.paths import HOME, CONFIG_HOME
+from aisecurity.utils.paths import CONFIG_HOME, CONFIG
 
 
 warnings.warn("logging with MySQL is deprecated and will be removed in later versions", DeprecationWarning)
@@ -20,7 +20,7 @@ warnings.warn("logging with MySQL is deprecated and will be removed in later ver
 THRESHOLDS = {
     "num_recognized": 5,
     "num_unknown": 5,
-    "percent_diff": 0.1,
+    "percent_diff": 0.2,
     "cooldown": 10.,
     "missed_frames": 10
 }
@@ -36,8 +36,8 @@ current_log = {}
 try:
     database = mysql.connector.connect(
         host="localhost",
-        user="root",
-        passwd="Blast314" if "ryan" in HOME else "KittyCat123",
+        user=CONFIG["mysql_user"],
+        passwd=CONFIG["mysql_password"],
         database="LOG"
     )
     cursor = database.cursor()
@@ -88,13 +88,14 @@ def update_current_logs(is_recognized, best_match):
         else:
             current_log[best_match].append(now)
 
-        if len(current_log[best_match]) == 1 or get_percent_diff(best_match) <= THRESHOLDS["percent_diff"]:
+        if len(current_log[best_match]) == 1 or get_percent_diff(best_match) <= THRESHOLDS["percent_diff"] + 0.2:
             num_recognized += 1
             num_unknown = 0
 
     else:
         num_unknown += 1
-        num_recognized = 0
+        if num_unknown >= THRESHOLDS["num_unknown"]:
+            num_recognized = 0
 
 
 # LOGGING FUNCTIONS
