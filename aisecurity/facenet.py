@@ -144,9 +144,9 @@ class FaceNet(object):
 
         return is_recognized, best_match, l2_dist
 
-
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics):
+    async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics, framerate,
+                                   resize):
         db_types = ["static"]
         if use_dynamic:
             db_types.append("dynamic")
@@ -155,7 +155,7 @@ class FaceNet(object):
 
         mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
 
-        cap = self.get_video_cap(width, height, picamera=use_picam)
+        cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate)
 
         missed_frames = 0
         l2_dists = []
@@ -164,34 +164,42 @@ class FaceNet(object):
 
         while True:
             _, frame = cap.read()
+            if resize:
+                result = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
+
+            # using MTCNN to detect faces
             result = mtcnn.detect_faces(frame)
 
             if result:
                 overlay = frame.copy()
 
                 for person in result:
-                    # using MTCNN to detect faces
                     face = person["box"]
+
+                    if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
+                        print("Face poorly detected")
+                        continue
 
                     # facial recognition
                     try:
                         embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, db_types)
                         print(
                             "L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
-                        if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
-                            continue
-                    except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+                    except (
+                    ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                         if "query data dimension" in str(error):
                             raise ValueError("Current model incompatible with database")
-                        elif "empty" in str(error) or "opencv" in str(error):
+                        elif "empty" in str(error):
                             print("Image refresh rate too high")
+                        elif "opencv" in str(error):
+                            print("Failed to capture frame")
                         else:
                             raise error
                         continue
 
                     # add graphics
                     if use_graphics:
-                        self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match)
+                        self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize)
 
                     if time.time() - start > 5.:  # wait 5 seconds before logging starts
 
@@ -225,32 +233,32 @@ class FaceNet(object):
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, use_log=True, use_dynamic=False, use_picam=False,
-                            use_graphics=True):
-
+                            framerate=20, use_graphics=True, resize=None):
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
         loop = asyncio.new_event_loop()
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log,
                                              use_dynamic=use_dynamic, use_graphics=use_graphics,
-                                             use_picam=use_picam))
+                                             use_picam=use_picam, framerate=framerate, resize=resize))
         loop.run_until_complete(task)
-
 
     # GRAPHICS
     @staticmethod
-    def get_video_cap(width, height, picamera):
+    def get_video_cap(width, height, picamera, framerate):
         def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=640, display_height=360,
-                                framerate=30, flip_method=0):
+                                framerate=20, flip_method=0):
             return (
-                    "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
-                    " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
-                    " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
-                    % (capture_width, capture_height, framerate, flip_method, display_width, display_height)
+                "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
+                " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
+                " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
+                % (capture_width, capture_height, framerate, flip_method, display_width, display_height)
             )
 
         if picamera:
-            return cv2.VideoCapture(_gstreamer_pipeline(display_width=width, display_height=height), cv2.CAP_GSTREAMER)
+            return cv2.VideoCapture(
+                _gstreamer_pipeline(display_width=width, display_height=height, framerate=framerate),
+                cv2.CAP_GSTREAMER)
         else:
             cap = cv2.VideoCapture(0)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
@@ -258,11 +266,10 @@ class FaceNet(object):
             return cap
 
     @staticmethod
-    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match):
+    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize):
         line_thickness = round(1e-6 * width * height + 1.5)
         radius = round((1e-6 * width * height + 1.5) / 2.)
         font_size = 4.5e-7 * width * height + 0.5
-
         # works for 6.25e4 pixel video cature to 1e6 pixel video capture
 
         def get_color(is_recognized, best_match):
@@ -273,10 +280,13 @@ class FaceNet(object):
             else:
                 return 0, 255, 0  # green
 
-        def add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness):
-            cv2.rectangle(frame, corner, box, color, line_thickness)
-            cv2.putText(frame, best_match.replace("_", " ").title(), corner, cv2.FONT_HERSHEY_SIMPLEX, font_size,
-                        color, thickness)
+        def add_box_and_label(frame, origin, corner, color, line_thickness, best_match, font_size, thickness):
+            cv2.rectangle(frame, origin, corner, color, line_thickness)
+
+            # label box
+            cv2.rectangle(frame, (origin[0], corner[1] - 35), corner, color, cv2.FILLED)
+            cv2.putText(frame, best_match.replace("_", " ").title(), (origin[0] + 6, corner[1] - 6),
+                        cv2.FONT_HERSHEY_DUPLEX, font_size, (255, 255, 255), thickness)  # white text
 
         def add_key_points(overlay, key_points, radius, color, line_thickness):
             cv2.circle(overlay, (key_points["left_eye"]), radius, color, line_thickness)
@@ -293,17 +303,24 @@ class FaceNet(object):
         key_points = person["keypoints"]
         x, y, height, width = person["box"]
 
+        if resize:
+            key_points = {feature: resize * key_points[feature] for feature in key_points}
+            x *= resize
+            y *= resize
+            height *= resize
+            width *= resize
+
         color = get_color(is_recognized, best_match)
 
         margin = CONSTANTS["margin"]
-        corner = (x - margin // 2, y - margin // 2)
-        box = (x + height + margin // 2, y + width + margin // 2)
+        origin = (x - margin // 2, y - margin // 2)
+        corner = (x + height + margin // 2, y + width + margin // 2)
 
         add_key_points(overlay, key_points, radius, color, line_thickness)
         cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
 
         text = best_match if is_recognized else ""
-        add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
+        add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
 
     # DISPLAY

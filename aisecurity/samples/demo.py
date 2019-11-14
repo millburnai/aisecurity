@@ -8,7 +8,7 @@ Demonstration of facial recognition system.
 
 
 def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_picam=False, use_graphics=True,
-         verbose=False):
+         resize=None, verbose=False):
 
     # default arg values (for Pycharm, where args.* default to None)
     if model is None:
@@ -60,7 +60,7 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_pic
     input("\nPress ENTER to continue:")
 
     facenet.real_time_recognize(use_log=use_log, use_dynamic=use_dynamic, use_picam=use_picam,
-                                use_graphics=use_graphics)
+                                use_graphics=use_graphics, resize=resize)
 
 
 if __name__ == "__main__":
@@ -74,6 +74,12 @@ if __name__ == "__main__":
         else:
             raise argparse.ArgumentTypeError("boolean value expected")
 
+    def bounded_float(string):
+        if 0. <= float(string) <= 1.:
+            return float(string)
+        else:
+            raise argparse.ArgumentTypeError("float between 0 and 1 expected")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", help="name of facenet model", type=str)
     parser.add_argument("--path_to_model", help="path to facenet model", type=str)
@@ -81,8 +87,9 @@ if __name__ == "__main__":
     parser.add_argument("--use_dynamic", help="(boolean) use dynamic logging", type=to_bool)
     parser.add_argument("--use_picam", help="(boolean) use Picamera", type=to_bool)
     parser.add_argument("--use_graphics", help="(boolean) display graphics", type=to_bool)
+    parser.add_argument("--resize", help="(boolean) resize frame for faster recognition", type=bounded_float)
     parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output", type=to_bool)
     args = parser.parse_args()
 
     demo(model=args.model, path=args.path_to_model, use_log=args.use_log, use_dynamic=args.use_dynamic,
-         use_picam=args.use_picam, use_graphics=args.use_picam, verbose=args.verbose)
+         use_picam=args.use_picam, use_graphics=args.use_picam, resize=args.resize, verbose=args.verbose)
