@@ -144,6 +144,7 @@ class FaceNet(object):
 
         return is_recognized, best_match, l2_dist
 
+
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics, framerate,
                                    resize):
@@ -153,9 +154,12 @@ class FaceNet(object):
         if use_log:
             log.init(flush=True)
 
-        mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
-
         cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate)
+
+        if resize:
+            width, height = width * resize, height * resize
+
+        mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
 
         missed_frames = 0
         l2_dists = []
@@ -164,14 +168,15 @@ class FaceNet(object):
 
         while True:
             _, frame = cap.read()
+            original_frame = frame.copy()
             if resize:
-                result = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
+                frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
             # using MTCNN to detect faces
             result = mtcnn.detect_faces(frame)
 
             if result:
-                overlay = frame.copy()
+                overlay = original_frame.copy()
 
                 for person in result:
                     face = person["box"]
@@ -199,7 +204,8 @@ class FaceNet(object):
 
                     # add graphics
                     if use_graphics:
-                        self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize)
+                        self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match,
+                                          resize)
 
                     if time.time() - start > 5.:  # wait 5 seconds before logging starts
 
@@ -209,7 +215,7 @@ class FaceNet(object):
 
                         # log activity
                         if use_log:
-                            self.log_activity(is_recognized, best_match, frame, log_unknown=True)
+                            self.log_activity(is_recognized, best_match, original_frame, log_unknown=True)
 
                         l2_dists.append(l2_dist)
 
@@ -221,7 +227,7 @@ class FaceNet(object):
                     l2_dists = []
                 print("No face detected")
 
-            cv2.imshow("AI Security v1.0a", frame)
+            cv2.imshow("AI Security v1.0a", original_frame)
 
             await asyncio.sleep(1e-6)
 
@@ -232,9 +238,8 @@ class FaceNet(object):
         cv2.destroyAllWindows()
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, use_log=True, use_dynamic=False, use_picam=False, framerate=20,
-                            use_graphics=True, resize=None):
-
+    def real_time_recognize(self, width=640, height=360, use_log=True, use_dynamic=False, use_picam=False,
+                            framerate=20, use_graphics=True, resize=None):
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
@@ -242,8 +247,8 @@ class FaceNet(object):
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log,
                                              use_dynamic=use_dynamic, use_graphics=use_graphics,
                                              use_picam=use_picam, framerate=framerate, resize=resize))
-
         loop.run_until_complete(task)
+
 
     # GRAPHICS
     @staticmethod
@@ -251,10 +256,10 @@ class FaceNet(object):
         def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=640, display_height=360,
                                 framerate=20, flip_method=0):
             return (
-                "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
-                " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
-                " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
-                % (capture_width, capture_height, framerate, flip_method, display_width, display_height)
+                    "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
+                    " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
+                    " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
+                    % (capture_width, capture_height, framerate, flip_method, display_width, display_height)
             )
 
         if picamera:
@@ -284,33 +289,34 @@ class FaceNet(object):
 
         def add_box_and_label(frame, origin, corner, color, line_thickness, best_match, font_size, thickness):
             cv2.rectangle(frame, origin, corner, color, line_thickness)
-
             # label box
             cv2.rectangle(frame, (origin[0], corner[1] - 35), corner, color, cv2.FILLED)
             cv2.putText(frame, best_match.replace("_", " ").title(), (origin[0] + 6, corner[1] - 6),
                         cv2.FONT_HERSHEY_DUPLEX, font_size, (255, 255, 255), thickness)  # white text
 
-        def add_key_points(overlay, key_points, radius, color, line_thickness):
-            cv2.circle(overlay, (key_points["left_eye"]), radius, color, line_thickness)
-            cv2.circle(overlay, (key_points["right_eye"]), radius, color, line_thickness)
-            cv2.circle(overlay, (key_points["nose"]), radius, color, line_thickness)
-            cv2.circle(overlay, (key_points["mouth_left"]), radius, color, line_thickness)
-            cv2.circle(overlay, (key_points["mouth_right"]), radius, color, line_thickness)
+        def add_features(overlay, features, radius, color, line_thickness):
+            cv2.circle(overlay, (features["left_eye"]), radius, color, line_thickness)
+            cv2.circle(overlay, (features["right_eye"]), radius, color, line_thickness)
+            cv2.circle(overlay, (features["nose"]), radius, color, line_thickness)
+            cv2.circle(overlay, (features["mouth_left"]), radius, color, line_thickness)
+            cv2.circle(overlay, (features["mouth_right"]), radius, color, line_thickness)
 
-            cv2.line(overlay, key_points["left_eye"], key_points["nose"], color, radius)
-            cv2.line(overlay, key_points["right_eye"], key_points["nose"], color, radius)
-            cv2.line(overlay, key_points["mouth_left"], key_points["nose"], color, radius)
-            cv2.line(overlay, key_points["mouth_right"], key_points["nose"], color, radius)
+            cv2.line(overlay, features["left_eye"], features["nose"], color, radius)
+            cv2.line(overlay, features["right_eye"], features["nose"], color, radius)
+            cv2.line(overlay, features["mouth_left"], features["nose"], color, radius)
+            cv2.line(overlay, features["mouth_right"], features["nose"], color, radius)
 
-        key_points = person["keypoints"]
+        features = person["keypoints"]
         x, y, height, width = person["box"]
 
         if resize:
-            key_points = {feature: resize * key_points[feature] for feature in key_points}
-            x *= resize
-            y *= resize
-            height *= resize
-            width *= resize
+            scale_factor = 1. / resize
+
+            scale = lambda x: tuple(int(element * scale_factor) for element in x)
+            features = {feature: scale(features[feature]) for feature in features}
+
+            scale = lambda *xs: tuple(int(x * scale_factor) for x in xs)
+            x, y, height, width = scale(x, y, height, width)
 
         color = get_color(is_recognized, best_match)
 
@@ -318,7 +324,7 @@ class FaceNet(object):
         origin = (x - margin // 2, y - margin // 2)
         corner = (x + height + margin // 2, y + width + margin // 2)
 
-        add_key_points(overlay, key_points, radius, color, line_thickness)
+        add_features(overlay, features, radius, color, line_thickness)
         cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
 
         text = best_match if is_recognized else ""
