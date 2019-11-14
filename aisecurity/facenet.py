@@ -232,8 +232,9 @@ class FaceNet(object):
         cv2.destroyAllWindows()
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, use_log=True, use_dynamic=False, use_picam=False,
-                            framerate=20, use_graphics=True, resize=None):
+    def real_time_recognize(self, width=640, height=360, use_log=True, use_dynamic=False, use_picam=False, framerate=20,
+                            use_graphics=True, resize=None):
+
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
@@ -241,6 +242,7 @@ class FaceNet(object):
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log,
                                              use_dynamic=use_dynamic, use_graphics=use_graphics,
                                              use_picam=use_picam, framerate=framerate, resize=resize))
+
         loop.run_until_complete(task)
 
     # GRAPHICS
