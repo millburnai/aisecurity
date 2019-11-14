@@ -277,10 +277,13 @@ class FaceNet(object):
             else:
                 return 0, 255, 0  # green
 
-        def add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness):
-            cv2.rectangle(frame, corner, box, color, line_thickness)
-            cv2.putText(frame, best_match.replace("_", " ").title(), corner, cv2.FONT_HERSHEY_SIMPLEX, font_size,
-                        color, thickness)
+        def add_box_and_label(frame, origin, corner, color, line_thickness, best_match, font_size, thickness):
+            cv2.rectangle(frame, origin, corner, color, line_thickness)
+
+            # label box
+            cv2.rectangle(frame, (origin[0], corner[1] - 35), corner, color, cv2.FILLED)
+            cv2.putText(frame, best_match.replace("_", " ").title(), (origin[0] + 6, corner[1] - 6),
+                        cv2.FONT_HERSHEY_DUPLEX, font_size, (255, 255, 255), thickness)  # white text
 
         def add_key_points(overlay, key_points, radius, color, line_thickness):
             cv2.circle(overlay, (key_points["left_eye"]), radius, color, line_thickness)
@@ -300,14 +303,14 @@ class FaceNet(object):
         color = get_color(is_recognized, best_match)
 
         margin = CONSTANTS["margin"]
-        corner = (x - margin // 2, y - margin // 2)
-        box = (x + height + margin // 2, y + width + margin // 2)
+        origin = (x - margin // 2, y - margin // 2)
+        corner = (x + height + margin // 2, y + width + margin // 2)
 
         add_key_points(overlay, key_points, radius, color, line_thickness)
         cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
 
         text = best_match if is_recognized else ""
-        add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
+        add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
 
     # DISPLAY
