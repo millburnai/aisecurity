@@ -178,46 +178,46 @@ class FaceNet(object):
             if result:
                 overlay = original_frame.copy()
 
-                for person in result:
-                    face = person["box"]
+                person = max(result, key=lambda person: person["confidence"])
+                face = person["box"]
 
-                    if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
-                        print("Face poorly detected")
-                        continue
+                if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
+                    print("Face poorly detected")
+                    continue
 
-                    # facial recognition
-                    try:
-                        embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, db_types)
-                        print(
-                            "L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
-                    except (
-                    ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
-                        if "query data dimension" in str(error):
-                            raise ValueError("Current model incompatible with database")
-                        elif "empty" in str(error):
-                            print("Image refresh rate too high")
-                        elif "opencv" in str(error):
-                            print("Failed to capture frame")
-                        else:
-                            raise error
-                        continue
+                # facial recognition
+                try:
+                    embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, db_types)
+                    print(
+                        "L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
+                except (
+                ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+                    if "query data dimension" in str(error):
+                        raise ValueError("Current model incompatible with database")
+                    elif "empty" in str(error):
+                        print("Image refresh rate too high")
+                    elif "opencv" in str(error):
+                        print("Failed to capture frame")
+                    else:
+                        raise error
+                    continue
 
-                    # add graphics
-                    if use_graphics:
-                        self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match,
-                                          resize)
+                # add graphics
+                if use_graphics:
+                    self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match,
+                                      resize)
 
-                    if time.time() - start > 5.:  # wait 5 seconds before logging starts
+                if time.time() - start > 5.:  # wait 5 seconds before logging starts
 
-                        # update dynamic database
-                        if use_dynamic:
-                            self.dynamic_update(embedding, l2_dists)
+                    # update dynamic database
+                    if use_dynamic:
+                        self.dynamic_update(embedding, l2_dists)
 
-                        # log activity
-                        if use_log:
-                            self.log_activity(is_recognized, best_match, original_frame, log_unknown=True)
+                    # log activity
+                    if use_log:
+                        self.log_activity(is_recognized, best_match, original_frame, log_unknown=True)
 
-                        l2_dists.append(l2_dist)
+                    l2_dists.append(l2_dist)
 
             else:
                 missed_frames += 1
@@ -229,10 +229,10 @@ class FaceNet(object):
 
             cv2.imshow("AI Security v1.0a", original_frame)
 
-            await asyncio.sleep(1e-6)
-
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
+
+            await asyncio.sleep(1e-6)
 
         cap.release()
         cv2.destroyAllWindows()
@@ -312,10 +312,10 @@ class FaceNet(object):
         if resize:
             scale_factor = 1. / resize
 
-            scale = lambda x: tuple(int(element * scale_factor) for element in x)
+            scale = lambda x: tuple(round(element * scale_factor) for element in x)
             features = {feature: scale(features[feature]) for feature in features}
 
-            scale = lambda *xs: tuple(int(x * scale_factor) for x in xs)
+            scale = lambda *xs: tuple(round(x * scale_factor) for x in xs)
             x, y, height, width = scale(x, y, height, width)
 
         color = get_color(is_recognized, best_match)
