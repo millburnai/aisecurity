@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ".aisecurity.make_config"
-# Program to make config file (~/.aisecurity.json)
+# Program to make config files (~/.aisecurity)
 
 if [ ! -d "$HOME/.aisecurity" ] ; then
   mkdir "$HOME/.aisecurity"
