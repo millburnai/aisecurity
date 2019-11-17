@@ -25,7 +25,6 @@ if [ ! -d "$config_path/database" ] ; then
   echo "Making database and unknown directories"
   mkdir database
   cd "$config_path/database" || echo "Error: unable to access $config_path/database"
-  mkdir unknown
   wget -O "encrypted.json" "https://www.dropbox.com/s/80xgr7zuybbhydu/encrypted.json?dl=1" || \
   echo "Error: unable to download encrypted.json"
 fi
@@ -54,4 +53,14 @@ if [ ! -d "$HOME/.aisecurity/bin" ] ; then
   cd "$config_path/bin" || echo "Error: unable to access $config_path/bin"
   wget -O "drop.sql" "https://github.com/orangese/aisecurity/raw/tensorrt/bin/drop.sql" || \
   echo "Error: drop.sql could not be downloaded"
+fi
+
+if [ ! -d "$HOME/.aisecurity/logging" ] ; then
+  echo "Creating logging directory"
+  cd "$config_path" || echo "Error: unable to access $config_path"
+  mkdir logging
+  cd "$config_path/logging" || echo "Error: unable to access $config_path/logging"
+  touch firebase.json
+  echo "Fill in '$config_path/logging/firebase.json' and a key file in the same directory to use firebase logging"
+  mkdir unknown
 fi

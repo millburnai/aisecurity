@@ -7,14 +7,14 @@ Demonstration of facial recognition system.
 """
 
 
-def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_picam=False, use_graphics=True,
-         resize=None, verbose=False):
+def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, use_picam=False, use_graphics=True,
+         resize=None, verbose=False, use_lcd=False):
 
     # default arg values (for Pycharm, where args.* default to None)
     if model is None:
         model = "ms_celeb_1m"
-    if use_log is None:
-        use_log = True
+    if logging is None:
+        logging = "firebase"
     if use_dynamic is None:
         use_dynamic = True
     if use_picam is None:
@@ -58,9 +58,8 @@ def demo(model="ms_celeb_1m", path=None, use_log=True, use_dynamic=True, use_pic
     facenet.set_data(retrieve_embeds(DATABASE, encrypted="names"))
 
     input("\nPress ENTER to continue:")
-
-    facenet.real_time_recognize(use_log=use_log, use_dynamic=use_dynamic, use_picam=use_picam,
-                                use_graphics=use_graphics, resize=resize)
+    facenet.real_time_recognize(logging=logging, use_dynamic=use_dynamic, use_picam=use_picam,
+                                use_graphics=use_graphics, resize=resize, use_lcd=use_lcd)
 
 
 if __name__ == "__main__":
@@ -83,13 +82,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", help="name of facenet model", type=str)
     parser.add_argument("--path_to_model", help="path to facenet model", type=str)
-    parser.add_argument("--use_log", help="(boolean) use MySQL logging", type=to_bool)
+    parser.add_argument("--logging", help="(string) logging type, mysql or firebase", type=str)
     parser.add_argument("--use_dynamic", help="(boolean) use dynamic logging", type=to_bool)
     parser.add_argument("--use_picam", help="(boolean) use Picamera", type=to_bool)
     parser.add_argument("--use_graphics", help="(boolean) display graphics", type=to_bool)
+    parser.add_argument("--use_lcd", help="(boolean) use LCD display", type=to_bool)
+    parser.add_argument("--firebase", help="(boolean) using Firebase as opposed to MySQL for logging purposes",
+                        type=to_bool)
     parser.add_argument("--resize", help="(boolean) resize frame for faster recognition", type=bounded_float)
     parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output", type=to_bool)
     args = parser.parse_args()
 
-    demo(model=args.model, path=args.path_to_model, use_log=args.use_log, use_dynamic=args.use_dynamic,
-         use_picam=args.use_picam, use_graphics=args.use_picam, resize=args.resize, verbose=args.verbose)
+    demo(model=args.model, path=args.path_to_model, logging=args.logging, use_dynamic=args.use_dynamic,
+         use_picam=args.use_picam, use_graphics=args.use_picam, resize=args.resize, use_lcd=args.use_lcd,
+         verbose=args.verbose)

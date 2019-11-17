@@ -10,7 +10,15 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 
 import asyncio
 import warnings
+import requests
 
+try:
+    from adafruit_character_lcd.character_lcd_i2c import Character_LCD_I2C as character_lcd
+    import busio
+    import board
+    import digitalio
+except NotImplementedError:
+    warnings.warn("LCD not supported")
 import keras
 from keras import backend as K
 import matplotlib.pyplot as plt
@@ -18,9 +26,9 @@ from sklearn import neighbors
 from termcolor import cprint
 
 from aisecurity.logging import log
-from aisecurity.utils.paths import CONFIG_HOME
-from aisecurity.utils.preprocessing import *
 from aisecurity.utils.dataflow import *
+from aisecurity.utils.paths import CONFIG_HOME, CONFIG
+from aisecurity.utils.preprocessing import *
 
 
 # FACENET
@@ -144,15 +152,21 @@ class FaceNet(object):
 
         return is_recognized, best_match, l2_dist
 
-
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics, framerate,
-                                   resize):
+    async def _real_time_recognize(self, width, height, logging, use_dynamic, use_picam, use_graphics, framerate,
+                                   resize, use_lcd):
         db_types = ["static"]
         if use_dynamic:
             db_types.append("dynamic")
-        if use_log:
-            log.init(flush=True)
+        if logging:
+            log.init(flush=True, logging=logging)
+        if use_lcd:
+            i2c = busio.I2C(board.SCL, board.SDA)
+            try:
+                i2c.scan()
+            except RuntimeError:
+                raise RuntimeError("Wire configuration incorrect")
+            lcd = character_lcd(i2c, 16, 2, backlight_inverted=False)
 
         cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate)
 
@@ -168,6 +182,8 @@ class FaceNet(object):
 
         while True:
             _, frame = cap.read()
+            if use_picam:
+                frame = cv2.addWeighted(frame, 2., frame, 0, -125.)  # picamera needs extra contrast
             original_frame = frame.copy()
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
@@ -191,7 +207,7 @@ class FaceNet(object):
                     print(
                         "L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
                 except (
-                ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+                        ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                     if "query data dimension" in str(error):
                         raise ValueError("Current model incompatible with database")
                     elif "empty" in str(error):
@@ -205,7 +221,7 @@ class FaceNet(object):
                 # add graphics
                 if use_graphics:
                     self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match,
-                                      resize)
+                                      resize, lcd if use_lcd else None)
 
                 if frames > 5:  # wait 5 frames before logging starts
 
@@ -214,8 +230,8 @@ class FaceNet(object):
                         self.dynamic_update(embedding, l2_dists)
 
                     # log activity
-                    if use_log:
-                        self.log_activity(is_recognized, best_match, original_frame, log_unknown=True)
+                    if logging:
+                        self.log_activity(is_recognized, best_match, original_frame, logging)
 
                     l2_dists.append(l2_dist)
 
@@ -240,17 +256,20 @@ class FaceNet(object):
         cv2.destroyAllWindows()
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, use_log=True, use_dynamic=False, use_picam=False,
-                            framerate=20, use_graphics=True, resize=None):
+    def real_time_recognize(self, width=640, height=360, logging="firebase", use_dynamic=False, use_picam=False,
+                            use_graphics=True, framerate=20, resize=None, use_lcd=False):
+        assert width > 0 and height > 0, "width and height must be positive integers"
+        assert logging == "mysql" or logging == "firebase", "only mysql and firebase logging supported"
+        assert 0 < framerate < 150, "framerate must be between 0 and 150"
+        assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
+
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
         loop = asyncio.new_event_loop()
-        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log,
-                                             use_dynamic=use_dynamic, use_graphics=use_graphics,
-                                             use_picam=use_picam, framerate=framerate, resize=resize))
+        task = loop.create_task(async_helper(self._real_time_recognize, width, height, logging, use_dynamic,
+                                             use_picam, use_graphics, framerate, resize, use_lcd))
         loop.run_until_complete(task)
-
 
     # GRAPHICS
     @staticmethod
@@ -275,10 +294,11 @@ class FaceNet(object):
             return cap
 
     @staticmethod
-    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize):
+    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize, lcd):
         line_thickness = round(1e-6 * width * height + 1.5)
         radius = round((1e-6 * width * height + 1.5) / 2.)
         font_size = 4.5e-7 * width * height + 0.5
+
         # works for 6.25e4 pixel video cature to 1e6 pixel video capture
 
         def get_color(is_recognized, best_match):
@@ -308,6 +328,15 @@ class FaceNet(object):
             cv2.line(overlay, features["mouth_left"], features["nose"], color, radius)
             cv2.line(overlay, features["mouth_right"], features["nose"], color, radius)
 
+        def add_lcd_display(lcd):
+            lcd.clear()
+            request = requests.get(CONFIG["server_address"])
+            data = request.json()
+            if data["accept"]:
+                lcd.message = "ID Accepted \n{}".format(best_match)
+            else:
+                lcd.message = "No Senior Priv\n{}".format(best_match)
+
         features = person["keypoints"]
         x, y, height, width = person["box"]
 
@@ -332,6 +361,8 @@ class FaceNet(object):
         text = best_match if is_recognized else ""
         add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
+        if lcd:
+            add_lcd_display(lcd)
 
     # DISPLAY
     def show_embeds(self, encrypted=False, single=False):
@@ -363,10 +394,10 @@ class FaceNet(object):
             if single and person == list(data.keys())[0]:
                 break
 
-
     # LOGGING
     @staticmethod
-    def log_activity(is_recognized, best_match, frame, log_unknown=True):
+    def log_activity(is_recognized, best_match, frame, logging_type):
+        firebase = True if logging_type == "firebase" else False
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
         mode = lambda d: max(d.keys(), key=lambda key: d[key])
@@ -376,17 +407,16 @@ class FaceNet(object):
         if log.num_recognized >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.last_logged):
             if log.get_percent_diff(best_match) <= log.THRESHOLDS["percent_diff"]:
                 recognized_person = mode(log.current_log)
-                log.log_person(recognized_person, times=log.current_log[recognized_person])
-                cprint("Regular activity logged", color="green", attrs=["bold"])
+                log.log_person(recognized_person, times=log.current_log[recognized_person], firebase=firebase)
+                cprint("Regular activity logged ({})".format(best_match), color="green", attrs=["bold"])
 
-        if log_unknown and log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
-            path = CONFIG_HOME + "/database/unknown/{}.jpg".format(len(os.listdir(CONFIG_HOME + "/database/unknown")))
-            log.log_unknown(path)
+        if log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
+            path = CONFIG_HOME + "/logging/unknown/{}.jpg".format(len(os.listdir(CONFIG_HOME + "/logging/unknown")))
+            log.log_unknown(path, firebase=firebase)
 
             warnings.warn("recording unknown images in user directory is deprecated and will be changed later")
             cv2.imwrite(path, frame)
             cprint("Unknown activity logged", color="red", attrs=["bold"])
-
 
     # DYNAMIC DATABASE
     def dynamic_update(self, embedding, l2_dists):

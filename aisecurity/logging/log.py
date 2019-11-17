@@ -2,27 +2,33 @@
 
 "aisecurity.logging.log"
 
-MySQL logging handling.
+MySQL and Firebase logging handling.
 
 """
 
+import json
 import time
 import warnings
 
 import mysql.connector
+import pyrebase
+from pyrebase import *
 
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
 
 
-warnings.warn("logging with MySQL is deprecated and will be removed in later versions", DeprecationWarning)
-
 # SETUP
+DATABASE = None
+CURSOR = None
+FIREBASE = None
+
 THRESHOLDS = {
-    "num_recognized": 5,
+    "num_recognized": 3,
     "num_unknown": 5,
     "percent_diff": 0.2,
     "cooldown": 10.,
-    "missed_frames": 10
+    "missed_frames": 10,
+    "refresh_rate": 3.
 }
 
 num_recognized = 0
@@ -32,35 +38,48 @@ last_logged = time.time() - THRESHOLDS["cooldown"] + 0.1  # don't log for first 
 unk_last_logged = time.time() - THRESHOLDS["cooldown"] + 0.1
 
 current_log = {}
-
-try:
-    database = mysql.connector.connect(
-        host="localhost",
-        user=CONFIG["mysql_user"],
-        passwd=CONFIG["mysql_password"],
-        database="LOG"
-    )
-    cursor = database.cursor()
-
-except (mysql.connector.errors.DatabaseError, mysql.connector.errors.InterfaceError):
-    warnings.warn("Database credentials missing or incorrect")
+current_log_start = time.time() - THRESHOLDS["cooldown"] + 0.1
 
 
 # LOGGING INIT AND HELPERS
-def init(flush=False, thresholds=None):
-    cursor.execute("USE LOG;")
-    database.commit()
+def init(flush=False, thresholds=None, logging="firebase"):
+    global DATABASE, CURSOR, FIREBASE
 
-    if flush:
-        instructions = open(CONFIG_HOME + "/bin/drop.sql")
-        for cmd in instructions:
-            if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"):
-                cursor.execute(cmd)
-                database.commit()
+    if logging == "mysql":
+        warnings.warn("logging with MySQL is deprecated and will be removed in later versions", DeprecationWarning)
+
+        try:
+            DATABASE = mysql.connector.connect(
+                host="localhost",
+                user=CONFIG["mysql_user"],
+                passwd=CONFIG["mysql_password"],
+                database="LOG"
+            )
+            CURSOR = DATABASE.cursor()
+
+        except (mysql.connector.errors.DatabaseError, mysql.connector.errors.InterfaceError):
+            warnings.warn("MySQL database credentials missing or incorrect")
+
+        CURSOR.execute("USE LOG;")
+        DATABASE.commit()
+
+        if flush:
+            instructions = open(CONFIG_HOME + "/bin/drop.sql")
+            for cmd in instructions:
+                if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"):
+                    CURSOR.execute(cmd)
+                    DATABASE.commit()
+
+    elif logging == "firebase":
+        try:
+            FIREBASE = pyrebase.initialize_app(json.load(open(CONFIG_HOME + "/logging/firebase.json")))
+            DATABASE = FIREBASE.database()
+        except FileNotFoundError:
+            raise FileNotFoundError(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
 
     if thresholds:
         global THRESHOLDS
-        THRESHOLDS = {**THRESHOLDS, **thresholds}  # combining and overwriting THRESHOLDS with thresholds param
+        THRESHOLDS = {**THRESHOLDS, **thresholds}
 
 
 def get_now(seconds):
@@ -79,6 +98,9 @@ def get_percent_diff(best_match):
 
 def update_current_logs(is_recognized, best_match):
     global current_log, num_recognized, num_unknown
+
+    if time.time() - current_log_start >= THRESHOLDS["refresh_rate"]:
+        flush_current()
 
     if is_recognized:
         now = time.time()
@@ -99,11 +121,28 @@ def update_current_logs(is_recognized, best_match):
 
 
 # LOGGING FUNCTIONS
-def log_person(student_name, times):
-    add = "INSERT INTO Activity (student_id, student_name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
-        get_id(student_name), student_name.replace("_", " ").title(), *get_now(sum(times) / len(times)))
-    cursor.execute(add)
-    database.commit()
+def log_person(student_name, times, firebase=True):
+    now = get_now(sum(times) / len(times))
+
+    if not firebase:
+        add = "INSERT INTO Activity (student_id, student_name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
+            get_id(student_name), student_name.replace("_", " ").title(), *now)
+        CURSOR.execute(add)
+        DATABASE.commit()
+
+    else:
+        path = DATABASE.child("known")
+        data = {
+            "student_id": get_id(student_name),
+            "student_name": student_name.replace("_", " ").title(),
+            "date": now[0],
+            "time": now[1]
+        }
+        if path.get().val() is None:
+            DATABASE.child("known").set(data)
+        else:
+            DATABASE.child("known").update(data)
+
 
     global last_logged
     last_logged = time.time()
@@ -111,11 +150,26 @@ def log_person(student_name, times):
     flush_current(regular_activity=True)
 
 
-def log_unknown(path_to_img):
-    add = "INSERT INTO Unknown (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
-        path_to_img, *get_now(time.time()))
-    cursor.execute(add)
-    database.commit()
+def log_unknown(path_to_img, firebase=True):
+    now = get_now(time.time())
+
+    if not firebase:
+        add = "INSERT INTO Unknown (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
+            path_to_img, *now)
+        CURSOR.execute(add)
+        DATABASE.commit()
+
+    else:
+        path = DATABASE.child("known")
+        data = {
+            "path_to_img": path_to_img,
+            "date": now[0],
+            "time": now[1]
+        }
+        if path.get().val() is None:
+            DATABASE.child("unknown").set(data)
+        else:
+            DATABASE.child("unknown").update(data)
 
     global unk_last_logged
     unk_last_logged = time.time()
@@ -124,9 +178,11 @@ def log_unknown(path_to_img):
 
 
 def flush_current(regular_activity=True):
-    global current_log, num_recognized, num_unknown
+    global current_log, num_recognized, num_unknown, current_log_start
+
     if regular_activity:
         current_log = {}
         num_recognized = 0
+        current_log_start = time.time()
     else:
         num_unknown = 0
