@@ -25,8 +25,8 @@ if [ ! -d "$config_path/database" ] ; then
   echo "Making database and unknown directories"
   mkdir database
   cd "$config_path/database" || echo "Error: unable to access $config_path/database"
-  wget -O "encrypted.json" "https://www.dropbox.com/s/80xgr7zuybbhydu/encrypted.json?dl=1" || \
-  echo "Error: unable to download encrypted.json"
+  touch encrypted.json
+  echo "Fill in $config_path/database/encrypted.json to use aisecurity"
 fi
 
 if [ ! -d "$config_path/models" ] ; then
