@@ -46,7 +46,6 @@ def init(flush=False, thresholds=None, logging="firebase"):
     global DATABASE, CURSOR, FIREBASE
 
     if logging == "mysql":
-        warnings.warn("logging with MySQL is deprecated and will be removed in later versions", DeprecationWarning)
 
         try:
             DATABASE = mysql.connector.connect(

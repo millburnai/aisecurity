@@ -152,6 +152,7 @@ class FaceNet(object):
 
         return is_recognized, best_match, l2_dist
 
+
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, logging, use_dynamic, use_picam, use_graphics, framerate,
                                    resize, use_lcd):
@@ -206,8 +207,7 @@ class FaceNet(object):
                     embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, db_types)
                     print(
                         "L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
-                except (
-                        ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+                except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                     if "query data dimension" in str(error):
                         raise ValueError("Current model incompatible with database")
                     elif "empty" in str(error):
@@ -218,20 +218,22 @@ class FaceNet(object):
                         raise error
                     continue
 
+                lcd = lcd if use_lcd else None
+
                 # add graphics
                 if use_graphics:
                     self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match,
-                                      resize, lcd if use_lcd else None)
+                                      resize, lcd)
 
                 if frames > 5:  # wait 5 frames before logging starts
 
                     # update dynamic database
                     if use_dynamic:
-                        self.dynamic_update(embedding, l2_dists)
+                        self.dynamic_update(embedding, l2_dists, lcd, best_match)
 
                     # log activity
                     if logging:
-                        self.log_activity(is_recognized, best_match, original_frame, logging)
+                        self.log_activity(is_recognized, best_match, original_frame, logging, lcd)
 
                     l2_dists.append(l2_dist)
 
@@ -255,6 +257,7 @@ class FaceNet(object):
         cap.release()
         cv2.destroyAllWindows()
 
+
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, logging="firebase", use_dynamic=False, use_picam=False,
                             use_graphics=True, framerate=20, resize=None, use_lcd=False):
@@ -270,6 +273,7 @@ class FaceNet(object):
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, logging, use_dynamic,
                                              use_picam, use_graphics, framerate, resize, use_lcd))
         loop.run_until_complete(task)
+
 
     # GRAPHICS
     @staticmethod
@@ -328,15 +332,6 @@ class FaceNet(object):
             cv2.line(overlay, features["mouth_left"], features["nose"], color, radius)
             cv2.line(overlay, features["mouth_right"], features["nose"], color, radius)
 
-        def add_lcd_display(lcd):
-            lcd.clear()
-            request = requests.get(CONFIG["server_address"])
-            data = request.json()
-            if data["accept"]:
-                lcd.message = "ID Accepted \n{}".format(best_match)
-            else:
-                lcd.message = "No Senior Priv\n{}".format(best_match)
-
         features = person["keypoints"]
         x, y, height, width = person["box"]
 
@@ -361,8 +356,6 @@ class FaceNet(object):
         text = best_match if is_recognized else ""
         add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
-        if lcd:
-            add_lcd_display(lcd)
 
     # DISPLAY
     def show_embeds(self, encrypted=False, single=False):
@@ -394,9 +387,10 @@ class FaceNet(object):
             if single and person == list(data.keys())[0]:
                 break
 
+
     # LOGGING
     @staticmethod
-    def log_activity(is_recognized, best_match, frame, logging_type):
+    def log_activity(is_recognized, best_match, frame, logging_type, lcd):
         firebase = True if logging_type == "firebase" else False
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
@@ -410,16 +404,33 @@ class FaceNet(object):
                 log.log_person(recognized_person, times=log.current_log[recognized_person], firebase=firebase)
                 cprint("Regular activity logged ({})".format(best_match), color="green", attrs=["bold"])
 
+                if lcd:
+                    FaceNet.add_lcd_display(lcd, best_match)
+
         if log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
             path = CONFIG_HOME + "/logging/unknown/{}.jpg".format(len(os.listdir(CONFIG_HOME + "/logging/unknown")))
             log.log_unknown(path, firebase=firebase)
 
-            warnings.warn("recording unknown images in user directory is deprecated and will be changed later")
+            warnings.warn("recording unknown images in user directory is deprecated andt will be changed later")
             cv2.imwrite(path, frame)
             cprint("Unknown activity logged", color="red", attrs=["bold"])
 
+            if lcd:
+                FaceNet.add_lcd_display(lcd, best_match)
+
+    @staticmethod
+    def add_lcd_display(lcd, best_match):
+        lcd.clear()
+        request = requests.get(CONFIG["server_address"])
+        data = request.json()
+        if data["accept"]:
+            lcd.message = "ID Accepted \n{}".format(best_match)
+        else:
+            lcd.message = "No Senior Priv\n{}".format(best_match)
+
+
     # DYNAMIC DATABASE
-    def dynamic_update(self, embedding, l2_dists):
+    def dynamic_update(self, embedding, l2_dists, lcd, best_match):
         previous_frames = l2_dists[-log.THRESHOLDS["num_unknown"]:]
         filtered = list(filter(lambda x: x > self.HYPERPARAMS["alpha"], previous_frames))
 
@@ -430,3 +441,6 @@ class FaceNet(object):
                 self.__dynamic_db["visitor_{}".format(len(self.__dynamic_db) + 1)] = embedding.flatten()
                 self._train_knn(knn_types=["dynamic"])
                 log.flush_current()
+
+                if lcd:
+                    self.add_lcd_display(lcd, best_match)
