@@ -152,10 +152,9 @@ class FaceNet(object):
 
         return is_recognized, best_match, l2_dist
 
-
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, logging, use_dynamic, use_picam, use_graphics, framerate,
-                                   resize, use_lcd):
+                                   resize, use_lcd, flip):
         db_types = ["static"]
         if use_dynamic:
             db_types.append("dynamic")
@@ -169,7 +168,7 @@ class FaceNet(object):
                 raise RuntimeError("Wire configuration incorrect")
             lcd = character_lcd(i2c, 16, 2, backlight_inverted=False)
 
-        cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate)
+        cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip)
 
         if resize:
             width, height = width * resize, height * resize
@@ -257,10 +256,9 @@ class FaceNet(object):
         cap.release()
         cv2.destroyAllWindows()
 
-
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, logging="firebase", use_dynamic=False, use_picam=False,
-                            use_graphics=True, framerate=20, resize=None, use_lcd=False):
+                            use_graphics=True, framerate=20, resize=None, use_lcd=False, flip=0):
         assert width > 0 and height > 0, "width and height must be positive integers"
         assert logging == "mysql" or logging == "firebase", "only mysql and firebase logging supported"
         assert 0 < framerate < 150, "framerate must be between 0 and 150"
@@ -271,25 +269,24 @@ class FaceNet(object):
 
         loop = asyncio.new_event_loop()
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, logging, use_dynamic,
-                                             use_picam, use_graphics, framerate, resize, use_lcd))
+                                             use_picam, use_graphics, framerate, resize, use_lcd, flip))
         loop.run_until_complete(task)
-
 
     # GRAPHICS
     @staticmethod
-    def get_video_cap(width, height, picamera, framerate):
+    def get_video_cap(width, height, picamera, framerate, flip):
         def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=640, display_height=360,
-                                framerate=20, flip_method=0):
+                                framerate=20, flip=0):
             return (
-                    "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
-                    " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
-                    " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
-                    % (capture_width, capture_height, framerate, flip_method, display_width, display_height)
+                "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
+                " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
+                " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
+                % (capture_width, capture_height, framerate, flip, display_width, display_height)
             )
 
         if picamera:
             return cv2.VideoCapture(
-                _gstreamer_pipeline(display_width=width, display_height=height, framerate=framerate),
+                _gstreamer_pipeline(display_width=width, display_height=height, framerate=framerate, flip=flip),
                 cv2.CAP_GSTREAMER)
         else:
             cap = cv2.VideoCapture(0)
@@ -356,7 +353,6 @@ class FaceNet(object):
         text = best_match if is_recognized else ""
         add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
-
     # DISPLAY
     def show_embeds(self, encrypted=False, single=False):
         assert self.data, "data must be provided to show embeddings"
@@ -386,7 +382,6 @@ class FaceNet(object):
 
             if single and person == list(data.keys())[0]:
                 break
-
 
     # LOGGING
     @staticmethod
@@ -427,7 +422,6 @@ class FaceNet(object):
             lcd.message = "ID Accepted \n{}".format(best_match)
         else:
             lcd.message = "No Senior Priv\n{}".format(best_match)
-
 
     # DYNAMIC DATABASE
     def dynamic_update(self, embedding, l2_dists, lcd, best_match):

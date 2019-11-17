@@ -8,7 +8,7 @@ Demonstration of facial recognition system.
 
 
 def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, use_picam=False, use_graphics=True,
-         resize=None, verbose=False, use_lcd=False):
+         resize=None, verbose=False, use_lcd=False, flip=0):
 
     # default arg values (for Pycharm, where args.* default to None)
     if model is None:
@@ -21,6 +21,8 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
         use_picam = False
     if use_graphics is None:
         use_graphics = True
+    if flip is None:
+        flip = 0
     if verbose is None:
         verbose = False
 
@@ -59,7 +61,7 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
 
     input("\nPress ENTER to continue:")
     facenet.real_time_recognize(logging=logging, use_dynamic=use_dynamic, use_picam=use_picam,
-                                use_graphics=use_graphics, resize=resize, use_lcd=use_lcd)
+                                use_graphics=use_graphics, resize=resize, use_lcd=use_lcd, flip=flip)
 
 
 if __name__ == "__main__":
@@ -79,6 +81,12 @@ if __name__ == "__main__":
         else:
             raise argparse.ArgumentTypeError("float between 0 and 1 expected")
 
+    def to_int(string):
+        try:
+            return int(string)
+        except TypeError:
+            raise argparse.ArgumentTypeError("integer expected")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", help="name of facenet model", type=str)
     parser.add_argument("--path_to_model", help="path to facenet model", type=str)
@@ -87,12 +95,12 @@ if __name__ == "__main__":
     parser.add_argument("--use_picam", help="(boolean) use Picamera", type=to_bool)
     parser.add_argument("--use_graphics", help="(boolean) display graphics", type=to_bool)
     parser.add_argument("--use_lcd", help="(boolean) use LCD display", type=to_bool)
-    parser.add_argument("--firebase", help="(boolean) using Firebase as opposed to MySQL for logging purposes",
-                        type=to_bool)
+    parser.add_argument("--firebase", help="(boolean) using Firebase as opposed to MySQL for logging purposes", type=to_bool)
     parser.add_argument("--resize", help="(boolean) resize frame for faster recognition", type=bounded_float)
+    parser.add_argument("--flip", help="(int) flip method: +1 = +90º rotation", type=to_int)
     parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output", type=to_bool)
     args = parser.parse_args()
 
     demo(model=args.model, path=args.path_to_model, logging=args.logging, use_dynamic=args.use_dynamic,
          use_picam=args.use_picam, use_graphics=args.use_picam, resize=args.resize, use_lcd=args.use_lcd,
-         verbose=args.verbose)
+         flip=args.flip, verbose=args.verbose)
