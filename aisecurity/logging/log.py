@@ -120,11 +120,12 @@ def update_current_logs(is_recognized, best_match):
 
 def get_id_firebase(child):
     child_elements = DATABASE.child(child).get()
-    if not child_elements:
-        id = 0
-    else:
+    try:
         child_elements = child_elements.val()
         id = len(child_elements.keys())
+    except AttributeError:
+        id = 0
+
     return id
 
 
