@@ -92,7 +92,10 @@ def get_id(name):
 
 
 def get_percent_diff(best_match):
-    return 1. - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
+    try:
+        return 1. - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
+    except KeyError:
+        return 1.0
 
 
 def update_current_logs(is_recognized, best_match):
