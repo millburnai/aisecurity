@@ -93,17 +93,17 @@ class FaceNet(object):
         return self.__static_db
 
     def get_embeds(self, data, *args, **kwargs):
-        embeds = []
-        for n in args:
-            if isinstance(n, str):
-                try:
-                    n = data[n]
-                except KeyError:
-                    n = self.predict([n], margin=CONSTANTS["margin"], **kwargs)
-            elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # n must be a vector
-                n = self.predict([n], margin=CONSTANTS["margin"], **kwargs)
-            embeds.append(n)
-        return embeds if len(embeds) > 1 else embeds[0]
+        def _embed_generator(predict, data, *args, **kwargs):
+            for n in args:
+                if isinstance(n, str):
+                    try:
+                        yield data[n]
+                    except KeyError:
+                        yield predict([n], margin=CONSTANTS["margin"], **kwargs)
+                elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # n must be a vector
+                    yield predict([n], margin=CONSTANTS["margin"], **kwargs)
+
+        return list(_embed_generator(self.predict, data, *args, **kwargs))
 
     def predict(self, paths_or_imgs, margin=CONSTANTS["margin"], faces=None):
         l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))

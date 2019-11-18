@@ -118,6 +118,15 @@ def update_current_logs(is_recognized, best_match):
         if num_unknown >= THRESHOLDS["num_unknown"]:
             num_recognized = 0
 
+def get_id_firebase(child):
+    child_elements = db.child(child).get()
+    if not child_elements:
+        id = 0
+    else:
+        child_elements = child_elements.val()
+        id = len(child_elements.keys())
+    return id
+
 
 # LOGGING FUNCTIONS
 def log_person(student_name, times, firebase=True):
@@ -130,17 +139,15 @@ def log_person(student_name, times, firebase=True):
         DATABASE.commit()
 
     else:
-        path = DATABASE.child("known")
+        # path = DATABASE.child("known")
         data = {
             "student_id": get_id(student_name),
             "student_name": student_name.replace("_", " ").title(),
             "date": now[0],
             "time": now[1]
         }
-        if path.get().val() is None:
-            DATABASE.child("known").set(data)
-        else:
-            DATABASE.child("known").update(data)
+        id = get_id_firebase("known")
+        DATABASE.child("known").child(id).set(data)
 
 
     global last_logged
@@ -159,16 +166,14 @@ def log_unknown(path_to_img, firebase=True):
         DATABASE.commit()
 
     else:
-        path = DATABASE.child("known")
+        # path = DATABASE.child("unknown")
         data = {
             "path_to_img": path_to_img,
             "date": now[0],
             "time": now[1]
         }
-        if path.get().val() is None:
-            DATABASE.child("unknown").set(data)
-        else:
-            DATABASE.child("unknown").update(data)
+        id = get_id_firebase("unknown")
+        DATABASE.child("unknown").child(id).set(data)
 
     global unk_last_logged
     unk_last_logged = time.time()
