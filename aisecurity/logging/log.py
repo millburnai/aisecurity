@@ -119,7 +119,7 @@ def update_current_logs(is_recognized, best_match):
             num_recognized = 0
 
 def get_id_firebase(child):
-    child_elements = db.child(child).get()
+    child_elements = DATABASE.child(child).get()
     if not child_elements:
         id = 0
     else:
