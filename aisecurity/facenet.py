@@ -131,7 +131,7 @@ class FaceNet(object):
 
         embedding = self.get_embeds(data, img, faces=faces)
         best_matches = []
-        for knn in reversed(knns):
+        for knn in knns:
             pred = knn.predict(embedding)[0]
             best_matches.append((pred, np.linalg.norm(embedding - data[pred])))
         best_match, l2_dist = sorted(best_matches, key=lambda n: n[1])[0]
@@ -183,6 +183,8 @@ class FaceNet(object):
 
         while True:
             _, frame = cap.read()
+            if use_picam:
+                frame = cv2.addWeighted(frame, 1.5, frame, 0, -100.)  # picamera needs extra contrast
             original_frame = frame.copy()
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
