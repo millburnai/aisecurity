@@ -103,7 +103,8 @@ class FaceNet(object):
                 elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # n must be a vector
                     yield predict([n], margin=CONSTANTS["margin"], **kwargs)
 
-        return list(_embed_generator(self.predict, data, *args, **kwargs))
+        result = _embed_generator(self.predict, data, *args, **kwargs)
+        return result if len(result) > 1 else result[0]
 
     def predict(self, paths_or_imgs, margin=CONSTANTS["margin"], faces=None):
         l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))

@@ -80,7 +80,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_graphics", help="(boolean) display graphics", type=to_bool, default=True)
     parser.add_argument("--use_lcd", help="(boolean) use LCD display", type=to_bool, default=False)
     parser.add_argument("--resize", help="(boolean) resize frame for faster recognition", type=bounded_float,
-                        default=1.0)
+                        default=None)
     parser.add_argument("--flip", help="(int) flip method: +1 = +90º rotation", type=to_int, default=0)
     parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output", type=to_bool,
                         default=False)
