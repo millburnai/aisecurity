@@ -139,7 +139,6 @@ def log_person(student_name, times, firebase=True):
         DATABASE.commit()
 
     else:
-        # path = DATABASE.child("known")
         data = {
             "student_id": get_id(student_name),
             "student_name": student_name.replace("_", " ").title(),
@@ -166,7 +165,6 @@ def log_unknown(path_to_img, firebase=True):
         DATABASE.commit()
 
     else:
-        # path = DATABASE.child("unknown")
         data = {
             "path_to_img": path_to_img,
             "date": now[0],
