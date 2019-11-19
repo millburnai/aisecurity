@@ -177,7 +177,6 @@ class FaceNet(object):
         mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
 
         missed_frames = 0
-        l2_dists = []
 
         frames = 0
 
@@ -225,24 +224,16 @@ class FaceNet(object):
                     self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match,
                                       resize, lcd)
 
-                if frames > 5:  # wait 5 frames before logging starts
+                if frames > 5 and logging:
+                    self.log_activity(is_recognized, best_match, original_frame, logging, lcd, use_dynamic)
 
-                    # update dynamic database
-                    if use_dynamic:
-                        self.dynamic_update(embedding, l2_dists, lcd, best_match)
-
-                    # log activity
-                    if logging:
-                        self.log_activity(is_recognized, best_match, original_frame, logging, lcd)
-
-                    l2_dists.append(l2_dist)
+                    log.l2_dists.append(l2_dist)
 
             else:
                 missed_frames += 1
                 if missed_frames > log.THRESHOLDS["missed_frames"]:
                     missed_frames = 0
-                    log.flush_current()
-                    l2_dists = []
+                    log.flush_current(mode=["known", "unknown"])
                 print("No face detected")
 
             cv2.imshow("AI Security v1.0a", original_frame)
@@ -253,6 +244,8 @@ class FaceNet(object):
             frames += 1
 
             await asyncio.sleep(1e-6)
+
+            time.sleep(0.5)
 
         cap.release()
         cv2.destroyAllWindows()
@@ -272,6 +265,7 @@ class FaceNet(object):
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, logging, use_dynamic,
                                              use_picam, use_graphics, framerate, resize, use_lcd, flip))
         loop.run_until_complete(task)
+
 
     # GRAPHICS
     @staticmethod
@@ -300,7 +294,6 @@ class FaceNet(object):
         line_thickness = round(1e-6 * width * height + 1.5)
         radius = round((1e-6 * width * height + 1.5) / 2.)
         font_size = 4.5e-7 * width * height + 0.5
-
         # works for 6.25e4 pixel video cature to 1e6 pixel video capture
 
         def get_color(is_recognized, best_match):
@@ -354,6 +347,7 @@ class FaceNet(object):
         text = best_match if is_recognized else ""
         add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
+
     # DISPLAY
     def show_embeds(self, encrypted=False, single=False):
         assert self.data, "data must be provided to show embeddings"
@@ -384,18 +378,19 @@ class FaceNet(object):
             if single and person == list(data.keys())[0]:
                 break
 
+
     # LOGGING
     @staticmethod
-    def log_activity(is_recognized, best_match, frame, logging_type, lcd):
+    def log_activity(is_recognized, best_match, frame, logging_type, lcd, use_dynamic):
         firebase = True if logging_type == "firebase" else False
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
-        mode = lambda d: max(d.keys(), key=lambda key: d[key])
+        mode = lambda d: max(d.keys(), key=lambda key: len(d[key]))
 
         log.update_current_logs(is_recognized, best_match)
 
         if log.num_recognized >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.last_logged):
-            if log.get_percent_diff(best_match) <= log.THRESHOLDS["percent_diff"]:
+            if log.get_percent_diff(best_match, log.current_log) <= log.THRESHOLDS["percent_diff"]:
                 recognized_person = mode(log.current_log)
                 log.log_person(recognized_person, times=log.current_log[recognized_person], firebase=firebase)
                 cprint("Regular activity logged ({})".format(best_match), color="green", attrs=["bold"])
@@ -403,13 +398,17 @@ class FaceNet(object):
                 if lcd:
                     FaceNet.add_lcd_display(lcd, best_match)
 
-        if log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
+        elif log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
             path = CONFIG_HOME + "/logging/unknown/{}.jpg".format(len(os.listdir(CONFIG_HOME + "/logging/unknown")))
             log.log_unknown(path, firebase=firebase)
 
-            warnings.warn("recording unknown images in user directory is deprecated andt will be changed later")
-            cv2.imwrite(path, frame)
             cprint("Unknown activity logged", color="red", attrs=["bold"])
+
+            if use_dynamic and np.std(log.l2_dists) > log.THRESHOLDS["percent_diff"] / 2:
+                self.__dynamic_db["visitor_{}".format(len(self.__dynamic_db) + 1)] = embedding.flatten()
+                self._train_knn(knn_types=["dynamic"])
+
+                cprint("Visitor activity logged", color="purple", attrs=["bold"])
 
             if lcd:
                 FaceNet.add_lcd_display(lcd, best_match)
@@ -423,19 +422,3 @@ class FaceNet(object):
             lcd.message = "ID Accepted \n{}".format(best_match)
         else:
             lcd.message = "No Senior Priv\n{}".format(best_match)
-
-    # DYNAMIC DATABASE
-    def dynamic_update(self, embedding, l2_dists, lcd, best_match):
-        previous_frames = l2_dists[-log.THRESHOLDS["num_unknown"]:]
-        filtered = list(filter(lambda x: x > self.HYPERPARAMS["alpha"], previous_frames))
-
-        if len(l2_dists) >= log.THRESHOLDS["num_unknown"] and len(filtered) > 0:
-            mostly_unknown = len(filtered) / len(previous_frames) >= 1. - log.THRESHOLDS["percent_diff"]
-
-            if mostly_unknown and np.std(filtered) <= log.THRESHOLDS["percent_diff"] / 2.:
-                self.__dynamic_db["visitor_{}".format(len(self.__dynamic_db) + 1)] = embedding.flatten()
-                self._train_knn(knn_types=["dynamic"])
-                log.flush_current()
-
-                if lcd:
-                    self.add_lcd_display(lcd, best_match)

@@ -26,9 +26,8 @@ THRESHOLDS = {
     "num_recognized": 3,
     "num_unknown": 3,
     "percent_diff": 0.2,
-    "cooldown": 10.,
+    "cooldown": 0.,
     "missed_frames": 10,
-    "refresh_rate": 3.
 }
 
 num_recognized = 0
@@ -36,9 +35,10 @@ num_unknown = 0
 
 last_logged = time.time() - THRESHOLDS["cooldown"] + 0.1  # don't log for first 0.1s- it's just warming up then
 unk_last_logged = time.time() - THRESHOLDS["cooldown"] + 0.1
+dynamic_last_logged = time.time() - THRESHOLDS["cooldown"] + 0.1
 
 current_log = {}
-current_log_start = time.time() - THRESHOLDS["cooldown"] + 0.1
+l2_dists = []
 
 
 # LOGGING INIT AND HELPERS
@@ -91,9 +91,9 @@ def get_id(name):
     return "00000"
 
 
-def get_percent_diff(best_match):
+def get_percent_diff(item, log):
     try:
-        return 1. - (len(current_log[best_match]) / len([item for sublist in current_log.values() for item in sublist]))
+        return 1. - (len(log[item]) / len([i for n in log.values() for i in n]))
     except KeyError:
         return 1.0
 
@@ -101,8 +101,8 @@ def get_percent_diff(best_match):
 def update_current_logs(is_recognized, best_match):
     global current_log, num_recognized, num_unknown
 
-    if time.time() - current_log_start >= THRESHOLDS["refresh_rate"]:
-        flush_current()
+    if len(l2_dists) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
+        flush_current(mode=["unknown", "known"])
 
     if is_recognized:
         now = time.time()
@@ -112,7 +112,7 @@ def update_current_logs(is_recognized, best_match):
         else:
             current_log[best_match].append(now)
 
-        if len(current_log[best_match]) == 1 or get_percent_diff(best_match) <= THRESHOLDS["percent_diff"] + 0.2:
+        if len(current_log[best_match]) == 1 or get_percent_diff(best_match, current_log) <= THRESHOLDS["percent_diff"]:
             num_recognized += 1
             num_unknown = 0
 
@@ -156,7 +156,7 @@ def log_person(student_name, times, firebase=True):
     global last_logged
     last_logged = time.time()
 
-    flush_current(regular_activity=True)
+    flush_current(mode="known")
 
 
 def log_unknown(path_to_img, firebase=True):
@@ -180,15 +180,17 @@ def log_unknown(path_to_img, firebase=True):
     global unk_last_logged
     unk_last_logged = time.time()
 
-    flush_current(regular_activity=False)
+    flush_current(mode="unknown")
 
 
-def flush_current(regular_activity=True):
-    global current_log, num_recognized, num_unknown, current_log_start
+def flush_current(mode="known"):
+    global current_log, num_recognized, num_unknown, current_log_start, dynamic_last_logged, l2_dists
 
-    if regular_activity:
+    if "known" in mode:
         current_log = {}
         num_recognized = 0
         current_log_start = time.time()
-    else:
+    if "unknown" in mode:
+        l2_dists = []
         num_unknown = 0
+        dynamic_last_logged = time.time()
