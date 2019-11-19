@@ -245,8 +245,6 @@ class FaceNet(object):
 
             await asyncio.sleep(1e-6)
 
-            time.sleep(0.5)
-
         cap.release()
         cv2.destroyAllWindows()
 
