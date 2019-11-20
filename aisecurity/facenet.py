@@ -182,8 +182,6 @@ class FaceNet(object):
 
         while True:
             _, frame = cap.read()
-            if use_picam:
-                frame = cv2.addWeighted(frame, 2., frame, 0, -125.)  # picamera needs extra contrast
             original_frame = frame.copy()
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
@@ -402,7 +400,7 @@ class FaceNet(object):
 
             cprint("Unknown activity logged", color="red", attrs=["bold"])
 
-            if use_dynamic and np.std(log.l2_dists) > log.THRESHOLDS["percent_diff"] / 2:
+            if use_dynamic:
                 self.__dynamic_db["visitor_{}".format(len(self.__dynamic_db) + 1)] = embedding.flatten()
                 self._train_knn(knn_types=["dynamic"])
 
