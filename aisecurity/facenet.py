@@ -404,9 +404,6 @@ class FaceNet(object):
 
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
 
-            if lcd:
-                FaceNet.add_lcd_display(lcd, best_match)
-
     @staticmethod
     def add_lcd_display(lcd, best_match):
         lcd.clear()
