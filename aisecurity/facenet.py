@@ -223,7 +223,7 @@ class FaceNet(object):
                                       resize, lcd)
 
                 if frames > 5 and logging:
-                    self.log_activity(is_recognized, best_match, original_frame, logging, lcd, use_dynamic)
+                    self.log_activity(is_recognized, best_match, logging, lcd, use_dynamic, embedding)
 
                     log.l2_dists.append(l2_dist)
 
@@ -374,10 +374,8 @@ class FaceNet(object):
             if single and person == list(data.keys())[0]:
                 break
 
-
     # LOGGING
-    @staticmethod
-    def log_activity(is_recognized, best_match, frame, logging_type, lcd, use_dynamic):
+    def log_activity(self, is_recognized, best_match, logging_type, lcd, use_dynamic, embedding):
         firebase = True if logging_type == "firebase" else False
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
@@ -396,7 +394,7 @@ class FaceNet(object):
 
         elif log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
             path = CONFIG_HOME + "/logging/unknown/{}.jpg".format(len(os.listdir(CONFIG_HOME + "/logging/unknown")))
-            log.log_unknown(path, firebase=firebase)
+            log.log_unknown("<DEPRECATED>", firebase=firebase)
 
             cprint("Unknown activity logged", color="red", attrs=["bold"])
 
@@ -404,7 +402,7 @@ class FaceNet(object):
                 self.__dynamic_db["visitor_{}".format(len(self.__dynamic_db) + 1)] = embedding.flatten()
                 self._train_knn(knn_types=["dynamic"])
 
-                cprint("Visitor activity logged", color="purple", attrs=["bold"])
+                cprint("Visitor activity logged", color="magenta", attrs=["bold"])
 
             if lcd:
                 FaceNet.add_lcd_display(lcd, best_match)
@@ -415,6 +413,6 @@ class FaceNet(object):
         request = requests.get(CONFIG["server_address"])
         data = request.json()
         if data["accept"]:
-            lcd.message = "ID Accepted \n{}".format(best_match)
+            lcd.message = "ID Accepted \n{}".format(best_match.replace("_", " ").title())
         else:
-            lcd.message = "No Senior Priv\n{}".format(best_match)
+            lcd.message = "No Senior Priv\n{}".format(best_match.replace("_", " ").title())
