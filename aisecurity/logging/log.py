@@ -121,11 +121,11 @@ def update_current_logs(is_recognized, best_match):
         if num_unknown >= THRESHOLDS["num_unknown"]:
             num_recognized = 0
 
-def get_id_firebase(child, best_match=None):
+def get_id_firebase(child):
     child_elements = DATABASE.child(child).get()
     try:
         child_elements = child_elements.val()
-        id = len(child_elements.keys()) if best_match is None else best_match
+        id = len(child_elements.keys())
     except AttributeError:
         id = 0
 
@@ -149,7 +149,7 @@ def log_person(student_name, times, firebase=True):
             "date": now[0],
             "time": now[1]
         }
-        id = get_id_firebase("known", student_name)
+        id = get_id_firebase("known")
         DATABASE.child("known").child(id).set(data)
 
 
