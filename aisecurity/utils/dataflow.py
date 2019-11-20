@@ -18,13 +18,15 @@ from aisecurity.utils.preprocessing import timer
 def online_load(facenet, img_dir, people=None):
     if people is None:
         people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
-    data = {person: facenet.predict(img_dir + person) for person in people}
+    data = {person.strip(".jpg").strip(".png"): facenet.predict([os.path.join(img_dir, person)]) for person in people}
+
     return data
 
 
-# LT STORAGE
+# LONG TERM STORAGE
 @timer(message="Data dumping time")
-def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, ignore_encrypt=None):
+def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, ignore_encrypt=None,
+                retrieve_encryption=None):
 
     if ignore_encrypt == "all":
         ignore_encrypt = ["names", "embeddings"]
@@ -32,11 +34,9 @@ def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=
         ignore_encrypt = [ignore_encrypt]
 
     if not full_overwrite:
-        people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
-        old_embeds = retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path)
-
-        new_people = [person for person in people if person not in old_embeds.keys()]
-        new_embeds = online_load(facenet, img_dir, people=new_people)
+        old_embeds = retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path,
+                                     encrypted=retrieve_encryption)
+        new_embeds = online_load(facenet, img_dir)
 
         embeds_dict = {**old_embeds, **new_embeds}  # combining dicts and overwriting any duplicates with new_embeds
     else:

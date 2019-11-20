@@ -105,8 +105,11 @@ class DataEncryption(object):
             embedding_cipher = generate_cipher("embeddings", alloc_mem=decryptable)
 
             encrypted_name, encrypted_embed = person, data[person]
+            if isinstance(encrypted_embed, np.ndarray):
+                encrypted_embed = encrypted_embed.reshape(-1,).tolist()
+
             if "names" not in ignore:
-                encrypted_name = [chr(c) for c in list(encrypt(bytearray(person, encoding="utf8"), name_cipher))]
+                encrypted_name = [chr(c) for c in list(encrypt(person.encode("utf8"), name_cipher))]
                 encrypted_name = "".join(encrypted_name)
                 # bytes are not json-serializable
             if "embeddings" not in ignore:
