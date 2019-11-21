@@ -102,7 +102,7 @@ def update_current_logs(is_recognized, best_match):
     global current_log, num_recognized, num_unknown
 
     if len(l2_dists) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
-        flush_current(mode="unknown, known")
+        flush_current(mode=["unknown", "known"])
 
     if is_recognized:
         now = time.time()

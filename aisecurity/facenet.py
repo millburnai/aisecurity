@@ -177,7 +177,6 @@ class FaceNet(object):
         mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
 
         missed_frames = 0
-
         frames = 0
 
         while True:
@@ -233,6 +232,11 @@ class FaceNet(object):
                     missed_frames = 0
                     log.flush_current(mode=["known", "unknown"])
                 print("No face detected")
+
+                # make sure computation is performed periodically to keep GPU "warm" (i.e., constantly active);
+                # otherwise, recognition times can be slow when spaced out by several minutes
+                if time.time() - log.last_logged > 15.:
+                     self._recognize(frame, faces=[0]*4, db_types=None)
 
             cv2.imshow("AI Security v1.0a", original_frame)
 
