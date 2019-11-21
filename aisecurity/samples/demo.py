@@ -87,5 +87,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     demo(model=args.model, path=args.path_to_model, logging=args.logging, use_dynamic=args.use_dynamic,
-         use_picam=args.use_picam, use_graphics=args.use_picam, resize=args.resize, use_lcd=args.use_lcd,
+         use_picam=args.use_picam, use_graphics=args.use_graphics, resize=args.resize, use_lcd=args.use_lcd,
          flip=args.flip, verbose=args.verbose)

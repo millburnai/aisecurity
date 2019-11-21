@@ -102,7 +102,7 @@ def update_current_logs(is_recognized, best_match):
     global current_log, num_recognized, num_unknown
 
     if len(l2_dists) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
-        flush_current(mode=["unknown", "known"])
+        flush_current(mode="unknown, known")
 
     if is_recognized:
         now = time.time()
@@ -120,16 +120,6 @@ def update_current_logs(is_recognized, best_match):
         num_unknown += 1
         if num_unknown >= THRESHOLDS["num_unknown"]:
             num_recognized = 0
-
-def get_id_firebase(child):
-    child_elements = DATABASE.child(child).get()
-    try:
-        child_elements = child_elements.val()
-        id = len(child_elements.keys())
-    except AttributeError:
-        id = 0
-
-    return id
 
 
 # LOGGING FUNCTIONS
@@ -149,9 +139,7 @@ def log_person(student_name, times, firebase=True):
             "date": now[0],
             "time": now[1]
         }
-        id = get_id_firebase("known")
-        DATABASE.child("known").child(id).set(data)
-
+        DATABASE.child("known").child(*get_now(time.time())).set(data)
 
     global last_logged
     last_logged = time.time()
@@ -174,8 +162,7 @@ def log_unknown(path_to_img, firebase=True):
             "date": now[0],
             "time": now[1]
         }
-        id = get_id_firebase("unknown")
-        DATABASE.child("unknown").child(id).set(data)
+        DATABASE.child("unknown").child(*get_now(time.time())).set(data)
 
     global unk_last_logged
     unk_last_logged = time.time()
@@ -184,12 +171,11 @@ def log_unknown(path_to_img, firebase=True):
 
 
 def flush_current(mode="known"):
-    global current_log, num_recognized, num_unknown, current_log_start, dynamic_last_logged, l2_dists
+    global current_log, num_recognized, num_unknown, dynamic_last_logged, l2_dists
 
     if "known" in mode:
         current_log = {}
         num_recognized = 0
-        current_log_start = time.time()
     if "unknown" in mode:
         l2_dists = []
         num_unknown = 0
