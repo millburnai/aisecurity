@@ -30,20 +30,20 @@ THRESHOLDS = {
     "missed_frames": 10,
 }
 
-num_recognized = 0
-num_unknown = 0
-
-last_logged = time.time() - THRESHOLDS["cooldown"] + 0.1  # don't log for first 0.1s- it's just warming up then
-unk_last_logged = time.time() - THRESHOLDS["cooldown"] + 0.1
-dynamic_last_logged = time.time() - THRESHOLDS["cooldown"] + 0.1
-
-current_log = {}
-l2_dists = []
+num_recognized, num_unknown = None, None
+last_logged, unk_last_logged = None, None
+current_log, l2_dists = None, None
 
 
 # LOGGING INIT AND HELPERS
 def init(flush=False, thresholds=None, logging="firebase"):
+    global num_recognized, num_unknown, last_logged, unk_last_logged, current_log, l2_dists, THRESHOLDS
     global DATABASE, CURSOR, FIREBASE
+
+    num_recognized, num_unknown = 0, 0
+    last_logged, unk_last_logged = time.time(), time.time()
+    current_log, l2_dists = {}, []
+
 
     if logging == "mysql":
 
@@ -77,7 +77,6 @@ def init(flush=False, thresholds=None, logging="firebase"):
             raise FileNotFoundError(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
 
     if thresholds:
-        global THRESHOLDS
         THRESHOLDS = {**THRESHOLDS, **thresholds}
 
 
@@ -144,9 +143,6 @@ def log_person(student_name, times, firebase=True):
         }
         DATABASE.child("known").child(*get_now(time.time())).set(data)
 
-    global last_logged
-    last_logged = time.time()
-
     flush_current(mode="known")
 
 
@@ -167,19 +163,19 @@ def log_unknown(path_to_img, firebase=True):
         }
         DATABASE.child("unknown").child(*get_now(time.time())).set(data)
 
-    global unk_last_logged
-    unk_last_logged = time.time()
-
     flush_current(mode="unknown")
 
 
-def flush_current(mode="known"):
-    global current_log, num_recognized, num_unknown, dynamic_last_logged, l2_dists
+def flush_current(mode="known", flush_times=True):
+    global current_log, num_recognized, num_unknown, l2_dists, last_logged, unk_last_logged
 
     if "known" in mode:
         current_log = {}
         num_recognized = 0
+        if flush_times:
+            last_logged = time.time()
     if "unknown" in mode:
         l2_dists = []
         num_unknown = 0
-        dynamic_last_logged = time.time()
+        if flush_times:
+            unk_last_logged = time.time()

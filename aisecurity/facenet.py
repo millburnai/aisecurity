@@ -9,8 +9,12 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 """
 
 import asyncio
+import time
 import warnings
+
+import cv2
 import requests
+from mtcnn.mtcnn import MTCNN
 
 try:
     from adafruit_character_lcd.character_lcd_i2c import Character_LCD_I2C as character_lcd
@@ -22,13 +26,15 @@ except NotImplementedError:
 import keras
 from keras import backend as K
 import matplotlib.pyplot as plt
+import numpy as np
+import os
 from sklearn import neighbors
 from termcolor import cprint
 
 from aisecurity.logging import log
-from aisecurity.utils.dataflow import *
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
-from aisecurity.utils.preprocessing import *
+from aisecurity.utils.preprocessing import CONSTANTS, whiten, align_imgs
+from aisecurity.utils.misc import timer, HidePrints
 
 
 # FACENET
@@ -106,10 +112,10 @@ class FaceNet(object):
         result = list(_embed_generator(self.predict, data, *args, **kwargs))
         return result if len(result) > 1 else result[0]
 
-    def predict(self, paths_or_imgs, margin=CONSTANTS["margin"], faces=None):
+    def predict(self, paths_or_imgs, margin=CONSTANTS["margin"], faces=None, checkup=False):
         l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
 
-        aligned_imgs = whiten(align_imgs(paths_or_imgs, margin, faces=faces))
+        aligned_imgs = whiten(align_imgs(paths_or_imgs, margin, faces=faces, checkup=checkup))
         raw_embeddings = self.facenet.predict(aligned_imgs)
         normalized_embeddings = l2_normalize(raw_embeddings)
 
@@ -118,18 +124,18 @@ class FaceNet(object):
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
-    def _recognize(self, img, faces=None, db_types=None):
+    def _recognize(self, img, db_types=None, *args, **kwargs):
         assert self.__static_db or self.__dynamic_db, "data must be provided"
 
         knns, data = [], {}
         if db_types is None or "static" in db_types:
             knns.append(self.static_knn)
             data.update(self.__static_db)
-        if "dynamic" in db_types and self.dynamic_knn and self.__dynamic_db:
+        if db_types is not None and "dynamic" in db_types and self.dynamic_knn and self.__dynamic_db:
             knns.append(self.dynamic_knn)
             data.update(self.__dynamic_db)
 
-        embedding = self.get_embeds(data, img, faces=faces)
+        embedding = self.get_embeds(data, img, *args, **kwargs)
         best_matches = []
         for knn in knns:
             pred = knn.predict(embedding)[0]
@@ -168,6 +174,7 @@ class FaceNet(object):
             except RuntimeError:
                 raise RuntimeError("Wire configuration incorrect")
             lcd = character_lcd(i2c, 16, 2, backlight_inverted=False)
+            lcd.message = "Loading..."
 
         cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip)
 
@@ -179,11 +186,24 @@ class FaceNet(object):
         missed_frames = 0
         frames = 0
 
+        computation_check = time.time()
+
         while True:
             _, frame = cap.read()
             original_frame = frame.copy()
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
+
+            # make sure computation is performed periodically to keep GPU "warm" (i.e., constantly active);
+            # otherwise, recognition times can be slow when spaced out by several minutes
+            next_check = log.THRESHOLDS["missed_frames"]
+            if frames == 0 or time.time() - computation_check > next_check:
+                with HidePrints():
+                    self._recognize(frame, checkup=True)
+                print("Regular computation check")
+                computation_check = time.time()
+            elif not (time.time() - log.last_logged > next_check or time.time() - log.unk_last_logged > next_check):
+                computation_check = time.time()
 
             # using MTCNN to detect faces
             result = mtcnn.detect_faces(frame)
@@ -200,7 +220,7 @@ class FaceNet(object):
 
                 # facial recognition
                 try:
-                    embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, db_types)
+                    embedding, is_recognized, best_match, l2_dist = self._recognize(frame, db_types, faces=face)
                     print(
                         "L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
                 except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
@@ -230,13 +250,8 @@ class FaceNet(object):
                 missed_frames += 1
                 if missed_frames > log.THRESHOLDS["missed_frames"]:
                     missed_frames = 0
-                    log.flush_current(mode=["known", "unknown"])
+                    log.flush_current(mode=["known", "unknown"], flush_times=False)
                 print("No face detected")
-
-                # make sure computation is performed periodically to keep GPU "warm" (i.e., constantly active);
-                # otherwise, recognition times can be slow when spaced out by several minutes
-                if time.time() - log.last_logged > 15.:
-                     self._recognize(frame, faces=[0]*4, db_types=None)
 
             cv2.imshow("AI Security v1.0a", original_frame)
 
@@ -378,6 +393,7 @@ class FaceNet(object):
             if single and person == list(data.keys())[0]:
                 break
 
+
     # LOGGING
     def log_activity(self, is_recognized, best_match, logging_type, lcd, use_dynamic, embedding):
         firebase = True if logging_type == "firebase" else False
@@ -410,15 +426,15 @@ class FaceNet(object):
 
     @staticmethod
     def add_lcd_display(lcd, best_match):
-        best_match = best_match.replace("_", " ").title())
+        best_match = best_match.replace("_", " ").title()
 
         lcd.clear()
         request = requests.get(CONFIG["server_address"])
         data = request.json()
 
         if data["accept"]:
-            lcd.message = "ID Accepted \n{}".format(best_match)
+            lcd.message = "ID Accepted\n{}".format(best_match)
         elif "visitor" in best_match.lower():
-            lcd.message = "Welcome to MHS\n{}".format(best_match)
+            lcd.message = "Welcome to MHS,\n{}".format(best_match)
         else:
             lcd.message = "No Senior Priv\n{}".format(best_match)
