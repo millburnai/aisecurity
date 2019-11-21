@@ -10,7 +10,7 @@ import json
 import os
 
 from aisecurity.privacy.encryptions import DataEncryption
-from aisecurity.utils.preprocessing import timer
+from aisecurity.utils.misc import timer
 
 
 # LOAD ON THE FLY

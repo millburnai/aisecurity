@@ -31,7 +31,10 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
             tf.logging.set_verbosity(tf.logging.ERROR)
 
 
-    from aisecurity.facenet import FaceNet, retrieve_embeds, cprint
+    from termcolor import cprint
+
+    from aisecurity.facenet import FaceNet
+    from aisecurity.utils.dataflow import retrieve_embeds
     from aisecurity.utils.paths import DATABASE, CONFIG_HOME
 
 
