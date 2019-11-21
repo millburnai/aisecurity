@@ -410,10 +410,15 @@ class FaceNet(object):
 
     @staticmethod
     def add_lcd_display(lcd, best_match):
+        best_match = best_match.replace("_", " ").title())
+
         lcd.clear()
         request = requests.get(CONFIG["server_address"])
         data = request.json()
+
         if data["accept"]:
-            lcd.message = "ID Accepted \n{}".format(best_match.replace("_", " ").title())
+            lcd.message = "ID Accepted \n{}".format(best_match)
+        elif "visitor" in best_match.lower():
+            lcd.message = "Welcome to MHS\n{}".format(best_match)
         else:
-            lcd.message = "No Senior Priv\n{}".format(best_match.replace("_", " ").title())
+            lcd.message = "No Senior Priv\n{}".format(best_match)

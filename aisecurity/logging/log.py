@@ -88,7 +88,10 @@ def get_now(seconds):
 
 def get_id(name):
     # will be filled in later
-    return "00000"
+    if "visitor" in name.lower():
+        return "V0000"
+    else:
+        return "00000"
 
 
 def get_percent_diff(item, log):
@@ -127,15 +130,15 @@ def log_person(student_name, times, firebase=True):
     now = get_now(sum(times) / len(times))
 
     if not firebase:
-        add = "INSERT INTO Activity (student_id, student_name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
+        add = "INSERT INTO Activity (id, name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
             get_id(student_name), student_name.replace("_", " ").title(), *now)
         CURSOR.execute(add)
         DATABASE.commit()
 
     else:
         data = {
-            "student_id": get_id(student_name),
-            "student_name": student_name.replace("_", " ").title(),
+            "id": get_id(student_name),
+            "name": student_name.replace("_", " ").title(),
             "date": now[0],
             "time": now[1]
         }
