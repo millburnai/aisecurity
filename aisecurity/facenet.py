@@ -10,24 +10,20 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 
 import asyncio
 import time
-import warnings
-
-import cv2
 import requests
-from mtcnn.mtcnn import MTCNN
-
-from aisecurity.privacy.encryptions import DataEncryption
+import warnings
 
 try:
     from adafruit_character_lcd.character_lcd_i2c import Character_LCD_I2C as character_lcd
     import busio
     import board
-    import digitalio
 except NotImplementedError:
     warnings.warn("LCD not supported")
+import cv2
 import keras
 from keras import backend as K
 import matplotlib.pyplot as plt
+from mtcnn.mtcnn import MTCNN
 import numpy as np
 import os
 from sklearn import neighbors
@@ -37,6 +33,7 @@ from aisecurity.logging import log
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
 from aisecurity.utils.preprocessing import CONSTANTS, whiten, align_imgs
 from aisecurity.utils.misc import timer, HidePrints
+from aisecurity.privacy.encryptions import DataEncryption
 
 
 # FACENET
