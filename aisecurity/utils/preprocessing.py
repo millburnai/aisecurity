@@ -26,7 +26,7 @@ def whiten(x):
 
 
 def align_imgs(paths_or_imgs, margin, faces=None, checkup=False):
-    if not faces:
+    if not faces and not checkup:
         detector = MTCNN()
 
     def align_img(path_or_img, faces, checkup):
