@@ -16,6 +16,8 @@ import cv2
 import requests
 from mtcnn.mtcnn import MTCNN
 
+from aisecurity.privacy.encryptions import DataEncryption
+
 try:
     from adafruit_character_lcd.character_lcd_i2c import Character_LCD_I2C as character_lcd
     import busio
