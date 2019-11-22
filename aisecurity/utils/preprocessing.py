@@ -14,7 +14,8 @@ import numpy as np
 # CONSTANTS
 CONSTANTS = {
     "margin": 10,
-    "img_size": (None, None)
+    "img_size": (None, None),
+    "mtcnn": None
 }
 
 
@@ -26,8 +27,8 @@ def whiten(x):
 
 
 def align_imgs(paths_or_imgs, margin, faces=None, checkup=False):
-    if not faces and not checkup:
-        detector = MTCNN()
+    if CONSTANTS["mtcnn"] is None and checkup is None and faces is None:
+        CONSTANTS["mtcnn"] = MTCNN()
 
     def align_img(path_or_img, faces, checkup):
         try:
@@ -37,7 +38,7 @@ def align_imgs(paths_or_imgs, margin, faces=None, checkup=False):
 
         if not checkup:
             if not faces:
-                found = detector.detect_faces(img)
+                found = CONSTANTS["mtcnn"].detect_faces(img)
                 assert len(found) != 0, "face was not found in {}".format(path_or_img)
                 faces = found[0]["box"]
 

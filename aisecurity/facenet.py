@@ -193,16 +193,17 @@ class FaceNet(object):
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
-            # make sure computation is performed periodically to keep GPU "warm" (i.e., constantly active);
-            # otherwise, recognition times can be slow when spaced out by several minutes
-            next_check = log.THRESHOLDS["missed_frames"]
-            if frames == 0 or time.time() - computation_check > next_check:
-                with HidePrints():
-                    self._recognize(frame, checkup=True)
-                print("Regular computation check")
-                computation_check = time.time()
-            elif not (time.time() - log.last_logged > next_check or time.time() - log.unk_last_logged > next_check):
-                computation_check = time.time()
+            if use_picam:
+                # make sure computation is performed periodically to keep GPU "warm" (i.e., constantly active);
+                # otherwise, recognition times can be slow when spaced out by several minutes
+                next_check = log.THRESHOLDS["missed_frames"]
+                if frames == 0 or time.time() - computation_check > next_check:
+                    with HidePrints():
+                        self._recognize(frame, checkup=True)
+                    print("Regular computation check")
+                    computation_check = time.time()
+                elif not (time.time() - log.last_logged > next_check or time.time() - log.unk_last_logged > next_check):
+                    computation_check = time.time()
 
             # using MTCNN to detect faces
             result = mtcnn.detect_faces(frame)
@@ -233,15 +234,13 @@ class FaceNet(object):
                         raise error
                     continue
 
-                lcd = lcd if use_lcd else None
-
                 # add graphics
                 if use_graphics:
-                    self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match,
-                                      resize, lcd)
+                    self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match, resize)
 
                 if frames > 5 and logging:
-                    self.log_activity(is_recognized, best_match, logging, lcd, use_dynamic, embedding)
+                    self.log_activity(is_recognized, best_match, logging, lcd if use_lcd else None, use_dynamic,
+                                      embedding)
 
                     log.l2_dists.append(l2_dist)
 
@@ -304,7 +303,7 @@ class FaceNet(object):
             return cap
 
     @staticmethod
-    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize, lcd):
+    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize):
         line_thickness = round(1e-6 * width * height + 1.5)
         radius = round((1e-6 * width * height + 1.5) / 2.)
         font_size = 4.5e-7 * width * height + 0.5
@@ -385,7 +384,7 @@ class FaceNet(object):
             try:
                 plt.title(person)
             except TypeError:
-                warnings.warn("encrypted data cannot be displayed due to presence of non-UTF8-decodable values")
+                warnings.warn("encrypted name cannot be displayed due to presence of non-UTF8-decodable values")
             plt.axis("off")
             plt.show()
 
@@ -406,13 +405,13 @@ class FaceNet(object):
             if log.get_percent_diff(best_match, log.current_log) <= log.THRESHOLDS["percent_diff"]:
                 recognized_person = mode(log.current_log)
                 log.log_person(recognized_person, times=log.current_log[recognized_person], firebase=firebase)
+
                 cprint("Regular activity logged ({})".format(best_match), color="green", attrs=["bold"])
 
                 if lcd:
                     FaceNet.add_lcd_display(lcd, best_match)
 
         elif log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
-            path = CONFIG_HOME + "/logging/unknown/{}.jpg".format(len(os.listdir(CONFIG_HOME + "/logging/unknown")))
             log.log_unknown("<DEPRECATED>", firebase=firebase)
 
             cprint("Unknown activity logged", color="red", attrs=["bold"])
