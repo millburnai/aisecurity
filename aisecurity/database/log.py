@@ -23,26 +23,26 @@ CURSOR = None
 FIREBASE = None
 
 THRESHOLDS = {
-    "num_recognized": 3,
-    "num_unknown": 3,
+    "NUM_RECOGNIZED": 3,
+    "NUM_UNKNOWN": 3,
     "percent_diff": 0.2,
     "cooldown": 0.,
     "missed_frames": 10,
 }
 
-num_recognized, num_unknown = None, None
-last_logged, unk_last_logged = None, None
-current_log, l2_dists = None, None
+NUM_RECOGNIZED, NUM_UNKNOWN = None, None
+LAST_LOGGED, UNK_LAST_LOGGED = None, None
+CURRENT_LOG, L2_DISTS = None, None
 
 
 # LOGGING INIT AND HELPERS
 def init(flush=False, thresholds=None, logging="firebase"):
-    global num_recognized, num_unknown, last_logged, unk_last_logged, current_log, l2_dists, THRESHOLDS
+    global NUM_RECOGNIZED, NUM_UNKNOWN, LAST_LOGGED, UNK_LAST_LOGGED, CURRENT_LOG, L2_DISTS, THRESHOLDS
     global DATABASE, CURSOR, FIREBASE
 
-    num_recognized, num_unknown = 0, 0
-    last_logged, unk_last_logged = time.time(), time.time()
-    current_log, l2_dists = {}, []
+    NUM_RECOGNIZED, NUM_UNKNOWN = 0, 0
+    LAST_LOGGED, UNK_LAST_LOGGED = time.time(), time.time()
+    CURRENT_LOG, L2_DISTS = {}, []
 
 
     if logging == "mysql":
@@ -101,27 +101,27 @@ def get_percent_diff(item, log):
 
 
 def update_current_logs(is_recognized, best_match):
-    global current_log, num_recognized, num_unknown
+    global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN
 
-    if len(l2_dists) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
+    if len(L2_DISTS) >= THRESHOLDS["NUM_RECOGNIZED"] + THRESHOLDS["NUM_UNKNOWN"]:
         flush_current(mode=["unknown", "known"])
 
     if is_recognized:
         now = time.time()
 
-        if best_match not in current_log:
-            current_log[best_match] = [now]
+        if best_match not in CURRENT_LOG:
+            CURRENT_LOG[best_match] = [now]
         else:
-            current_log[best_match].append(now)
+            CURRENT_LOG[best_match].append(now)
 
-        if len(current_log[best_match]) == 1 or get_percent_diff(best_match, current_log) <= THRESHOLDS["percent_diff"]:
-            num_recognized += 1
-            num_unknown = 0
+        if len(CURRENT_LOG[best_match]) == 1 or get_percent_diff(best_match, CURRENT_LOG) <= THRESHOLDS["percent_diff"]:
+            NUM_RECOGNIZED += 1
+            NUM_UNKNOWN = 0
 
     else:
-        num_unknown += 1
-        if num_unknown >= THRESHOLDS["num_unknown"]:
-            num_recognized = 0
+        NUM_UNKNOWN += 1
+        if NUM_UNKNOWN >= THRESHOLDS["NUM_UNKNOWN"]:
+            NUM_RECOGNIZED = 0
 
 
 # LOGGING FUNCTIONS
@@ -167,15 +167,15 @@ def log_unknown(path_to_img, firebase=True):
 
 
 def flush_current(mode="known", flush_times=True):
-    global current_log, num_recognized, num_unknown, l2_dists, last_logged, unk_last_logged
+    global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN, L2_DISTS, LAST_LOGGED, UNK_LAST_LOGGED
 
     if "known" in mode:
-        current_log = {}
-        num_recognized = 0
+        CURRENT_LOG = {}
+        NUM_RECOGNIZED = 0
         if flush_times:
-            last_logged = time.time()
+            LAST_LOGGED = time.time()
     if "unknown" in mode:
-        l2_dists = []
-        num_unknown = 0
+        L2_DISTS = []
+        NUM_UNKNOWN = 0
         if flush_times:
-            unk_last_logged = time.time()
+            UNK_LAST_LOGGED = time.time()

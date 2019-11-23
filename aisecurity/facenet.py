@@ -209,7 +209,7 @@ class FaceNet(object):
                         self._recognize(frame, checkup=True)
                     print("Regular computation check")
                     computation_check = time.time()
-                elif not (time.time() - log.last_logged > next_check or time.time() - log.unk_last_logged > next_check):
+                elif not (time.time() - log.LAST_LOGGED > next_check or time.time() - log.UNK_LAST_LOGGED > next_check):
                     computation_check = time.time()
 
             # using MTCNN to detect faces
@@ -249,7 +249,7 @@ class FaceNet(object):
                     self.log_activity(is_recognized, best_match, logging, lcd if use_lcd else None, use_dynamic,
                                       embedding, use_server)
 
-                    log.l2_dists.append(l2_dist)
+                    log.L2_DISTS.append(l2_dist)
 
             else:
                 missed_frames += 1
@@ -408,17 +408,17 @@ class FaceNet(object):
 
         log.update_current_logs(is_recognized, best_match)
 
-        if log.num_recognized >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.last_logged):
-            if log.get_percent_diff(best_match, log.current_log) <= log.THRESHOLDS["percent_diff"]:
-                recognized_person = mode(log.current_log)
-                log.log_person(recognized_person, times=log.current_log[recognized_person], firebase=firebase)
+        if log.NUM_RECOGNIZED >= log.THRESHOLDS["NUM_RECOGNIZED"] and cooldown_ok(log.LAST_LOGGED):
+            if log.get_percent_diff(best_match, log.CURRENT_LOG) <= log.THRESHOLDS["percent_diff"]:
+                recognized_person = mode(log.CURRENT_LOG)
+                log.log_person(recognized_person, times=log.CURRENT_LOG[recognized_person], firebase=firebase)
 
                 cprint("Regular activity logged ({})".format(best_match), color="green", attrs=["bold"])
 
                 if lcd:
-                    FaceNet.add_lcd_display(lcd, best_match, use_picam)
+                    FaceNet.add_lcd_display(lcd, best_match, use_server)
 
-        elif log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
+        elif log.NUM_UNKNOWN >= log.THRESHOLDS["NUM_UNKNOWN"] and cooldown_ok(log.UNK_LAST_LOGGED):
             log.log_unknown("<DEPRECATED>", firebase=firebase)
 
             cprint("Unknown activity logged", color="red", attrs=["bold"])
