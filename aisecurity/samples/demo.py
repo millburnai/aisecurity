@@ -77,7 +77,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", help="name of facenet model", type=str, default="ms_celeb_1m")
     parser.add_argument("--path_to_model", help="path to facenet model", type=str, default=None)
-    parser.add_argument("--database", help="(string) database type, mysql or firebase", type=str, default="firebase")
+    parser.add_argument("--logging", help="(string) logging type, mysql or firebase", type=str, default="firebase")
     parser.add_argument("--use_dynamic", help="(boolean) use dynamic database", type=to_bool, default=True)
     parser.add_argument("--use_picam", help="(boolean) use Picamera", type=to_bool, default=False)
     parser.add_argument("--use_graphics", help="(boolean) display graphics", type=to_bool, default=True)
