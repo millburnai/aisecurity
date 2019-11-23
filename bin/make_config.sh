@@ -58,7 +58,7 @@ fi
 if [ ! -d "$HOME/.aisecurity/logging" ] ; then
   echo "Creating logging directory"
   cd "$config_path" || echo "Error: unable to access $config_path"
-  mkdir logging
+  mkdir database
   cd "$config_path/logging" || echo "Error: unable to access $config_path/logging"
   touch firebase.json
   echo "Fill in '$config_path/logging/firebase.json' and a key file in the same directory to use firebase logging"

@@ -29,7 +29,7 @@ import os
 from sklearn import neighbors
 from termcolor import cprint
 
-from aisecurity.logging import log
+from aisecurity.database import log
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
 from aisecurity.utils.preprocessing import CONSTANTS, whiten, align_imgs
 from aisecurity.utils.misc import timer, HidePrints
@@ -274,7 +274,7 @@ class FaceNet(object):
     def real_time_recognize(self, width=640, height=360, logging="firebase", use_dynamic=False, use_picam=False,
                             use_graphics=True, framerate=20, resize=None, use_lcd=False, flip=0):
         assert width > 0 and height > 0, "width and height must be positive integers"
-        assert logging == "mysql" or logging == "firebase", "only mysql and firebase logging supported"
+        assert logging == "mysql" or logging == "firebase", "only mysql and firebase database supported"
         assert 0 < framerate < 150, "framerate must be between 0 and 150"
         assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
 

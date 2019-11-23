@@ -4,7 +4,7 @@ from aisecurity.utils.paths import *
 from . import privacy
 from . import samples
 from . import facenet
-from . import logging
+from . import database
 from . import utils
 
 # also importable from root
