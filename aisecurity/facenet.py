@@ -177,8 +177,10 @@ class FaceNet(object):
         try:
             print("Connecting to server...")
             requests.get(CONFIG["server_address"])
+            use_server = True
         except requests.exceptions.ConnectionError:
             warnings.warn("ID server unreachable")
+            use_server = False
 
         cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip)
 
@@ -245,7 +247,7 @@ class FaceNet(object):
 
                 if frames > 5 and logging:
                     self.log_activity(is_recognized, best_match, logging, lcd if use_lcd else None, use_dynamic,
-                                      embedding)
+                                      embedding, use_server)
 
                     log.l2_dists.append(l2_dist)
 
@@ -398,7 +400,7 @@ class FaceNet(object):
 
 
     # LOGGING
-    def log_activity(self, is_recognized, best_match, logging_type, lcd, use_dynamic, embedding):
+    def log_activity(self, is_recognized, best_match, logging_type, lcd, use_dynamic, embedding, use_server):
         firebase = True if logging_type == "firebase" else False
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
@@ -414,7 +416,7 @@ class FaceNet(object):
                 cprint("Regular activity logged ({})".format(best_match), color="green", attrs=["bold"])
 
                 if lcd:
-                    FaceNet.add_lcd_display(lcd, best_match)
+                    FaceNet.add_lcd_display(lcd, best_match, use_picam)
 
         elif log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
             log.log_unknown("<DEPRECATED>", firebase=firebase)
@@ -428,10 +430,11 @@ class FaceNet(object):
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
 
     @staticmethod
-    def add_lcd_display(lcd, best_match, use_server=True):
+    def add_lcd_display(lcd, best_match, use_server):
+        lcd.clear()
+        
         best_match = best_match.replace("_", " ").title()
 
-        lcd.clear()
         if use_server:
             request = requests.get(CONFIG["server_address"])
             data = request.json()
