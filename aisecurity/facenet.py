@@ -173,13 +173,14 @@ class FaceNet(object):
             except RuntimeError:
                 raise RuntimeError("Wire configuration incorrect")
             lcd = character_lcd(i2c, 16, 2, backlight_inverted=False)
-            lcd.message = "Loading..."
+            lcd.message = "Loading...\n[Camera and server]"
         try:
             print("Connecting to server...")
             requests.get(CONFIG["server_address"])
             use_server = True
         except requests.exceptions.ConnectionError:
             warnings.warn("ID server unreachable")
+            print("ID server unreachable")
             use_server = False
 
         cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip)
@@ -450,4 +451,4 @@ class FaceNet(object):
             if "visitor" in best_match.lower():
                 lcd.message = "Welcome to MHS,\n{}".format(best_match)
             else:
-                lcd.message = "ID Server Down\n {}".format(best_match)
+                lcd.message = "[Server Error]\n{}".format(best_match)
