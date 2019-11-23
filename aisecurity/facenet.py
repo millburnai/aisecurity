@@ -10,7 +10,6 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 
 import asyncio
 import time
-import requests
 import warnings
 
 try:
@@ -26,6 +25,7 @@ import matplotlib.pyplot as plt
 from mtcnn.mtcnn import MTCNN
 import numpy as np
 import os
+import requests
 from sklearn import neighbors
 from termcolor import cprint
 
@@ -432,7 +432,7 @@ class FaceNet(object):
     @staticmethod
     def add_lcd_display(lcd, best_match, use_server):
         lcd.clear()
-        
+
         best_match = best_match.replace("_", " ").title()
 
         if use_server:

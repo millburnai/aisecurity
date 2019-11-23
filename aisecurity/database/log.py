@@ -71,10 +71,10 @@ def init(flush=False, thresholds=None, logging="firebase"):
 
     elif logging == "firebase":
         try:
-            FIREBASE = pyrebase.initialize_app(json.load(open(CONFIG_HOME + "/database/firebase.json")))
+            FIREBASE = pyrebase.initialize_app(json.load(open(CONFIG_HOME + "/logging/firebase.json")))
             DATABASE = FIREBASE.database()
         except FileNotFoundError:
-            raise FileNotFoundError(CONFIG_HOME + "/database/firebase.json and a key file are needed to use firebase")
+            raise FileNotFoundError(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
 
     if thresholds:
         THRESHOLDS = {**THRESHOLDS, **thresholds}
