@@ -174,6 +174,11 @@ class FaceNet(object):
                 raise RuntimeError("Wire configuration incorrect")
             lcd = character_lcd(i2c, 16, 2, backlight_inverted=False)
             lcd.message = "Loading..."
+        try:
+            print("Connecting to server...")
+            requests.get(CONFIG["server_address"])
+        except requests.exceptions.ConnectionError:
+            warnings.warn("ID server unreachable")
 
         cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip)
 
@@ -423,16 +428,23 @@ class FaceNet(object):
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
 
     @staticmethod
-    def add_lcd_display(lcd, best_match):
+    def add_lcd_display(lcd, best_match, use_server=True):
         best_match = best_match.replace("_", " ").title()
 
         lcd.clear()
-        request = requests.get(CONFIG["server_address"])
-        data = request.json()
+        if use_server:
+            request = requests.get(CONFIG["server_address"])
+            data = request.json()
 
-        if data["accept"]:
-            lcd.message = "ID Accepted\n{}".format(best_match)
-        elif "visitor" in best_match.lower():
-            lcd.message = "Welcome to MHS,\n{}".format(best_match)
+            if data["accept"]:
+                lcd.message = "ID Accepted\n{}".format(best_match)
+            elif "visitor" in best_match.lower():
+                lcd.message = "Welcome to MHS,\n{}".format(best_match)
+            else:
+                lcd.message = "No Senior Priv\n{}".format(best_match)
+
         else:
-            lcd.message = "No Senior Priv\n{}".format(best_match)
+            if "visitor" in best_match.lower():
+                lcd.message = "Welcome to MHS,\n{}".format(best_match)
+            else:
+                lcd.message = "ID Server Down\n {}".format(best_match)
