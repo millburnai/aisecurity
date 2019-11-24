@@ -173,12 +173,12 @@ class FaceNet(object):
             except RuntimeError:
                 raise RuntimeError("Wire configuration incorrect")
             lcd = character_lcd(i2c, 16, 2, backlight_inverted=False)
-            lcd.message = "Loading...\n[Camera and server]"
+            lcd.message = "Loading...\n[Initializing]"
         try:
             print("Connecting to server...")
-            requests.get(CONFIG["server_address"])
+            requests.get(CONFIG["server_address"], timeout=1.0)
             use_server = True
-        except requests.exceptions.ConnectionError:
+        except requests.exceptions.Timeout:
             warnings.warn("ID server unreachable")
             print("ID server unreachable")
             use_server = False
@@ -195,6 +195,9 @@ class FaceNet(object):
 
         computation_check = time.time()
 
+        if use_lcd:
+            lcd.message = "Loading...\n[Diagnostics] "
+
         while True:
             _, frame = cap.read()
             original_frame = frame.copy()
@@ -210,6 +213,8 @@ class FaceNet(object):
                         self._recognize(frame, checkup=True)
                     print("Regular computation check")
                     computation_check = time.time()
+                    if use_lcd:
+                        lcd.clear()
                 elif not (time.time() - log.LAST_LOGGED > next_check or time.time() - log.UNK_LAST_LOGGED > next_check):
                     computation_check = time.time()
 
