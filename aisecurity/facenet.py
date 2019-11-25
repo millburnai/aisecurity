@@ -32,7 +32,7 @@ from termcolor import cprint
 from aisecurity.database import log
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
 from aisecurity.utils.preprocessing import CONSTANTS, whiten, align_imgs
-from aisecurity.utils.misc import timer, HidePrints
+from aisecurity.utils.misc import timer, HidePrints, LCDProgressBar
 from aisecurity.privacy.encryptions import DataEncryption
 
 
@@ -174,6 +174,8 @@ class FaceNet(object):
                 raise RuntimeError("Wire configuration incorrect")
             lcd = character_lcd(i2c, 16, 2, backlight_inverted=False)
             lcd.message = "Loading...\n[Initializing]"
+            progress_bar = LCDProgressBar(total=log.THRESHOLDS["num_recognized"], lcd=lcd)
+
         try:
             print("Connecting to server...")
             requests.get(CONFIG["server_address"], timeout=1.0)
@@ -234,8 +236,7 @@ class FaceNet(object):
                 # facial recognition
                 try:
                     embedding, is_recognized, best_match, l2_dist = self._recognize(frame, db_types, faces=face)
-                    print(
-                        "L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
+                    print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
                 except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                     if "query data dimension" in str(error):
                         raise ValueError("Current model incompatible with database")
@@ -249,11 +250,12 @@ class FaceNet(object):
 
                 # add graphics
                 if use_graphics:
-                    self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match, resize)
+                    self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match, resize,
+                                      progress_bar=progress_bar if use_lcd else None)
 
                 if frames > 5 and logging:
                     self.log_activity(is_recognized, best_match, logging, lcd if use_lcd else None, use_dynamic,
-                                      embedding, use_server)
+                                      embedding, use_server, progress_bar)
 
                     log.L2_DISTS.append(l2_dist)
 
@@ -316,7 +318,7 @@ class FaceNet(object):
             return cap
 
     @staticmethod
-    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize):
+    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize, progress_bar):
         line_thickness = round(1e-6 * width * height + 1.5)
         radius = round((1e-6 * width * height + 1.5) / 2.)
         font_size = 4.5e-7 * width * height + 0.5
@@ -373,6 +375,9 @@ class FaceNet(object):
         text = best_match if is_recognized else ""
         add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
+        if progress_bar and is_recognized:
+            progress_bar.update(previous_msg="Recognizing...")
+
 
     # DISPLAY
     def show_embeds(self, encrypted=False, single=False):
@@ -406,7 +411,7 @@ class FaceNet(object):
 
 
     # LOGGING
-    def log_activity(self, is_recognized, best_match, logging_type, lcd, use_dynamic, embedding, use_server):
+    def log_activity(self, is_recognized, best_match, logging_type, lcd, use_dynamic, embedding, use_server, progress_bar):
         firebase = True if logging_type == "firebase" else False
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
@@ -414,7 +419,7 @@ class FaceNet(object):
 
         log.update_current_logs(is_recognized, best_match)
 
-        if log.NUM_RECOGNIZED >= log.THRESHOLDS["NUM_RECOGNIZED"] and cooldown_ok(log.LAST_LOGGED):
+        if log.NUM_RECOGNIZED >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.LAST_LOGGED):
             if log.get_percent_diff(best_match, log.CURRENT_LOG) <= log.THRESHOLDS["percent_diff"]:
                 recognized_person = mode(log.CURRENT_LOG)
                 log.log_person(recognized_person, times=log.CURRENT_LOG[recognized_person], firebase=firebase)
@@ -422,9 +427,9 @@ class FaceNet(object):
                 cprint("Regular activity logged ({})".format(best_match), color="green", attrs=["bold"])
 
                 if lcd:
-                    FaceNet.add_lcd_display(lcd, best_match, use_server)
+                    FaceNet.add_lcd_display(lcd, best_match, use_server, progress_bar)
 
-        elif log.NUM_UNKNOWN >= log.THRESHOLDS["NUM_UNKNOWN"] and cooldown_ok(log.UNK_LAST_LOGGED):
+        elif log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.UNK_LAST_LOGGED):
             log.log_unknown("<DEPRECATED>", firebase=firebase)
 
             cprint("Unknown activity logged", color="red", attrs=["bold"])
@@ -436,8 +441,9 @@ class FaceNet(object):
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
 
     @staticmethod
-    def add_lcd_display(lcd, best_match, use_server):
+    def add_lcd_display(lcd, best_match, use_server, progress_bar):
         lcd.clear()
+        progress_bar.display_off()
 
         best_match = best_match.replace("_", " ").title()
 

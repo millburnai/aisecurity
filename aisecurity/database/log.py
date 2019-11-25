@@ -23,8 +23,8 @@ CURSOR = None
 FIREBASE = None
 
 THRESHOLDS = {
-    "NUM_RECOGNIZED": 3,
-    "NUM_UNKNOWN": 3,
+    "num_recognized": 3,
+    "num_unknown": 3,
     "percent_diff": 0.2,
     "cooldown": 0.,
     "missed_frames": 10,
@@ -103,7 +103,7 @@ def get_percent_diff(item, log):
 def update_current_logs(is_recognized, best_match):
     global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN
 
-    if len(L2_DISTS) >= THRESHOLDS["NUM_RECOGNIZED"] + THRESHOLDS["NUM_UNKNOWN"]:
+    if len(L2_DISTS) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
         flush_current(mode=["unknown", "known"])
 
     if is_recognized:
@@ -120,7 +120,7 @@ def update_current_logs(is_recognized, best_match):
 
     else:
         NUM_UNKNOWN += 1
-        if NUM_UNKNOWN >= THRESHOLDS["NUM_UNKNOWN"]:
+        if NUM_UNKNOWN >= THRESHOLDS["num_unknown"]:
             NUM_RECOGNIZED = 0
 
 
