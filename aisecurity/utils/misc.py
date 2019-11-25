@@ -54,7 +54,7 @@ class LCDProgressBar(object):
 
         self.is_on = False
 
-    def display_off(msg=""):
+    def display_off(self, msg=""):
         self.lcd.message = msg
         self.is_on = False
 
