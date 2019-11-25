@@ -64,3 +64,21 @@ if [ ! -d "$HOME/.aisecurity/logging" ] ; then
   echo "Fill in '$config_path/logging/firebase.json' and a key file in the same directory to use firebase logging"
   mkdir unknown
 fi
+
+if [ ! -d "$HOME/etc/systemd/system/rc-local.service" ] ; then
+  if [ ! -d "$HOME/etc/" ] ; then
+    echo "Creating /etc/ folder"
+    cd "$HOME"
+    mkdir /etc
+    touch rc.local
+  fi
+
+  echo "Initializing rc.local"
+  cd "$HOME/etc/systemd/system"
+  touch rc-local.service
+  cd "$config_path/bin/scripts"
+  mv "rc-local.service" "$HOME/etc/systemd/system/rc-local.service"
+  mv "rc.local" "$HOME/etc/"
+
+  echo "Successfully transferred rc.local file"
+fi
