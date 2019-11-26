@@ -65,7 +65,7 @@ if [ ! -d "$HOME/.aisecurity/logging" ] ; then
   mkdir unknown
 fi
 
-if [ ! -d "$HOME/etc/systemd/system/rc-local.service" ] ; then
+:' if [ ! -d "$HOME/etc/systemd/system/rc-local.service" ] ; then
   if [ ! -d "$HOME/etc/" ] ; then
     echo "Creating /etc/ folder"
     cd "$HOME"
@@ -82,3 +82,4 @@ if [ ! -d "$HOME/etc/systemd/system/rc-local.service" ] ; then
 
   echo "Successfully transferred rc.local file"
 fi
+'
