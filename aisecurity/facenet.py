@@ -202,7 +202,10 @@ class FaceNet(object):
 
         while True:
             _, frame = cap.read()
-            original_frame = frame.copy()
+            try:
+                original_frame = frame.copy()
+            except AttributeError:
+                print("Not reading frame")
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
