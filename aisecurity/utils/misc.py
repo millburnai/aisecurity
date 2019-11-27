@@ -57,16 +57,13 @@ class LCDProgressBar(object):
     def display_off(self, msg=""):
         self.lcd.message = msg
         self.is_on = False
+        self.flush(previous_msg=msg)
 
     def _update(self, percent, previous_msg=None):
         if not self.is_on:
             self.is_on = True
 
         self.progress += percent
-        if self.progress > 1.:
-            self.progress = 1.
-        elif self.progress < 0.:
-            self.progress = 0.
 
         bar_length = self.length - 2  # compensate for [] at beginning and end
         done = self.marker * round(self.progress * bar_length)
@@ -79,8 +76,8 @@ class LCDProgressBar(object):
 
         self.is_on = True
 
-        if self.progress == 1.:
-            self.flush(previous_msg)
+        if self.progress >= 1. or self.progress < 0.:
+            self.progress = 0.
 
     def update(self, amt=1, previous_msg=None):
         self._update(amt / self.total, previous_msg)
