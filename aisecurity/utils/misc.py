@@ -79,9 +79,17 @@ class LCDProgressBar(object):
 
         self.is_on = True
 
+        if self.progress == 1.:
+            self.flush(previous_msg)
 
     def update(self, amt=1, previous_msg=None):
         self._update(amt / self.total, previous_msg)
+
+    def flush(previous_msg=None):
+        if previous_msg:
+            self.lcd.message = "{}\n[{}]".format(previous_msg, " " * bar_length)
+        else:
+            self.lcd.message = "[{}]".format(" " * bar_length)
 
 
 # PROGRESS BAR DECORATOR
