@@ -258,7 +258,7 @@ class FaceNet(object):
 
                 if frames > 5 and logging:
                     self.log_activity(is_recognized, best_match, logging, lcd if use_lcd else None, use_dynamic,
-                                      embedding, use_server, progress_bar)
+                                      embedding, use_server, progress_bar if use_lcd else None)
 
                     log.L2_DISTS.append(l2_dist)
 
