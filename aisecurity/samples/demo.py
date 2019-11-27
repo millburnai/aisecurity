@@ -54,6 +54,8 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
 if __name__ == "__main__":
     import argparse
 
+
+    # TYPE CASTING
     def to_bool(string):
         if string.lower() in ("yes", "true", "t", "y", "1"):
             return True
@@ -74,10 +76,18 @@ if __name__ == "__main__":
         except TypeError:
             raise argparse.ArgumentTypeError("integer expected")
 
+    def none_or_str(string):
+        if string.lower() == "none":
+            return None
+        else:
+            return string
+
+
+    # ARG PARSE
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", help="name of facenet model", type=str, default="ms_celeb_1m")
     parser.add_argument("--path_to_model", help="path to facenet model", type=str, default=None)
-    parser.add_argument("--logging", help="(string) logging type, mysql or firebase", type=str, default="firebase")
+    parser.add_argument("--logging", help="(string) logging type, mysql or firebase", type=none_or_str, default="firebase")
     parser.add_argument("--use_dynamic", help="(boolean) use dynamic database", type=to_bool, default=True)
     parser.add_argument("--use_picam", help="(boolean) use Picamera", type=to_bool, default=False)
     parser.add_argument("--use_graphics", help="(boolean) display graphics", type=to_bool, default=True)
@@ -89,6 +99,8 @@ if __name__ == "__main__":
                         default=False)
     args = parser.parse_args()
 
+
+    # DEMO
     demo(model=args.model, path=args.path_to_model, logging=args.logging, use_dynamic=args.use_dynamic,
          use_picam=args.use_picam, use_graphics=args.use_graphics, resize=args.resize, use_lcd=args.use_lcd,
          flip=args.flip, verbose=args.verbose)
