@@ -198,7 +198,7 @@ class FaceNet(object):
             print("Connecting to server...")
             requests.get(CONFIG["server_address"], timeout=1.)
             use_server = True
-        except requests.exceptions.Timeout:
+        except (requests.exceptions.Timeout, KerError) as e:
             warnings.warn("ID server unreachable")
             print("ID server unreachable")
             use_server = False
