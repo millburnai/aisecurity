@@ -12,6 +12,23 @@ import asyncio
 import time
 import warnings
 
+COLORS = None
+COLORSSET = False
+
+try:
+    import Jetson.GPIO as GPIO
+    GPIO.cleanup()
+    GPIO.setmode(GPIO.BCM)
+    COLORS = [18, 23]
+    try:
+        for color in COLORS:
+            GPIO.setup(color, GPIO.OUT)
+        COLORSSET = True
+    except RuntimeError:
+        warnings.warn("Wires improperly configured. Colors will not be available")
+except ImportError:
+    warnings.warn("Not using Jetson Nano")
+
 try:
     from adafruit_character_lcd.character_lcd_i2c import Character_LCD_I2C as character_lcd
     import busio
@@ -444,8 +461,31 @@ class FaceNet(object):
 
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
 
+
+
     @staticmethod
     def add_lcd_display(lcd, best_match, use_server, progress_bar):
+        #I dont know if these are the right combos yet
+        @staticmethod
+        def output_red():
+            GPIO.output(COLORS[0], GPIO.LOW)
+            GPIO.output(COLORS[1], GPIO.LOW)
+
+        @staticmethod
+        def output_violet():
+            GPIO.output(COLORS[0], GPIO.LOW)
+            GPIO.output(COLORS[1], GPIO.HIGH)
+
+        @staticmethod
+        def output_white():
+            GPIO.output(COLORS[0], GPIO.HIGH)
+            GPIO.output(COLORS[1], GPIO.LOW)
+        @staticmethod
+        def reset_lcd():
+            if COLORSSET:
+                output_white()
+            lcd.message = "Look into the camera"
+        #--------------------------------------------
         lcd.clear()
         progress_bar.display_off()
 
@@ -457,10 +497,24 @@ class FaceNet(object):
 
             if data["accept"]:
                 lcd.message = "ID Accepted\n{}".format(best_match)
+                if COLORSSET: 
+                    output_violet()
+                time.sleep(2)
+                reset_lcd()
             elif "visitor" in best_match.lower():
                 lcd.message = "Welcome to MHS,\n{}".format(best_match)
+                if COLORSSET: 
+                    output_violet()
+                time.sleep(2)
+                reset_lcd()
             else:
                 lcd.message = "No Senior Priv\n{}".format(best_match)
+                if COLORSSET: 
+                    output_red()
+                time.sleep(2)
+                reset_lcd()
+
+
 
         else:
             if "visitor" in best_match.lower():
