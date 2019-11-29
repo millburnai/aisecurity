@@ -118,7 +118,12 @@ class FaceNet(object):
         def _embed_generator(predict, data, *args, **kwargs):
             for n in args:
                 print(n)
+                try:
+                    print(n.shape)
+                except RuntimeError:
+                    print("oops")
                 print(args)
+                print(len(args))
                 if isinstance(n, str):
                     try:
                         yield data[n]
