@@ -2,20 +2,3 @@
 *.pyc
 .idea/
 .DS_STORE
-
-# hidden files
-_*
-
-# make sure "__init__.py"s are not ignored
-!__init__.py
-
-# .gitignore exceptions for dev purposes-- will be removed later
-!_decrypted.json
-!_encrypted.json
-!_unknown
-
-!_data_management.py
-
-!_local
-!_keys
-!_database
