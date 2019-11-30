@@ -9,48 +9,26 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 """
 
 import asyncio
+import os
+import requests
 import time
 import warnings
 
-COLORS = None
-COLORSSET = False
-
-try:
-    import Jetson.GPIO as GPIO
-    GPIO.cleanup()
-    GPIO.setmode(GPIO.BCM)
-    COLORS = [18, 23]
-    try:
-        for color in COLORS:
-            GPIO.setup(color, GPIO.OUT)
-        COLORSSET = True
-    except RuntimeError:
-        warnings.warn("Wires improperly configured. Colors will not be available")
-except ImportError:
-    warnings.warn("Not using Jetson Nano")
-
-try:
-    from adafruit_character_lcd.character_lcd_i2c import Character_LCD_I2C as character_lcd
-    import busio
-    import board
-except NotImplementedError:
-    warnings.warn("LCD not supported")
 import cv2
 import keras
 from keras import backend as K
 import matplotlib.pyplot as plt
 from mtcnn.mtcnn import MTCNN
 import numpy as np
-import os
-import requests
 from sklearn import neighbors
 from termcolor import cprint
 
 from aisecurity.database import log
+from aisecurity.privacy.encryptions import DataEncryption
+from aisecurity.utils.lcd import board, busio, Character_LCD_I2C, COLORS, GPIO, LCDProgressBar
+from aisecurity.utils.misc import timer, HidePrints
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
 from aisecurity.utils.preprocessing import CONSTANTS, whiten, align_imgs
-from aisecurity.utils.misc import timer, HidePrints, LCDProgressBar
-from aisecurity.privacy.encryptions import DataEncryption
 
 
 # FACENET
@@ -115,27 +93,21 @@ class FaceNet(object):
         return self.__static_db
 
     def get_embeds(self, data, *args, **kwargs):
-        def _embed_generator(predict, data, *args, **kwargs):
-            for n in args:
-                print(n)
+        embeds = []
+        for n in args:
+            if isinstance(n, str):
                 try:
-                    print(n.shape)
-                except RuntimeError:
-                    print("oops")
-                print(args)
-                print(len(args))
-                if isinstance(n, str):
-                    try:
-                        yield data[n]
-                    except KeyError:
-                        yield predict([n], margin=CONSTANTS["margin"], **kwargs)
-                elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # n must be a vector
-                    yield predict([n], margin=CONSTANTS["margin"], **kwargs)
+                    embeds.append(data[n])
+                except KeyError:
+                    embeds.append(self.predict([n], **kwargs))
+            elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):
+                # n must be a vector
+                embeds.append(self.predict([n], **kwargs))
 
-        result = list(_embed_generator(self.predict, data, *args, **kwargs))
-        return result if len(result) > 1 else result[0]
+        return embeds if len(embeds) > 1 else embeds[0]
 
     def predict(self, paths_or_imgs, margin=CONSTANTS["margin"], faces=None, checkup=False):
+
         l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
 
         aligned_imgs = whiten(align_imgs(paths_or_imgs, margin, faces=faces, checkup=checkup))
@@ -186,6 +158,7 @@ class FaceNet(object):
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, logging, use_dynamic, use_picam, use_graphics, framerate,
                                    resize, use_lcd, flip):
+        # INITS
         db_types = ["static"]
         if use_dynamic:
             db_types.append("dynamic")
@@ -225,6 +198,7 @@ class FaceNet(object):
         if use_lcd:
             lcd.message = "Loading...\n[Diagnostics] "
 
+        # CAM LOOP
         while True:
             _, frame = cap.read()
             try:
@@ -472,27 +446,23 @@ class FaceNet(object):
 
     @staticmethod
     def add_lcd_display(lcd, best_match, use_server, progress_bar):
-        #I dont know if these are the right combos yet
-        @staticmethod
-        def output_red():
+
+        def green_display():
+            GPIO.output(COLORS[0], GPIO.HIGH)
+            GPIO.output(COLORS[1], GPIO.HIGH)
+
+        def red_display():
             GPIO.output(COLORS[0], GPIO.LOW)
             GPIO.output(COLORS[1], GPIO.LOW)
 
-        @staticmethod
-        def output_violet():
+        def violet_display():
             GPIO.output(COLORS[0], GPIO.LOW)
             GPIO.output(COLORS[1], GPIO.HIGH)
 
-        @staticmethod
-        def output_white():
+        def white_display():
             GPIO.output(COLORS[0], GPIO.HIGH)
             GPIO.output(COLORS[1], GPIO.LOW)
-        @staticmethod
-        def reset_lcd():
-            if COLORSSET:
-                output_white()
-            lcd.message = "Look into the camera"
-        #--------------------------------------------
+
         lcd.clear()
         progress_bar.display_off()
 
@@ -504,27 +474,18 @@ class FaceNet(object):
 
             if data["accept"]:
                 lcd.message = "ID Accepted\n{}".format(best_match)
-                if COLORSSET: 
-                    output_violet()
-                time.sleep(2)
-                reset_lcd()
+                green_display()
             elif "visitor" in best_match.lower():
                 lcd.message = "Welcome to MHS,\n{}".format(best_match)
-                if COLORSSET: 
-                    output_violet()
-                time.sleep(2)
-                reset_lcd()
+                violet_display()
             else:
                 lcd.message = "No Senior Priv\n{}".format(best_match)
-                if COLORSSET: 
-                    output_red()
-                time.sleep(2)
-                reset_lcd()
-
-
+                red_display()
 
         else:
             if "visitor" in best_match.lower():
                 lcd.message = "Welcome to MHS,\n{}".format(best_match)
+                violet_display()
             else:
                 lcd.message = "[Server Error]\n{}".format(best_match)
+                green_display()
