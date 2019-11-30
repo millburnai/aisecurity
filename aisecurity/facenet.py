@@ -80,6 +80,8 @@ class FaceNet(object):
         IMG_CONSTANTS["img_size"] = (self.facenet.input_shape[1], self.facenet.input_shape[1])
 
     def _trt_init(self, filepath, input_name, output_name):
+        assert tf.test.is_gpu_available(), "TF-TRT mode requires a CUDA-enabled GPU"
+
         trt_graph = self.get_frozen_graph(filepath)
 
         config = tf.ConfigProto()
