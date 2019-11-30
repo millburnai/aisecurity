@@ -2,7 +2,7 @@
 
 "aisecurity.facenet"
 
-Facial recognition with FaceNet in Keras.
+Facial recognition with FaceNet in Keras or TF-TRT.
 
 Paper: https://arxiv.org/pdf/1503.03832.pdf
 
@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from mtcnn.mtcnn import MTCNN
 import numpy as np
 from sklearn import neighbors
+import tensorflow as tf
 from termcolor import cprint
 
 from aisecurity.database import log
@@ -28,7 +29,7 @@ from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.utils.lcd import board, busio, Character_LCD_I2C, COLORS, GPIO, LCDProgressBar
 from aisecurity.utils.misc import timer, HidePrints
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
-from aisecurity.utils.preprocessing import CONSTANTS, whiten, align_imgs
+from aisecurity.utils.preprocessing import IMG_CONSTANTS, whiten, align_imgs
 
 
 # FACENET
@@ -41,17 +42,68 @@ class FaceNet(object):
         "mtcnn_alpha": 0.9
     }
 
+    # CONSTANTS (for TF-TRT)
+    CONSTANTS = {
+        "ms_celeb_1m": {
+            "inputs": ["input_1"],
+            "outputs": ["Bottleneck_BatchNorm/batchnorm/add_1"]
+        },
+        "vgg_face_2": {
+            "inputs": ["base_input"],
+            "outputs": ["classifier_low_dim/Softmax"]
+        }
+    }
+
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.h5"):
+    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.pb", input_name=None, output_name=None):
         assert os.path.exists(filepath), "{} not found".format(filepath)
-        self.facenet = keras.models.load_model(filepath)
+
+        if ".pb" in filepath:
+            self.MODE = "tf-trt"
+        elif ".h5" in filepath:
+            self.MODE = "keras"
+        else:
+            raise TypeError("model must be a .h5 or a frozen .pb file")
+
+        if self.MODE == "keras":
+            self._keras_init(filepath)
+        elif self.MODE == "tf-trt":
+            self._trt_init(filepath, input_name, output_name)
 
         self.__static_db = None  # must be filled in by user
         self.__dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
 
-        CONSTANTS["img_size"] = (self.facenet.input_shape[1], self.facenet.input_shape[1])
+    def _keras_init(self, filepath):
+        self.facenet = keras.models.load_model(filepath)
+        IMG_CONSTANTS["img_size"] = (self.facenet.input_shape[1], self.facenet.input_shape[1])
+
+    def _trt_init(self, filepath, input_name, output_name):
+        trt_graph = self.get_frozen_graph(filepath)
+
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        self.sess = tf.Session(config=config)
+
+        tf.import_graph_def(trt_graph, name="")
+
+        self._io_tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
+
+        self.facenet = self.sess.graph
+        IMG_CONSTANTS["img_size"] = tuple(self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3])
+
+    def _io_tensor_init(self, model_name, input_name, output_name):
+        self.input_name, self.output_name = None, None
+        for model in self.CONSTANTS:
+            if model in model_name:
+                self.input_name = self.CONSTANTS[model]["inputs"][0] + ":0"
+                self.output_name = self.CONSTANTS[model]["outputs"][0] + ":0"
+        if not self.input_name:
+            self.input_name = input_name
+        elif not self.output_name:
+            self.output_name = output_name
+        assert self.input_name and self.output_name, "I/O tensors for {} not detected or provided".format(model_name)
 
 
     # MUTATORS
@@ -92,6 +144,13 @@ class FaceNet(object):
     def data(self):
         return self.__static_db
 
+    @staticmethod
+    def get_frozen_graph(path):
+        with tf.gfile.FastGFile(path, "rb") as graph_file:
+            graph_def = tf.GraphDef()
+            graph_def.ParseFromString(graph_file.read())
+        return graph_def
+
     def get_embeds(self, data, *args, **kwargs):
         embeds = []
         for n in args:
@@ -100,18 +159,21 @@ class FaceNet(object):
                     embeds.append(data[n])
                 except KeyError:
                     embeds.append(self.predict([n], **kwargs))
-            elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):
-                # n must be a vector
+            elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # n must be a vector
                 embeds.append(self.predict([n], **kwargs))
 
         return embeds if len(embeds) > 1 else embeds[0]
 
-    def predict(self, paths_or_imgs, margin=CONSTANTS["margin"], faces=None, checkup=False):
-
+    def predict(self, paths_or_imgs, margin=IMG_CONSTANTS["margin"], faces=None, checkup=False):
         l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
+        if self.MODE == "keras":
+            predict = lambda imgs: self.facenet.predict(imgs)
+        elif self.MODE == "tf-trt":
+            output_tensor = self.facenet.get_tensor_by_name(self.output_name)
+            predict = lambda imgs: self.sess.run(output_tensor, {self.input_name: imgs})
 
         aligned_imgs = whiten(align_imgs(paths_or_imgs, margin, faces=faces, checkup=checkup))
-        raw_embeddings = self.facenet.predict(aligned_imgs)
+        raw_embeddings = predict(aligned_imgs)
         normalized_embeddings = l2_normalize(raw_embeddings)
 
         return normalized_embeddings
@@ -367,7 +429,7 @@ class FaceNet(object):
 
         color = get_color(is_recognized, best_match)
 
-        margin = CONSTANTS["margin"]
+        margin = IMG_CONSTANTS["margin"]
         origin = (x - margin // 2, y - margin // 2)
         corner = (x + height + margin // 2, y + width + margin // 2)
 
@@ -443,7 +505,7 @@ class FaceNet(object):
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
 
 
-
+    # LCD
     @staticmethod
     def add_lcd_display(lcd, best_match, use_server, progress_bar):
 

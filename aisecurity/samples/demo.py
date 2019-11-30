@@ -40,7 +40,10 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
 
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
-    facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.h5".format(model))
+    try:
+        facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.h5".format(model))
+    except OSError:
+        facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.pb".format(model))
 
     cprint("\nLoading encrypted database", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
