@@ -26,7 +26,7 @@ from termcolor import cprint
 
 from aisecurity.database import log
 from aisecurity.privacy.encryptions import DataEncryption
-from aisecurity.utils.lcd import board, busio, Character_LCD_I2C, COLORS, GPIO, LCDProgressBar
+from aisecurity.utils.lcd import board, busio, character_lcd, COLORS, GPIO, LCDProgressBar
 from aisecurity.utils.misc import timer, HidePrints
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
 from aisecurity.utils.preprocessing import IMG_CONSTANTS, whiten, align_imgs
