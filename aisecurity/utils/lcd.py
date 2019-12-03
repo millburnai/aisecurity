@@ -13,7 +13,6 @@ import warnings
 
 # CONSTANTS
 COLORS = None
-bar_length = None
 
 
 # AUTOINIT
@@ -65,9 +64,9 @@ class LCDProgressBar(object):
 
         self.progress += percent
 
-        bar_length = self.length - 2  # compensate for [] at beginning and end
-        done = self.marker * round(self.progress * bar_length)
-        left = " " * (bar_length - len(done))
+        self.bar_length = self.length - 2  # compensate for [] at beginning and end
+        done = self.marker * round(self.progress * self.bar_length)
+        left = " " * (self.bar_length - len(done))
 
         if previous_msg:
             self.lcd.message = "{}\n[{}{}]".format(previous_msg, done, left)
@@ -84,9 +83,9 @@ class LCDProgressBar(object):
 
     def flush(self, previous_msg=None):
         if previous_msg:
-            self.lcd.message = "{}\n[{}]".format(previous_msg, " " * bar_length)
+            self.lcd.message = "{}\n[{}]".format(previous_msg, " " * self.bar_length)
         else:
-            self.lcd.message = "[{}]".format(" " * bar_length)
+            self.lcd.message = "[{}]".format(" " * self.bar_length)
 
 
 # PROGRESS BAR DECORATOR
