@@ -13,6 +13,7 @@ import warnings
 
 # CONSTANTS
 COLORS = None
+bar_length = None
 
 
 # AUTOINIT
