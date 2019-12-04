@@ -10,7 +10,6 @@ Paper: https://arxiv.org/pdf/1503.03832.pdf
 
 import asyncio
 import os
-import requests
 import time
 import warnings
 
@@ -26,9 +25,9 @@ from termcolor import cprint
 
 from aisecurity.database import log
 from aisecurity.privacy.encryptions import DataEncryption
-from aisecurity.utils.lcd import board, busio, character_lcd, COLORS, GPIO, LCDProgressBar
+from aisecurity.utils import lcd
 from aisecurity.utils.misc import timer, HidePrints
-from aisecurity.utils.paths import CONFIG_HOME, CONFIG
+from aisecurity.utils.paths import CONFIG_HOME
 from aisecurity.utils.preprocessing import IMG_CONSTANTS, whiten, align_imgs
 
 
@@ -224,28 +223,14 @@ class FaceNet(object):
                                    resize, use_lcd, flip):
         # INITS
         db_types = ["static"]
+        use_server = False
         if use_dynamic:
             db_types.append("dynamic")
         if logging:
             log.init(flush=True, logging=logging)
+            use_server = log.server_init()
         if use_lcd:
-            i2c = busio.I2C(board.SCL, board.SDA)
-            try:
-                i2c.scan()
-            except RuntimeError:
-                raise RuntimeError("Wire configuration incorrect")
-            lcd = character_lcd(i2c, 16, 2, backlight_inverted=False)
-            lcd.message = "Loading...\n[Initializing]"
-            progress_bar = LCDProgressBar(total=log.THRESHOLDS["num_recognized"], lcd=lcd)
-
-        try:
-            print("Connecting to server...")
-            requests.get(CONFIG["server_address"], timeout=1.)
-            use_server = True
-        except (requests.exceptions.Timeout, KeyError) as e:
-            warnings.warn("ID server unreachable")
-            print("ID server unreachable")
-            use_server = False
+            lcd.init()
 
         cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip)
 
@@ -260,7 +245,7 @@ class FaceNet(object):
         computation_check = time.time()
 
         if use_lcd:
-            lcd.message = "Loading...\n[Diagnostics] "
+            lcd.LCD.message = "Loading...\n[Diagnostics] "
 
         # CAM LOOP
         while True:
@@ -268,7 +253,7 @@ class FaceNet(object):
             try:
                 original_frame = frame.copy()
             except AttributeError:
-                print("Not reading frame")
+                raise ValueError("Frame read error")
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
@@ -282,7 +267,7 @@ class FaceNet(object):
                     print("Regular computation check")
                     computation_check = time.time()
                     if use_lcd:
-                        lcd.clear()
+                        lcd.LCD.clear()
                 elif not (time.time() - log.LAST_LOGGED > next_check or time.time() - log.UNK_LAST_LOGGED > next_check):
                     computation_check = time.time()
 
@@ -314,14 +299,15 @@ class FaceNet(object):
                         raise error
                     continue
 
-                # add graphics
+                # add graphics, lcd, and do logging
                 if use_graphics:
-                    self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match, resize,
-                                      progress_bar=progress_bar if use_lcd else None)
+                    self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match, resize)
 
-                if frames > 5 and logging:
-                    self.log_activity(is_recognized, best_match, logging, lcd if use_lcd else None, use_dynamic,
-                                      embedding, use_server, progress_bar if use_lcd else None)
+                if use_lcd and is_recognized:
+                    lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
+
+                if logging and frames > 5:
+                    self.log_activity(is_recognized, best_match, logging, use_dynamic, embedding, use_server)
 
                     log.L2_DISTS.append(l2_dist)
 
@@ -332,10 +318,7 @@ class FaceNet(object):
                     log.flush_current(mode=["known", "unknown"], flush_times=False)
                 print("No face detected")
 
-            cv2.imshow("AI Security v1.0a", original_frame)
-
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
+            # cv2.imshow("AI Security v0.9a", original_frame)
 
             frames += 1
 
@@ -349,7 +332,7 @@ class FaceNet(object):
                             use_graphics=True, framerate=20, resize=None, use_lcd=False, flip=0):
         assert width > 0 and height > 0, "width and height must be positive integers"
         assert not logging or (logging == "mysql" or logging == "firebase"), "only mysql and firebase database supported"
-        assert 0 < framerate < 150, "framerate must be between 0 and 150"
+        assert 0 < framerate <= 120, "framerate must be between 0 and 120"
         assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
 
         async def async_helper(recognize_func, *args, **kwargs):
@@ -384,7 +367,7 @@ class FaceNet(object):
             return cap
 
     @staticmethod
-    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize, progress_bar):
+    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize):
         line_thickness = round(1e-6 * width * height + 1.5)
         radius = round((1e-6 * width * height + 1.5) / 2.)
         font_size = 4.5e-7 * width * height + 0.5
@@ -441,9 +424,6 @@ class FaceNet(object):
         text = best_match if is_recognized else ""
         add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
-        if progress_bar and is_recognized:
-            progress_bar.update(previous_msg="Recognizing...")
-
 
     # DISPLAY
     def show_embeds(self, encrypted=False, single=False):
@@ -477,7 +457,7 @@ class FaceNet(object):
 
 
     # LOGGING
-    def log_activity(self, is_recognized, best_match, logging_type, lcd, use_dynamic, embedding, use_server, progress_bar):
+    def log_activity(self, is_recognized, best_match, logging_type, use_dynamic, embedding, use_server):
         firebase = True if logging_type == "firebase" else False
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
@@ -492,8 +472,7 @@ class FaceNet(object):
 
                 cprint("Regular activity logged ({})".format(best_match), color="green", attrs=["bold"])
 
-                if lcd:
-                    FaceNet.add_lcd_display(lcd, best_match, use_server, progress_bar)
+                lcd.add_lcd_display(best_match, use_server)  # will silently fail if lcd not supported
 
         elif log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.UNK_LAST_LOGGED):
             log.log_unknown("<DEPRECATED>", firebase=firebase)
@@ -505,51 +484,3 @@ class FaceNet(object):
                 self._train_knn(knn_types=["dynamic"])
 
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
-
-
-    # LCD
-    @staticmethod
-    def add_lcd_display(lcd, best_match, use_server, progress_bar):
-
-        def green_display():
-            GPIO.output(COLORS[0], GPIO.HIGH)
-            GPIO.output(COLORS[1], GPIO.HIGH)
-
-        def red_display():
-            GPIO.output(COLORS[0], GPIO.LOW)
-            GPIO.output(COLORS[1], GPIO.LOW)
-
-        def violet_display():
-            GPIO.output(COLORS[0], GPIO.LOW)
-            GPIO.output(COLORS[1], GPIO.HIGH)
-
-        def white_display():
-            GPIO.output(COLORS[0], GPIO.HIGH)
-            GPIO.output(COLORS[1], GPIO.LOW)
-
-        lcd.clear()
-        progress_bar.display_off()
-
-        best_match = best_match.replace("_", " ").title()
-
-        if use_server:
-            request = requests.get(CONFIG["server_address"])
-            data = request.json()
-
-            if data["accept"]:
-                lcd.message = "ID Accepted\n{}".format(best_match)
-                green_display()
-            elif "visitor" in best_match.lower():
-                lcd.message = "Welcome to MHS,\n{}".format(best_match)
-                violet_display()
-            else:
-                lcd.message = "No Senior Priv\n{}".format(best_match)
-                red_display()
-
-        else:
-            if "visitor" in best_match.lower():
-                lcd.message = "Welcome to MHS,\n{}".format(best_match)
-                violet_display()
-            else:
-                lcd.message = "[Server Error]\n{}".format(best_match)
-                green_display()
