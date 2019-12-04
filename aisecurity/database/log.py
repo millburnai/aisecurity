@@ -13,6 +13,7 @@ import warnings
 import mysql.connector
 import pyrebase
 from pyrebase import *
+import requests
 
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
 
@@ -78,6 +79,23 @@ def init(flush=False, thresholds=None, logging="firebase"):
 
     if thresholds:
         THRESHOLDS = {**THRESHOLDS, **thresholds}
+
+
+def server_init():
+    try:
+        print("Connecting to server...")
+        requests.get(CONFIG["server_address"], timeout=1.)
+        use_server = True
+    except (requests.exceptions.Timeout, requests.exceptions.MissingSchema, KeyError) as error:
+        if isinstance(error, requests.exceptions.Timeout):
+            warnings.warn("ID server unreachable")
+        elif isinstance(error, requests.exceptions.MissingSchema):
+            warnings.warn("Invalid server address in config")
+        elif isinstance(error, KeyError):
+            warnings.warn("Server address missing in config")
+        use_server = False
+
+    return use_server
 
 
 def get_now(seconds):
