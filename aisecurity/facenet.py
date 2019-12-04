@@ -224,6 +224,7 @@ class FaceNet(object):
         # INITS
         db_types = ["static"]
         use_server = False
+
         if use_dynamic:
             db_types.append("dynamic")
         if logging:
@@ -231,29 +232,27 @@ class FaceNet(object):
             use_server = log.server_init()
         if use_lcd:
             lcd.init()
+        if resize:
+            mtcnn_width, mtcnn_height = width * resize, height * resize
+        else:
+            mtcnn_width, mtcnn_height = width, height
 
         cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip)
+        assert cap.isOpened(), "video capture failed to initialize"
 
-        if resize:
-            width, height = width * resize, height * resize
-
-        mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
+        mtcnn = MTCNN(min_face_size=0.5 * (mtcnn_width + mtcnn_height) / 3)
+        # face needs to fill at least 1/3 of the frame
 
         missed_frames = 0
         frames = 0
 
         computation_check = time.time()
 
-        if use_lcd:
-            lcd.LCD.message = "Loading...\n[Diagnostics] "
-
         # CAM LOOP
         while True:
             _, frame = cap.read()
-            try:
-                original_frame = frame.copy()
-            except AttributeError:
-                raise ValueError("Frame read error")
+            original_frame = frame.copy()
+
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
@@ -318,7 +317,10 @@ class FaceNet(object):
                     log.flush_current(mode=["known", "unknown"], flush_times=False)
                 print("No face detected")
 
-            # cv2.imshow("AI Security v0.9a", original_frame)
+            cv2.imshow("AI Security v0.9a", original_frame)
+
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
 
             frames += 1
 
