@@ -8,7 +8,7 @@ Demonstration of facial recognition system.
 
 
 def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, use_picam=False, use_graphics=True,
-         use_lcd=False, resize=None, flip=0, gpu_alloc=False, verbose=False):
+         use_lcd=False, resize=None, flip=0, allow_gpu_growth=False, verbose=False):
     if not verbose:
         # SETUP
         import os
@@ -29,13 +29,9 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
         except AttributeError:
             tf.logging.set_verbosity(tf.logging.ERROR)
 
-        if gpu_alloc:
-            session_config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
-            sess = tf.Session(config=session_config)
-
-            from keras import backend as K
-            K.set_session(sess)
-
+        if allow_gpu_growth:
+            sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True)))
+            # tf.keras.backend.set_session(sess)
             sess.__enter__()
 
     from termcolor import cprint
@@ -95,18 +91,20 @@ if __name__ == "__main__":
 
     # ARG PARSE
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", help="name of facenet model", type=str, default="ms_celeb_1m")
-    parser.add_argument("--path_to_model", help="path to facenet model", type=str, default=None)
-    parser.add_argument("--logging", help="(string) logging type, mysql or firebase", type=none_or_str, default="firebase")
-    parser.add_argument("--use_dynamic", help="(boolean) use dynamic database", type=to_bool, default=True)
-    parser.add_argument("--use_picam", help="(boolean) use Picamera", type=to_bool, default=False)
-    parser.add_argument("--use_graphics", help="(boolean) display graphics", type=to_bool, default=True)
-    parser.add_argument("--use_lcd", help="(boolean) use LCD display", type=to_bool, default=False)
-    parser.add_argument("--resize", help="(boolean) resize frame for faster recognition", type=bounded_float,
+    parser.add_argument("--model", help="name of facenet model (default: ms_celeb_1m)", type=str, default="ms_celeb_1m")
+    parser.add_argument("--path_to_model", help="path to facenet model (default: ~/.aisecurity/models/ms_celeb_1m)",
+                        type=str, default=None)
+    parser.add_argument("--logging", help="logging type, mysql or firebase (default: None)", type=none_or_str,
                         default=None)
-    parser.add_argument("--flip", help="(int) flip method: +1 = +90º rotation", type=to_int, default=0)
-    parser.add_argument("--gpu_alloc", help="(boolean) limit GPU growth", type=to_bool, default=False)
-    parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output", type=to_bool,
+    parser.add_argument("--use_dynamic", help="use dynamic database (default: True)", type=to_bool, default=True)
+    parser.add_argument("--use_picam", help="use Picamera (default: False)", type=to_bool, default=False)
+    parser.add_argument("--use_graphics", help="display graphics (default: True)", type=to_bool, default=True)
+    parser.add_argument("--use_lcd", help="use LCD display (default: False)", type=to_bool, default=False)
+    parser.add_argument("--resize", help="resize frame for faster recognition (default: None)", type=bounded_float,
+                        default=None)
+    parser.add_argument("--flip", help="flip method: +1 = +90º rotation (default: 0)", type=to_int, default=0)
+    parser.add_argument("--allow_gpu_growth", help="GPU growth (default: False)", type=to_bool, default=False)
+    parser.add_argument("--verbose", help="suppress warnings and TensorFlow output (default: False)", type=to_bool,
                         default=False)
     args = parser.parse_args()
 
@@ -114,4 +112,4 @@ if __name__ == "__main__":
     # DEMO
     demo(model=args.model, path=args.path_to_model, logging=args.logging, use_dynamic=args.use_dynamic,
          use_picam=args.use_picam, use_graphics=args.use_graphics, resize=args.resize, use_lcd=args.use_lcd,
-         flip=args.flip, gpu_alloc=args.gpu_alloc, verbose=args.verbose)
+         flip=args.flip, allow_gpu_growth=args.allow_gpu_growth, verbose=args.verbose)
