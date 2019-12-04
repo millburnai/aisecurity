@@ -8,8 +8,7 @@ Demonstration of facial recognition system.
 
 
 def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, use_picam=False, use_graphics=True,
-         resize=None, verbose=False, use_lcd=False, flip=0):
-
+         use_lcd=False, resize=None, flip=0, gpu_alloc=False, verbose=False):
     if not verbose:
         # SETUP
         import os
@@ -30,6 +29,14 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
         except AttributeError:
             tf.logging.set_verbosity(tf.logging.ERROR)
 
+        if gpu_alloc:
+            session_config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
+            sess = tf.Session(config=session_config)
+
+            from keras import backend as K
+            K.set_session(sess)
+
+            sess.__enter__()
 
     from termcolor import cprint
 
@@ -98,6 +105,7 @@ if __name__ == "__main__":
     parser.add_argument("--resize", help="(boolean) resize frame for faster recognition", type=bounded_float,
                         default=None)
     parser.add_argument("--flip", help="(int) flip method: +1 = +90º rotation", type=to_int, default=0)
+    parser.add_argument("--gpu_alloc", help="(boolean) limit GPU growth", type=to_bool, default=False)
     parser.add_argument("--verbose", help="(boolean) suppress warnings and TensorFlow output", type=to_bool,
                         default=False)
     args = parser.parse_args()
@@ -106,4 +114,4 @@ if __name__ == "__main__":
     # DEMO
     demo(model=args.model, path=args.path_to_model, logging=args.logging, use_dynamic=args.use_dynamic,
          use_picam=args.use_picam, use_graphics=args.use_graphics, resize=args.resize, use_lcd=args.use_lcd,
-         flip=args.flip, verbose=args.verbose)
+         flip=args.flip, gpu_alloc=args.gpu_alloc, verbose=args.verbose)
