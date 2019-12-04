@@ -20,10 +20,10 @@ IMG_CONSTANTS = {
 
 
 # IMAGE PROCESSING
-def whiten(x):
+def normalize(x):
     std_adj = np.maximum(np.std(x, axis=(0, 1, 2), keepdims=True), 1. / np.sqrt(x.size))
-    whitened = (x - np.mean(x, axis=(0, 1, 2), keepdims=True)) / std_adj
-    return whitened
+    normalized = (x - np.mean(x, axis=(0, 1, 2), keepdims=True)) / std_adj
+    return normalized
 
 
 def align_imgs(paths_or_imgs, margin, faces=None, checkup=False):
