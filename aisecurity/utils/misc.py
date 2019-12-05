@@ -11,11 +11,9 @@ import os
 import sys
 import time
 
-from keras import backend as K
-
 
 # PRINT HANDLING
-class HidePrints(object):
+class HidePrints:
 
     def __enter__(self):
         self.to_show = sys.stdout

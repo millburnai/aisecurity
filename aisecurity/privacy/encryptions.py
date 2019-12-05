@@ -89,7 +89,7 @@ def decrypt(cipher_text, key_type, position):
 
 
 # DATA ENCRYPTION
-class DataEncryption(object):
+class DataEncryption:
 
     @staticmethod
     def encrypt_data(data, ignore=None, decryptable=True):
