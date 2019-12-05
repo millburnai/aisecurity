@@ -9,13 +9,13 @@ Demonstration of facial recognition system.
 
 def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, use_picam=False, use_graphics=True,
          use_lcd=False, resize=None, flip=0, allow_gpu_growth=False, verbose=False):
+
+    # imports
     if not verbose:
-        # SETUP
         import os
 
         os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-        # ERROR HANDLING
         import warnings
 
         warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -28,11 +28,15 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
             tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
         except AttributeError:
             tf.logging.set_verbosity(tf.logging.ERROR)
+    else:
+        import os
+        import warnings
 
-        if allow_gpu_growth:
-            sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True)))
-            # tf.keras.backend.set_session(sess)
-            sess.__enter__()
+        import tensorflow as tf
+
+    if allow_gpu_growth:
+        sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True)))
+        sess.__enter__()
 
     from termcolor import cprint
 
@@ -41,6 +45,7 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
     from aisecurity.utils.paths import DATABASE, CONFIG_HOME
 
 
+    # demo
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
     try:
