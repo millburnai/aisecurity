@@ -32,7 +32,7 @@ from aisecurity.utils.preprocessing import IMG_CONSTANTS, normalize, align_imgs
 
 
 # FACENET
-class FaceNet(object):
+class FaceNet:
 
 
     # HYPERPARAMETERS
@@ -266,7 +266,7 @@ class FaceNet(object):
                     print("Regular computation check")
                     computation_check = time.time()
                     if use_lcd:
-                        lcd.LCD.clear()
+                        lcd.LCD_DEVICE.clear()
                 elif not (time.time() - log.LAST_LOGGED > next_check or time.time() - log.UNK_LAST_LOGGED > next_check):
                     computation_check = time.time()
 
