@@ -15,7 +15,7 @@ import numpy as np
 IMG_CONSTANTS = {
     "margin": 10,
     "img_size": (None, None),
-    "mtcnn": None
+    "mtcnn": MTCNN()
 }
 
 
@@ -27,8 +27,6 @@ def normalize(x):
 
 
 def align_imgs(paths_or_imgs, margin, faces=None, checkup=False):
-    if IMG_CONSTANTS["mtcnn"] is None and checkup is None and faces is None:
-        IMG_CONSTANTS["mtcnn"] = MTCNN()
 
     def align_img(path_or_img, faces, checkup):
         try:
