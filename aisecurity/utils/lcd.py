@@ -128,6 +128,10 @@ class LCD:
     def lcd(self):
         return self.__lcd
 
+    @property
+    def message(self):
+        return self.__lcd.message
+
 
 # SIMULATION SUPPORT FOR DEV
 class LCDSimulation:
