@@ -35,8 +35,7 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
         import tensorflow as tf
 
     if allow_gpu_growth:
-        sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True)))
-        sess.__enter__()
+        tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
 
     from termcolor import cprint
 

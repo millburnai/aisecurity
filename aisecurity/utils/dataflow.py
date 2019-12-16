@@ -8,6 +8,8 @@ Data utils.
 
 import json
 import os
+import tqdm
+import warnings
 
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.utils.misc import timer
@@ -18,7 +20,16 @@ from aisecurity.utils.misc import timer
 def online_load(facenet, img_dir, people=None):
     if people is None:
         people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
-    data = {person.strip(".jpg").strip(".png"): facenet.predict([os.path.join(img_dir, person)]) for person in people}
+
+    data = {}
+    with tqdm.trange(len(people)) as pbar:
+        for person in people:
+            try:
+                data[person.strip(".jpg").strip(".png")] = facenet.predict([os.path.join(img_dir, person)])
+                pbar.update()
+            except AssertionError:
+                warnings.warn("face not found in {}".format(person))
+                continue
 
     return data
 
