@@ -15,6 +15,7 @@ import warnings
 
 import cv2
 import keras
+from keypad import keypad
 from keras import backend as K
 import matplotlib.pyplot as plt
 from mtcnn.mtcnn import MTCNN
@@ -38,7 +39,8 @@ class FaceNet:
     # HYPERPARAMETERS
     HYPERPARAMS = {
         "alpha": 0.75,
-        "mtcnn_alpha": 0.9
+        "mtcnn_alpha": 0.9,
+        "error": 0.1
     }
 
     # CONSTANTS (for TF-TRT)
@@ -200,13 +202,14 @@ class FaceNet:
             best_matches.append((pred, np.linalg.norm(embedding - data[pred])))
         best_match, l2_dist = sorted(best_matches, key=lambda n: n[1])[0]
         is_recognized = l2_dist <= FaceNet.HYPERPARAMS["alpha"]
+        prompt_keypad = l2_dist <= FaceNet.HYPERPARAMS["alpha"] + FaceNet.HYPERPARAMS["error"]
 
-        return embedding, is_recognized, best_match, l2_dist
+        return embedding, is_recognized, best_match, l2_dist, prompt_keypad
 
     # FACIAL RECOGNITION
     def recognize(self, img, verbose=True):
         # img can be a path, image, database name, or embedding
-        _, is_recognized, best_match, l2_dist = self._recognize(img)
+        _, is_recognized, best_match, l2_dist, prompt_keypad = self._recognize(img)
 
         if verbose:
             if is_recognized:
@@ -215,12 +218,12 @@ class FaceNet:
                 print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
                     best_match, l2_dist))
 
-        return is_recognized, best_match, l2_dist
+        return is_recognized, best_match, l2_dist, prompt_keypad
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, logging, use_dynamic, use_picam, use_graphics, framerate,
-                                   resize, use_lcd, flip):
+                                   resize, use_lcd, flip, use_keypad):
         # INITS
         db_types = ["static"]
         use_server = False
@@ -285,7 +288,7 @@ class FaceNet:
 
                 # facial recognition
                 try:
-                    embedding, is_recognized, best_match, l2_dist = self._recognize(frame, db_types, faces=face)
+                    embedding, is_recognized, best_match, l2_dist, prompt_keypad = self._recognize(frame, db_types, faces=face)
                     print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
                 except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                     if "query data dimension" in str(error):
@@ -298,12 +301,20 @@ class FaceNet:
                         raise error
                     continue
 
+                last_best_match = best_match
+
                 # add graphics, lcd, and do logging
                 if use_graphics:
                     self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match, resize)
 
                 if use_lcd and is_recognized:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
+
+                if use_keypad and prompt_keypad:
+                    keypad.monitor(3)
+
+                if last_best_match != best_match:
+                    keypad.monitor(0)
 
                 if logging and frames > 5:
                     self.log_activity(is_recognized, best_match, logging, use_dynamic, embedding, use_server)
@@ -331,7 +342,7 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, logging="firebase", use_dynamic=False, use_picam=False,
-                            use_graphics=True, framerate=20, resize=None, use_lcd=False, flip=0):
+                            use_graphics=True, framerate=20, resize=None, use_lcd=False, flip=0, use_keypad=False):
         assert width > 0 and height > 0, "width and height must be positive integers"
         assert not logging or (logging == "mysql" or logging == "firebase"), "only mysql and firebase database supported"
         assert 0 < framerate <= 120, "framerate must be between 0 and 120"
@@ -340,9 +351,12 @@ class FaceNet:
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
+        if use_keypad:
+            keypad.init()
+
         loop = asyncio.new_event_loop()
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, logging, use_dynamic,
-                                             use_picam, use_graphics, framerate, resize, use_lcd, flip))
+                                             use_picam, use_graphics, framerate, resize, use_lcd, flip, use_keypad))
         loop.run_until_complete(task)
 
 
