@@ -310,11 +310,11 @@ class FaceNet:
                 if use_lcd and is_recognized:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
-                if use_keypad and prompt_keypad:
-                    keypad.monitor(3)
-
-                if last_best_match != best_match:
-                    keypad.monitor(0)
+                if use_keypad: 
+                    if prompt_keypad:
+                        keypad.monitor(3)
+                    else if last_best_match != best_match:
+                        keypad.monitor(0)
 
                 if logging and frames > 5:
                     self.log_activity(is_recognized, best_match, logging, use_dynamic, embedding, use_server)
