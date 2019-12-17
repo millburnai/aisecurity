@@ -43,6 +43,7 @@ def init():
 		for column in CONFIG["columns"]:
 			GPIO.setup(column, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 		USE_KEYPAD = True
+
 	except NameError:  # not sure that this is the right error... will check later
 		warnings.warn("Keypad not supported")
 		USE_KEYPAD = False
