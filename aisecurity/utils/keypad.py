@@ -1,73 +1,95 @@
-import asyncio
+"""
+
+"aisecurity.utils.keypad"
+
+Keypad utils.
+
+"""
+
+import time
 import warnings
+
+import requests
+
+
+# ---------------- INITS ----------------
+
+# AUTOINIT
 try:
 	from lcd import GPIO, LCD_DEVICE
 except ImportError:
-    warnings.warn("Board not properly set up. Keypad will be unusable")
-
-server_address = None 
-#To be found and set up by database team
-kiosk_num = 1
-#Differs between kiosks
-
-class keypad(object):
-	rows = [16, 6, 12, 13]
-	columns = [19, 26, 21] #[19, 20 21]
-
-	@staticmethod
-	def submit(student_id):
-		r = requests.get(url = server_address, params = {"id":str(student_id), "kiosk":str(kiosk_num)})
-		student_info = r.json()
-		return student_info
-
-	def current_input(lcd):
-		return lcd.message[4 : len(lcd.message)]
-
-	@staticmethod
-	def init():
-	    for row in rows:
-	        GPIO.setup(row, GPIO.OUT)
-	        GPIO.output(row, GPIO.LOW)
-	    for column in columns:
-	        GPIO.setup(column, GPIO.IN, pull_up_down = GPIO.PUD_DOWN)
-
-	@staticmethod
-	def monitor(seconds):
-		LCD_DEVICE.set_message = "ID: "
-		start = time.time()
-		while (time.time() - start < seconds):
-			time.sleep(0.021)
-			for row in rows:
-				GPIO.output(row, GPIO.HIGH)
-				for column in columns:
-					if(GPIO.input(column)):
-						button_id = (rows.index(row) * 3) + (columns.index(column) + 1)
-						press(button_id)
-						start = time.time()
-					time.sleep(.021)
-				GPIO.output(row, GPIO.LOW)
-
-	def press(button_id, lcd):
-
-		if button_id == 12 and len(current_input(lcd)) == 5:
-			student_info = submit(current_input(lcd))
-		else if (button_id <= 9 or button_id == 11) and len(current_input(lcd)) <= 5:
-			LCD_DEVICE.set_message(LCD_DEVICE.message + str(button_id if button_id != 11 else 0))
-		else if button_id == 10 and len(current_input(lcd)) > 0:
-			LCD_DEVICE.set_message(LCD_DEVICE.message[0 : len(LCD_DEVICE.message) - 1])
+	warnings.warn("Keypad not supported")
 
 
+# CONFIG AND GLOBALS
+CONFIG = {
+	"server_address": "",  # TODO: set up (@database)
+	"kiosk_num": 1,
+	"rows": [16, 6, 12, 13],
+	"columns": [19, 26, 21]  # [19, 20, 21]
+}
 
-async def async_helper(recognize_func, *args, **kwargs):
+USE_KEYPAD = None
+
+
+# MANUAL INIT
+def init():
+	global USE_KEYPAD
+
+	try:
+		for row in CONFIG["rows"]:
+			GPIO.setup(row, GPIO.OUT)
+			GPIO.output(row, GPIO.LOW)
+		for column in CONFIG["columns"]:
+			GPIO.setup(column, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+		USE_KEYPAD = True
+	except NameError:  # not sure that this is the right error... will check later
+		warnings.warn("Keypad not supported")
+		USE_KEYPAD = False
+
+
+# ---------------- FUNCTIONS ----------------
+def submit(student_id):
+	params = {
+		"id": str(student_id),
+		"kiosk": str(CONFIG["kiosk_num"])
+	}
+	r = requests.get(url=CONFIG["server_address"], params=params)
+	student_info = r.json()
+	return student_info
+
+
+def monitor(seconds):
+
+	LCD_DEVICE.set_message = "ID: "
+	start = time.time()
+
+	while time.time() - start < seconds:
+		time.sleep(0.021)
+
+		for row in CONFIG["rows"]:
+			GPIO.output(row, GPIO.HIGH)
+
+			for column in CONFIG["columns"]:
+				if GPIO.input(column):
+					button_id = (CONFIG["rows"].index(row) * 3) + (CONFIG["columns"].index(column) + 1)
+					press(button_id)
+					start = time.time()
+
+				time.sleep(0.021)
+
+			GPIO.output(row, GPIO.LOW)
+
+
+def press(button_id):
     await recognize_func(*args, **kwargs)
 
-async def time():
-	import time
-	start = time.time()
-	await asyncio.sleep(2)
-	print(time.time()-start)
+	lcd_display = LCD_DEVICE.message[4:len(LCD_DEVICE.message)]
+	lcd_display_length = len(LCD_DEVICE.message[4:len(LCD_DEVICE.message)])
 
-def test(func):
-	loop = asyncio.new_event_loop()
-	task = loop.create_task(async_helper(func))
-	loop.run_until_complete(task)
+	if button_id == 12 and lcd_display_length == 5:
+		student_info = submit(lcd_display)
+	elif (button_id <= 9 or button_id == 11) and lcd_display_length <= 5:
+		LCD_DEVICE.set_message(LCD_DEVICE.message + button_id if button_id != 11 else "0")
+	elif button_id == 10 and lcd_display_length > 0:
+		LCD_DEVICE.set_message(LCD_DEVICE.message[0:lcd_display_length - 1])
