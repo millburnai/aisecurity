@@ -25,11 +25,10 @@ from termcolor import cprint
 
 from aisecurity.database import log
 from aisecurity.privacy.encryptions import DataEncryption
-from aisecurity.utils import lcd
-from aisecurity.utils import keypad
+from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.misc import timer, HidePrints
 from aisecurity.utils.paths import CONFIG_HOME
-from aisecurity.utils.preprocessing import IMG_CONSTANTS, normalize, align_imgs
+from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, align_imgs
 
 
 # FACENET
@@ -313,7 +312,7 @@ class FaceNet:
                         keypad.monitor(seconds=3)
                     # elif last_best_match != best_match:
                     #     keypad.monitor(0)
-                    # FIXME: 
+                    # FIXME:
                     #  1. above lines should be changed and use log.current_log instead of making another local var
                     #  2. use of 3 is ambiguous-- add to keypad.CONFIG)
                     #  3. keypad.monitor(0) should be replaced with a reset or flush function if that's what it does
@@ -345,7 +344,7 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, logging="firebase", use_dynamic=False, use_picam=False,
-                            use_graphics=True, framerate=20, resize=None, use_lcd=False, flip=0, use_keypad=False):
+                            use_graphics=True, framerate=20, resize=None, use_lcd=False, use_keypad=False, flip=0):
         assert width > 0 and height > 0, "width and height must be positive integers"
         assert not logging or logging == "mysql" or logging == "firebase", "only mysql and firebase database supported"
         assert 0 < framerate <= 120, "framerate must be between 0 and 120"
