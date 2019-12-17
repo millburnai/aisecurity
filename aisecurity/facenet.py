@@ -15,7 +15,6 @@ import warnings
 
 import cv2
 import keras
-from keypad import keypad
 from keras import backend as K
 import matplotlib.pyplot as plt
 from mtcnn.mtcnn import MTCNN
@@ -27,6 +26,7 @@ from termcolor import cprint
 from aisecurity.database import log
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.utils import lcd
+from aisecurity.utils import keypad
 from aisecurity.utils.misc import timer, HidePrints
 from aisecurity.utils.paths import CONFIG_HOME
 from aisecurity.utils.preprocessing import IMG_CONSTANTS, normalize, align_imgs
@@ -39,11 +39,10 @@ class FaceNet:
     # HYPERPARAMETERS
     HYPERPARAMS = {
         "alpha": 0.75,
-        "mtcnn_alpha": 0.9,
-        "error": 0.1
+        "mtcnn_alpha": 0.9
     }
 
-    # CONSTANTS (for TF-TRT)
+    # CONSTANTS (FOR TF-TRT)
     CONSTANTS = {
         "ms_celeb_1m": {
             "inputs": ["input_1"],
@@ -169,6 +168,7 @@ class FaceNet:
 
     def predict(self, paths_or_imgs, margin=IMG_CONSTANTS["margin"], faces=None, checkup=False):
         l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
+
         if self.MODE == "keras":
             predict = lambda imgs: self.facenet.predict(imgs)
         elif self.MODE == "tf-trt":
@@ -202,14 +202,13 @@ class FaceNet:
             best_matches.append((pred, np.linalg.norm(embedding - data[pred])))
         best_match, l2_dist = sorted(best_matches, key=lambda n: n[1])[0]
         is_recognized = l2_dist <= FaceNet.HYPERPARAMS["alpha"]
-        prompt_keypad = l2_dist <= FaceNet.HYPERPARAMS["alpha"] + FaceNet.HYPERPARAMS["error"]
 
-        return embedding, is_recognized, best_match, l2_dist, prompt_keypad
+        return embedding, is_recognized, best_match, l2_dist
 
     # FACIAL RECOGNITION
     def recognize(self, img, verbose=True):
         # img can be a path, image, database name, or embedding
-        _, is_recognized, best_match, l2_dist, prompt_keypad = self._recognize(img)
+        _, is_recognized, best_match, l2_dist = self._recognize(img)
 
         if verbose:
             if is_recognized:
@@ -218,7 +217,7 @@ class FaceNet:
                 print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
                     best_match, l2_dist))
 
-        return is_recognized, best_match, l2_dist, prompt_keypad
+        return is_recognized, best_match, l2_dist
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
@@ -226,15 +225,16 @@ class FaceNet:
                                    resize, use_lcd, flip, use_keypad):
         # INITS
         db_types = ["static"]
-        use_server = False
 
         if use_dynamic:
             db_types.append("dynamic")
         if logging:
             log.init(flush=True, logging=logging)
-            use_server = log.server_init()
+            log.server_init()
         if use_lcd:
             lcd.init()
+        if use_keypad:
+            keypad.init()
         if resize:
             mtcnn_width, mtcnn_height = width * resize, height * resize
         else:
@@ -288,7 +288,7 @@ class FaceNet:
 
                 # facial recognition
                 try:
-                    embedding, is_recognized, best_match, l2_dist, prompt_keypad = self._recognize(frame, db_types, faces=face)
+                    embedding, is_recognized, best_match, l2_dist = self._recognize(frame, db_types, faces=face)
                     print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
                 except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                     if "query data dimension" in str(error):
@@ -301,8 +301,6 @@ class FaceNet:
                         raise error
                     continue
 
-                last_best_match = best_match
-
                 # add graphics, lcd, and do logging
                 if use_graphics:
                     self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match, resize)
@@ -311,13 +309,17 @@ class FaceNet:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
                 if use_keypad: 
-                    if prompt_keypad:
-                        keypad.monitor(3)
-                    else if last_best_match != best_match:
-                        keypad.monitor(0)
+                    if is_recognized:
+                        keypad.monitor(seconds=3)
+                    # elif last_best_match != best_match:
+                    #     keypad.monitor(0)
+                    # FIXME: 
+                    #  1. above lines should be changed and use log.current_log instead of making another local var
+                    #  2. use of 3 is ambiguous-- add to keypad.CONFIG)
+                    #  3. keypad.monitor(0) should be replaced with a reset or flush function if that's what it does
 
-                if logging and frames > 5:
-                    self.log_activity(is_recognized, best_match, logging, use_dynamic, embedding, use_server)
+                if logging and frames > 5:  # five frames before logging starts
+                    self.log_activity(is_recognized, best_match, logging, use_dynamic, embedding)
 
                     log.L2_DISTS.append(l2_dist)
 
@@ -340,19 +342,17 @@ class FaceNet:
         cap.release()
         cv2.destroyAllWindows()
 
+
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, logging="firebase", use_dynamic=False, use_picam=False,
                             use_graphics=True, framerate=20, resize=None, use_lcd=False, flip=0, use_keypad=False):
         assert width > 0 and height > 0, "width and height must be positive integers"
-        assert not logging or (logging == "mysql" or logging == "firebase"), "only mysql and firebase database supported"
+        assert not logging or logging == "mysql" or logging == "firebase", "only mysql and firebase database supported"
         assert 0 < framerate <= 120, "framerate must be between 0 and 120"
         assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
 
         async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
-
-        if use_keypad:
-            keypad.init()
 
         loop = asyncio.new_event_loop()
         task = loop.create_task(async_helper(self._real_time_recognize, width, height, logging, use_dynamic,
@@ -473,7 +473,7 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, is_recognized, best_match, logging_type, use_dynamic, embedding, use_server):
+    def log_activity(self, is_recognized, best_match, logging_type, use_dynamic, embedding):
         firebase = True if logging_type == "firebase" else False
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
@@ -488,7 +488,7 @@ class FaceNet:
 
                 cprint("Regular activity logged ({})".format(best_match), color="green", attrs=["bold"])
 
-                lcd.add_lcd_display(best_match, use_server)  # will silently fail if lcd not supported
+                lcd.add_lcd_display(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
         elif log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.UNK_LAST_LOGGED):
             log.log_unknown("<DEPRECATED>", firebase=firebase)
