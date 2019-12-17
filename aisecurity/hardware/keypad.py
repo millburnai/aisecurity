@@ -1,6 +1,6 @@
 """
 
-"aisecurity.utils.keypad"
+"aisecurity.hardware.keypad"
 
 Keypad utils.
 

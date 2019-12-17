@@ -1,6 +1,6 @@
 """
 
-"aisecurity.utils.lcd"
+"aisecurity.hardware.lcd"
 
 LCD utils.
 
