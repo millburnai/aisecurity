@@ -60,6 +60,10 @@ def submit(student_id):
 
 
 def monitor(seconds):
+	# FIXME:
+	#  1. monitor should be asynchronous. previous asyncio code needed to be heavily refactored so best just to rewrite.
+	#  2. setting the LCD_DEVICE from a non-lcd.py function is not recommended, as it could screw with the lcd code
+	#  3. add a config entry for 0.021 seconds and 3 and 1 (line ~79)-- what does it do?
 
 	LCD_DEVICE.set_message = "ID: "
 	start = time.time()
@@ -82,7 +86,10 @@ def monitor(seconds):
 
 
 def press(button_id):
-    await recognize_func(*args, **kwargs)
+	# FIXME:
+	#  1. what does press do? why is it called press?
+	#  2. numbers 4, 12, 5, 9, 11, 10, and 0 should go in the config dict (need to have meaningful key entries)
+	#  3. what is the point of student_info? it's not returned
 
 	lcd_display = LCD_DEVICE.message[4:len(LCD_DEVICE.message)]
 	lcd_display_length = len(LCD_DEVICE.message[4:len(LCD_DEVICE.message)])
