@@ -35,6 +35,8 @@ NUM_RECOGNIZED, NUM_UNKNOWN = None, None
 LAST_LOGGED, UNK_LAST_LOGGED = None, None
 CURRENT_LOG, L2_DISTS = None, None
 
+USE_SERVER = None
+
 
 # LOGGING INIT AND HELPERS
 def init(flush=False, thresholds=None, logging="firebase"):
@@ -82,10 +84,12 @@ def init(flush=False, thresholds=None, logging="firebase"):
 
 
 def server_init():
+    global USE_SERVER
+
     try:
         print("Connecting to server...")
         requests.get(CONFIG["server_address"], timeout=1.)
-        use_server = True
+        USE_SERVER = True
     except (requests.exceptions.Timeout, requests.exceptions.MissingSchema, KeyError) as error:
         if isinstance(error, requests.exceptions.Timeout):
             warnings.warn("ID server unreachable")
@@ -93,9 +97,7 @@ def server_init():
             warnings.warn("Invalid server address in config")
         elif isinstance(error, KeyError):
             warnings.warn("Server address missing in config")
-        use_server = False
-
-    return use_server
+        USE_SERVER = False
 
 
 def get_now(seconds):
