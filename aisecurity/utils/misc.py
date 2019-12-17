@@ -6,6 +6,7 @@ Miscellaneous tools.
 
 """
 
+import asyncio
 import functools
 import os
 import sys
@@ -37,3 +38,13 @@ def timer(message="Time elapsed"):
         return _func
 
     return _timer
+
+
+# ASYNC
+def run_async_method(func, *args, **kwargs):
+    async def async_helper(func, *args, **kwargs):
+        await func(*args, **kwargs)
+
+    loop = asyncio.new_event_loop()
+    task = loop.create_task(async_helper(func, *args, **kwargs))
+    loop.run_until_complete(task)

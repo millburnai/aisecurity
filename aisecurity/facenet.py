@@ -26,7 +26,7 @@ from termcolor import cprint
 from aisecurity.database import log
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
-from aisecurity.utils.misc import timer, HidePrints
+from aisecurity.utils.misc import timer, HidePrints, run_async_method
 from aisecurity.utils.paths import CONFIG_HOME
 from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, align_imgs
 
@@ -307,7 +307,7 @@ class FaceNet:
                 if use_lcd and is_recognized:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
-                if use_keypad: 
+                if use_keypad:
                     if is_recognized:
                         run_async_method(keypad.monitor)
                     elif last_best_match != best_match:
@@ -341,13 +341,6 @@ class FaceNet:
         cap.release()
         cv2.destroyAllWindows()
 
-    async def async_helper(recognize_func, *args, **kwargs):
-            await recognize_func(*args, **kwargs)
-
-    def run_async_method(func, *args, **kwargs):
-        loop = asyncio.new_event_loop()
-        task = loop.crete_task(async_helper(func, *args, **kwargs))
-        loop.run_until_complete(task)
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, logging="firebase", use_dynamic=False, use_picam=False,
@@ -358,7 +351,7 @@ class FaceNet:
         assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
 
         run_async_method(self._real_time_recognize, width, height, logging, use_dynamic,
-                                             use_picam, use_graphics, framerate, resize, use_lcd, flip, use_keypad)
+                         use_picam, use_graphics, framerate, resize, use_lcd, flip, use_keypad)
 
 
     # GRAPHICS
