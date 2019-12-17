@@ -309,9 +309,9 @@ class FaceNet:
 
                 if use_keypad: 
                     if is_recognized:
-                        keypad.monitor(seconds=3)
-                    # elif last_best_match != best_match:
-                    #     keypad.monitor(0)
+                        run_async_method(keypad.monitor)
+                    elif last_best_match != best_match:
+                         keypad.CONFIG["continue"] = False
                     # FIXME:
                     #  1. above lines should be changed and use log.current_log instead of making another local var
                     #  2. use of 3 is ambiguous-- add to keypad.CONFIG)
@@ -350,14 +350,16 @@ class FaceNet:
         assert 0 < framerate <= 120, "framerate must be between 0 and 120"
         assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
 
-        async def async_helper(recognize_func, *args, **kwargs):
+        run_async_method(self._real_time_recognize, width, height, logging, use_dynamic,
+                                             use_picam, use_graphics, framerate, resize, use_lcd, flip, use_keypad)
+
+    async def async_helper(recognize_func, *args, **kwargs):
             await recognize_func(*args, **kwargs)
 
+    def run_async_method(func, *args, **kwargs):
         loop = asyncio.new_event_loop()
-        task = loop.create_task(async_helper(self._real_time_recognize, width, height, logging, use_dynamic,
-                                             use_picam, use_graphics, framerate, resize, use_lcd, flip, use_keypad))
+        task = loop.crete_task(async_helper(func, *args, **kwargs))
         loop.run_until_complete(task)
-
 
     # GRAPHICS
     @staticmethod
