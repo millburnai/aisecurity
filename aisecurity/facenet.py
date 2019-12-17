@@ -341,6 +341,13 @@ class FaceNet:
         cap.release()
         cv2.destroyAllWindows()
 
+    async def async_helper(recognize_func, *args, **kwargs):
+            await recognize_func(*args, **kwargs)
+
+    def run_async_method(func, *args, **kwargs):
+        loop = asyncio.new_event_loop()
+        task = loop.crete_task(async_helper(func, *args, **kwargs))
+        loop.run_until_complete(task)
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, logging="firebase", use_dynamic=False, use_picam=False,
@@ -353,13 +360,6 @@ class FaceNet:
         run_async_method(self._real_time_recognize, width, height, logging, use_dynamic,
                                              use_picam, use_graphics, framerate, resize, use_lcd, flip, use_keypad)
 
-    async def async_helper(recognize_func, *args, **kwargs):
-            await recognize_func(*args, **kwargs)
-
-    def run_async_method(func, *args, **kwargs):
-        loop = asyncio.new_event_loop()
-        task = loop.crete_task(async_helper(func, *args, **kwargs))
-        loop.run_until_complete(task)
 
     # GRAPHICS
     @staticmethod
