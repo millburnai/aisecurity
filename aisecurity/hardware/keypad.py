@@ -91,7 +91,7 @@ async def monitor():
 
                 time.sleep(0.021)
 
-             GPIO.output(row, GPIO.LOW)
+            GPIO.output(row, GPIO.LOW)
 
 
 def press(button_id):
