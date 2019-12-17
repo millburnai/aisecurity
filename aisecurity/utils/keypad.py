@@ -49,11 +49,11 @@ class keypad(object):
 
 	def press(button_id, lcd):
 
-		if button_id == 12 and current_input(lcd) == 5:
+		if button_id == 12 and len(current_input(lcd) == 5):
 			student_info = submit(current_input(lcd))
 		else if button_id <= 9 or button_id == 11:
 			LCD_DEVICE.set_message(LCD_DEVICE.message + str(button_id if button_id != 11 else 0))
-		else if button_id == 10 and current_input(lcd) > 0:
+		else if button_id == 10 and len(current_input(lcd) > 0):
 			LCD_DEVICE.set_message(LCD_DEVICE.message[0 : len(LCD_DEVICE.message) - 1])
 
 
