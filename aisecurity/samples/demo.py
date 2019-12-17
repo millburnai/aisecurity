@@ -45,7 +45,7 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
 
 
     # demo
-    cprint("\nLoading faciall recognition system", attrs=["bold"], end="")
+    cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
     try:
         facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.pb".format(model))
@@ -55,7 +55,6 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
     cprint("\nLoading encrypted database", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
     facenet.set_data(retrieve_embeds(DATABASE, encrypted="names"))
-
 
     input("\nPress ENTER to continue:")
     facenet.real_time_recognize(logging=logging, use_dynamic=use_dynamic, use_picam=use_picam,
