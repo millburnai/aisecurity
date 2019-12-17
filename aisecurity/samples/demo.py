@@ -8,7 +8,7 @@ Demonstration of facial recognition system.
 
 
 def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, use_picam=False, use_graphics=True,
-         use_lcd=False, resize=None, flip=0, allow_gpu_growth=False, verbose=False):
+         use_lcd=False, use_keypad=False, resize=None, flip=0, allow_gpu_growth=False, verbose=False):
 
     # imports
     if not verbose:
@@ -40,7 +40,7 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
     from termcolor import cprint
 
     from aisecurity.facenet import FaceNet
-    from aisecurity.utils.dataflow import retrieve_embeds
+    from aisecurity.data.dataflow import retrieve_embeds
     from aisecurity.utils.paths import DATABASE, CONFIG_HOME
 
 
@@ -58,7 +58,8 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
 
     input("\nPress ENTER to continue:")
     facenet.real_time_recognize(logging=logging, use_dynamic=use_dynamic, use_picam=use_picam,
-                                use_graphics=use_graphics, resize=resize, use_lcd=use_lcd, flip=flip)
+                                use_graphics=use_graphics, resize=resize, use_lcd=use_lcd, use_keypad=use_keypad,
+                                flip=flip)
 
 
 if __name__ == "__main__":
@@ -104,6 +105,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_picam", help="use Picamera (default: False)", type=to_bool, default=False)
     parser.add_argument("--use_graphics", help="display graphics (default: True)", type=to_bool, default=True)
     parser.add_argument("--use_lcd", help="use LCD display (default: False)", type=to_bool, default=False)
+    parser.add_argument("--use_keypad", help="use keypad display (default: False)", type=to_bool, default=False)
     parser.add_argument("--resize", help="resize frame for faster recognition (default: None)", type=bounded_float,
                         default=None)
     parser.add_argument("--flip", help="flip method: +1 = +90º rotation (default: 0)", type=to_int, default=0)
@@ -116,4 +118,4 @@ if __name__ == "__main__":
     # DEMO
     demo(model=args.model, path=args.path_to_model, logging=args.logging, use_dynamic=args.use_dynamic,
          use_picam=args.use_picam, use_graphics=args.use_graphics, resize=args.resize, use_lcd=args.use_lcd,
-         flip=args.flip, allow_gpu_growth=args.allow_gpu_growth, verbose=args.verbose)
+         use_keypad=args.use_keypad, flip=args.flip, allow_gpu_growth=args.allow_gpu_growth, verbose=args.verbose)
