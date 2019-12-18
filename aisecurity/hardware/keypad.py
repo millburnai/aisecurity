@@ -16,11 +16,7 @@ import requests
 # ---------------- INITS ----------------
 
 # AUTOINIT
-try:
-    from lcd import GPIO, LCD_DEVICE
-except ImportError:
-    warnings.warn("Keypad not supported")
-
+from lcd import GPIO, LCD_DEVICE
 
 # CONFIG AND GLOBALS
 CONFIG = {
