@@ -16,7 +16,7 @@ import requests
 # ---------------- INITS ----------------
 
 # AUTOINIT
-from lcd import GPIO, LCD_DEVICE
+from aisecurity.hardware.lcd import GPIO, LCD_DEVICE
 
 # CONFIG AND GLOBALS
 CONFIG = {
