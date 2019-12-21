@@ -36,7 +36,7 @@ def online_load(facenet, img_dir, people=None):
 
 # LONG TERM STORAGE
 @timer(message="Data dumping time")
-def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, ignore_encrypt=None,
+def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, mode="w+", ignore_encrypt=None,
                 retrieve_encryption=None):
 
     if ignore_encrypt == "all":
@@ -55,7 +55,7 @@ def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=
 
     encrypted_data = DataEncryption.encrypt_data(embeds_dict, ignore=ignore_encrypt)
 
-    with open(dump_path, "w+") as json_file:
+    with open(dump_path, mode) as json_file:
         json.dump(encrypted_data, json_file, indent=4, ensure_ascii=False)
 
 
