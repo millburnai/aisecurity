@@ -23,7 +23,7 @@ from aisecurity.utils.paths import CONFIG
 
 # AUTOINIT
 COLORS = None
-LCD_DEVICE, PROGRESS_BAR = None, None
+LCD_DEVICE, PROGRESS_BAR, GPIO = None, None, None
 
 try:
     import Jetson.GPIO as GPIO
