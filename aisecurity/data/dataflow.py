@@ -17,7 +17,10 @@ from aisecurity.utils.misc import timer
 
 # LOAD ON THE FLY
 @timer(message="Data preprocessing time")
-def online_load(facenet, img_dir, people=None):
+def online_load(facenet, img_dir, error_path, people=None):
+
+    errored_imgs = []
+
     if people is None:
         people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
 
@@ -29,14 +32,19 @@ def online_load(facenet, img_dir, people=None):
                 pbar.update()
             except AssertionError:
                 warnings.warn("face not found in {}".format(person))
+                if error_path: errored_imgs.append(person)
                 continue
+
+    if error_path:
+        with open(error_path, 'a+') as json_file:
+            json.dump(errored_imgs, json_file)
 
     return data
 
 
 # LONG TERM STORAGE
 @timer(message="Data dumping time")
-def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, mode="w+", ignore_encrypt=None,
+def dump_embeds(facenet, img_dir, dump_path, error_path = None, retrieve_path=None, full_overwrite=False, mode="w+", ignore_encrypt=None,
                 retrieve_encryption=None):
 
     if ignore_encrypt == "all":
@@ -47,11 +55,11 @@ def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=
     if not full_overwrite:
         old_embeds = retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path,
                                      encrypted=retrieve_encryption)
-        new_embeds = online_load(facenet, img_dir)
+        new_embeds = online_load(facenet, img_dir, error_path)
 
         embeds_dict = {**old_embeds, **new_embeds}  # combining dicts and overwriting any duplicates with new_embeds
     else:
-        embeds_dict = online_load(facenet, img_dir)
+        embeds_dict = online_load(facenet, img_dir, error_path)
 
     encrypted_data = DataEncryption.encrypt_data(embeds_dict, ignore=ignore_encrypt)
 
