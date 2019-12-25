@@ -17,14 +17,12 @@ from aisecurity.utils.misc import timer
 
 # LOAD ON THE FLY
 @timer(message="Data preprocessing time")
-def online_load(facenet, img_dir, error_path, people=None):
-
-    errored_imgs = []
-
+def online_load(facenet, img_dir, people=None):
     if people is None:
         people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
 
     data = {}
+    no_faces = []
     with tqdm.trange(len(people)) as pbar:
         for person in people:
             try:
@@ -32,51 +30,36 @@ def online_load(facenet, img_dir, error_path, people=None):
                 pbar.update()
             except AssertionError:
                 warnings.warn("face not found in {}".format(person))
-                if error_path: errored_imgs.append(person)
+                no_faces.append(person)
                 continue
 
-    if error_path:
-        with open(error_path, 'a+') as json_file:
-            json.dump(errored_imgs, json_file)
-
-    return data
+    return data, no_faces
 
 
 # LONG TERM STORAGE
 @timer(message="Data dumping time")
-def dump_embeds(facenet, img_dir, dump_path, error_path = None, retrieve_path=None, full_overwrite=False, mode="w+", ignore_encrypt=None,
-                retrieve_encryption=None, return_data=False, encrypted_data=None):
+def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, ignore_encrypt=None,
+                retrieve_encryption=None, mode="a+"):
+    if ignore_encrypt == "all":
+        ignore_encrypt = ["names", "embeddings"]
+    elif ignore_encrypt is not None:
+        ignore_encrypt = [ignore_encrypt]
 
-    def dump():
-        with open(dump_path, mode) as json_file:
-            json.dump(encrypted_data, json_file, indent=4, ensure_ascii=False)
+    if not full_overwrite:
+        old_embeds = retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path,
+                                     encrypted=retrieve_encryption)
+        new_embeds, no_faces = online_load(facenet, img_dir)
 
-    if not encrypted_data:
-
-        if ignore_encrypt == "all":
-            ignore_encrypt = ["names", "embeddings"]
-        elif ignore_encrypt is not None:
-            ignore_encrypt = [ignore_encrypt]
-
-        if not full_overwrite:
-            old_embeds = retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path,
-                                         encrypted=retrieve_encryption)
-            new_embeds = online_load(facenet, img_dir, error_path)
-
-            embeds_dict = {**old_embeds, **new_embeds}  # combining dicts and overwriting any duplicates with new_embeds
-        else:
-            embeds_dict = online_load(facenet, img_dir, error_path)
-
-        encrypted_data = DataEncryption.encrypt_data(embeds_dict, ignore=ignore_encrypt)
-
-        if not return_data:
-            dump()
-
-        else:
-            return encrypted_data
-
+        embeds_dict = {**old_embeds, **new_embeds}  # combining dicts and overwriting any duplicates with new_embeds
     else:
-        dump()
+        embeds_dict, no_faces = online_load(facenet, img_dir)
+
+    encrypted_data = DataEncryption.encrypt_data(embeds_dict, ignore=ignore_encrypt)
+
+    with open(dump_path, mode) as json_file:
+        json.dump(encrypted_data, json_file, indent=4, ensure_ascii=False)
+
+    return encrypted_data, no_faces
 
 
 @timer(message="Data retrieval time")
