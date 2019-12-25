@@ -127,15 +127,10 @@ class DataEncryption:
 
         decrypted = {}
         for nonce_pos, encrypted_name in enumerate(data):
-            print(encrypted_name)
-            print("ree")
             name, embed = encrypted_name, data[encrypted_name]
             if "names" not in ignore:
                 name = decrypt(bytes([ord(c) for c in encrypted_name]), key_type="names", position=nonce_pos)
-                print(name)
-                print(type(name))
-                name = str(name, "utf-8")
-                name = name.decode("utf-8")
+                name = name.decode("utf8")
             if "embeddings" not in ignore:
                 byte_embed = decrypt(bytes(data[encrypted_name]), key_type="embeddings", position=nonce_pos)
                 embed = np.array(list(struct.unpack("%sd" % (len(byte_embed) // 8), byte_embed)), dtype=np.float32)
