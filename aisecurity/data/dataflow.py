@@ -45,26 +45,38 @@ def online_load(facenet, img_dir, error_path, people=None):
 # LONG TERM STORAGE
 @timer(message="Data dumping time")
 def dump_embeds(facenet, img_dir, dump_path, error_path = None, retrieve_path=None, full_overwrite=False, mode="w+", ignore_encrypt=None,
-                retrieve_encryption=None):
+                retrieve_encryption=None, return_data=False, encrypted_data=None):
 
-    if ignore_encrypt == "all":
-        ignore_encrypt = ["names", "embeddings"]
-    elif ignore_encrypt is not None:
-        ignore_encrypt = [ignore_encrypt]
+    def dump():
+        with open(dump_path, mode) as json_file:
+            json.dump(encrypted_data, json_file, indent=4, ensure_ascii=False)
 
-    if not full_overwrite:
-        old_embeds = retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path,
-                                     encrypted=retrieve_encryption)
-        new_embeds = online_load(facenet, img_dir, error_path)
+    if not encrypted_data:
 
-        embeds_dict = {**old_embeds, **new_embeds}  # combining dicts and overwriting any duplicates with new_embeds
+        if ignore_encrypt == "all":
+            ignore_encrypt = ["names", "embeddings"]
+        elif ignore_encrypt is not None:
+            ignore_encrypt = [ignore_encrypt]
+
+        if not full_overwrite:
+            old_embeds = retrieve_embeds(retrieve_path if retrieve_path is not None else dump_path,
+                                         encrypted=retrieve_encryption)
+            new_embeds = online_load(facenet, img_dir, error_path)
+
+            embeds_dict = {**old_embeds, **new_embeds}  # combining dicts and overwriting any duplicates with new_embeds
+        else:
+            embeds_dict = online_load(facenet, img_dir, error_path)
+
+        encrypted_data = DataEncryption.encrypt_data(embeds_dict, ignore=ignore_encrypt)
+
+        if not return_data:
+            dump()
+
+        else:
+            return encrypted_data
+
     else:
-        embeds_dict = online_load(facenet, img_dir, error_path)
-
-    encrypted_data = DataEncryption.encrypt_data(embeds_dict, ignore=ignore_encrypt)
-
-    with open(dump_path, mode) as json_file:
-        json.dump(encrypted_data, json_file, indent=4, ensure_ascii=False)
+        dump()
 
 
 @timer(message="Data retrieval time")
