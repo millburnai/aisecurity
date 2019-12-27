@@ -10,14 +10,17 @@ import json
 import os
 import tqdm
 import warnings
+from mtcnn.mtcnn import MTCNN
+import cv2
 
 from aisecurity.privacy.encryptions import DataEncryption
-from aisecurity.utils.misc import timer
+from aisecurity.utils.misc import timer, isolate_face
 
 
 # LOAD ON THE FLY
 @timer(message="Data preprocessing time")
 def online_load(facenet, img_dir, people=None):
+    mtcnn = MTCNN()
     if people is None:
         people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
 

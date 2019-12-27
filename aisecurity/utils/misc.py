@@ -30,6 +30,11 @@ def time_limit(seconds):
     finally:
         signal.alarm(0)
 
+def isolate_face(result, frame):
+    box = result[0]['box']
+    cropped_img = frame[int(.75 * box[0]): int(1.25 * (box[0] + box[2])), int(.75 * box[1]): int(1.25 * (box[1] + box[3]))]
+    return cropped_img
+
 
 # PRINT HANDLING
 class HidePrints:
