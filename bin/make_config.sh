@@ -38,6 +38,8 @@ if [ ! -d "$config_path/models" ] ; then
   || echo "Error: MS-Celeb-1M model could not be downloaded"
   wget -O "vgg_face_2.h5" "https://www.dropbox.com/s/4xo8uuhu9ug8ir3/vgg_face_2.h5?dl=1" \
   || echo "Error: VGGFace2 model could not be downloaded"
+  wget -O "haarcascade_frontalface_default.xml" "https://www.dropbox.com/s/mk75ue9k65u0sx9/haarcascade_frontalface_default.xml?dl=0" \
+  || echo "Error: haarcascade model could not be downloaded"
 fi
 
 if [ ! -d "$HOME/.aisecurity/keys" ] ; then
