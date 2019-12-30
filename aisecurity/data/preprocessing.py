@@ -5,6 +5,7 @@
 Preprocessing for FaceNet.
 
 """
+from aisecurity.utils.paths import CONFIG_HOME
 
 import cv2
 from mtcnn.mtcnn import MTCNN
@@ -15,7 +16,8 @@ import numpy as np
 IMG_CONSTANTS = {
     "margin": 10,
     "img_size": (None, None),
-    "mtcnn": MTCNN()
+    "mtcnn": MTCNN(),
+    "face_cascade": cv2.CascadeClassifier(CONFIG_HOME + '/models/haarcascade_frontalface_default.xml')
 }
 
 
@@ -37,8 +39,12 @@ def align_imgs(paths_or_imgs, margin, faces=None, checkup=False):
         if not checkup:
             if not faces:
                 found = IMG_CONSTANTS["mtcnn"].detect_faces(img)
-                assert len(found) != 0, "face was not found in {}".format(path_or_img)
-                faces = found[0]["box"]
+                if len(found) != 0:
+                    faces = found[0]["box"]
+                else:
+                    found = IMG_CONSTANTS["face_cascade"].detectMultiScale(img, scaleFactor=1.1)
+                    assert len(found) != 0, "face was not found in {}".format(path_or_img)
+                    faces = found[0]
 
             x, y, width, height = faces
             img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
