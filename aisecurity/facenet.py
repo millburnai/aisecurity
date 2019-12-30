@@ -26,7 +26,7 @@ from termcolor import cprint
 from aisecurity.database import log
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
-from aisecurity.utils.misc import timer, HidePrints, run_async_method, isolate_face
+from aisecurity.utils.misc import timer, HidePrints, run_async_method
 from aisecurity.utils.paths import CONFIG_HOME
 from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces
 
