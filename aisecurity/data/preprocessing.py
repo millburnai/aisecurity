@@ -5,6 +5,7 @@
 Preprocessing for FaceNet.
 
 """
+
 from aisecurity.utils.paths import CONFIG_HOME
 
 import cv2
@@ -17,7 +18,7 @@ IMG_CONSTANTS = {
     "margin": 10,
     "img_size": (None, None),
     "mtcnn": MTCNN(),
-    "face_cascade": cv2.CascadeClassifier(CONFIG_HOME + '/models/haarcascade_frontalface_default.xml')
+    "cascade": cv2.CascadeClassifier(CONFIG_HOME + "/models/haarcascade_frontalface_default.xml")
 }
 
 
@@ -28,9 +29,9 @@ def normalize(x):
     return normalized
 
 
-def align_imgs(paths_or_imgs, margin, faces=None, checkup=False):
+def crop_faces(paths_or_imgs, margin, faces=None, checkup=False):
 
-    def align_img(path_or_img, faces, checkup):
+    def crop_face(path_or_img, faces, checkup):
         try:
             img = cv2.imread(path_or_img).astype(np.uint8)
         except (SystemError, TypeError):  # if img is actually image
@@ -42,7 +43,7 @@ def align_imgs(paths_or_imgs, margin, faces=None, checkup=False):
                 if len(found) != 0:
                     faces = found[0]["box"]
                 else:
-                    found = IMG_CONSTANTS["face_cascade"].detectMultiScale(img, scaleFactor=1.1)
+                    found = IMG_CONSTANTS["cascade"].detectMultiScale(img, scaleFactor=1.1)
                     assert len(found) != 0, "face was not found in {}".format(path_or_img)
                     faces = found[0]
 
@@ -52,4 +53,4 @@ def align_imgs(paths_or_imgs, margin, faces=None, checkup=False):
         resized = cv2.resize(img, IMG_CONSTANTS["img_size"])
         return resized
 
-    return np.array([align_img(path_or_img, faces, checkup) for path_or_img in paths_or_imgs])
+    return np.array([crop_face(path_or_img, faces, checkup) for path_or_img in paths_or_imgs])

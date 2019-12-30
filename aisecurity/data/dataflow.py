@@ -10,19 +10,14 @@ import json
 import os
 import tqdm
 import warnings
-from mtcnn.mtcnn import MTCNN
-import cv2
 
 from aisecurity.privacy.encryptions import DataEncryption
-from aisecurity.utils.misc import timer, isolate_face
-from aisecurity.utils.paths import CONFIG_HOME
+from aisecurity.utils.misc import timer
 
 
 # LOAD ON THE FLY
 @timer(message="Data preprocessing time")
 def online_load(facenet, img_dir, people=None):
-    mtcnn = MTCNN()
-    face_cascade = cv2.CascadeClassifier(CONFIG_HOME + '/models/haarcascade_frontalface_default.xml')
     if people is None:
         people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
 

@@ -28,7 +28,7 @@ from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.misc import timer, HidePrints, run_async_method, isolate_face
 from aisecurity.utils.paths import CONFIG_HOME
-from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, align_imgs
+from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces
 
 
 # FACENET
@@ -174,8 +174,8 @@ class FaceNet:
             output_tensor = self.facenet.get_tensor_by_name(self.output_name)
             predict = lambda imgs: self.sess.run(output_tensor, {self.input_name: imgs})
 
-        aligned_imgs = normalize(align_imgs(paths_or_imgs, margin, faces=faces, checkup=checkup))
-        raw_embeddings = predict(aligned_imgs)
+        cropped_imgs = normalize(crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup))
+        raw_embeddings = predict(cropped_imgs)
         normalized_embeddings = l2_normalize(raw_embeddings)
 
         return normalized_embeddings
