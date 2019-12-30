@@ -38,6 +38,8 @@ if [ ! -d "$config_path/models" ] ; then
   || echo "Error: MS-Celeb-1M model could not be downloaded"
   wget -O "vgg_face_2.h5" "https://www.dropbox.com/s/4xo8uuhu9ug8ir3/vgg_face_2.h5?dl=1" \
   || echo "Error: VGGFace2 model could not be downloaded"
+  wget -O "haarcascade_frontalface_default.xml" "https://www.dropbox.com/s/mk75ue9k65u0sx9/haarcascade_frontalface_default.xml?dl=0" \
+  || echo "Error: haarcascade model could not be downloaded"
 fi
 
 if [ ! -d "$HOME/.aisecurity/keys" ] ; then
@@ -64,22 +66,3 @@ if [ ! -d "$HOME/.aisecurity/logging" ] ; then
   echo "Fill in '$config_path/logging/firebase.json' and a key file in the same directory to use firebase logging"
   mkdir unknown
 fi
-
-:' if [ ! -d "$HOME/etc/systemd/system/rc-local.service" ] ; then
-  if [ ! -d "$HOME/etc/" ] ; then
-    echo "Creating /etc/ folder"
-    cd "$HOME"
-    mkdir /etc
-    touch rc.local
-  fi
-
-  echo "Initializing rc.local"
-  cd "$HOME/etc/systemd/system"
-  touch rc-local.service
-  cd "$config_path/bin/scripts"
-  mv "rc-local.service" "$HOME/etc/systemd/system/rc-local.service"
-  mv "rc.local" "$HOME/etc/"
-
-  echo "Successfully transferred rc.local file"
-fi
-'

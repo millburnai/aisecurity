@@ -10,7 +10,7 @@ except TimeoutException as e:
 
 import cv2
 from mtcnn.mtcnn import MTCNN
-
+'''
 img = cv2.imread("parsed_images/9/kevin_xu.jpg")
 mtcnn = MTCNN()
 box = mtcnn.detect_faces(img)[0]['box']
@@ -34,3 +34,19 @@ while(cap.isOpened()):
         break
 cap.release()
 cv2.destroyAllWindows()
+'''
+face_cascade = cv2.CascadeClassifier('/Users/michaelpilarski/Desktop/haarcascade_frontalface_default.xml')
+# Read the input image
+img = cv2.imread('/Users/michaelpilarski/Desktop/julia_aronovich_copy.png')
+# Convert into grayscale
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+# Detect faces
+faces = face_cascade.detectMultiScale(img, scaleFactor=1.1)
+# Draw rectangle around the faces
+
+
+for (x, y, w, h) in faces:
+    cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+# Display the output
+cv2.imshow('img', img)
+cv2.waitKey()
