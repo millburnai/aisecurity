@@ -66,3 +66,11 @@ if [ ! -d "$HOME/.aisecurity/logging" ] ; then
   echo "Fill in '$config_path/logging/firebase.json' and a key file in the same directory to use firebase logging"
   mkdir unknown
 fi
+
+if [ ! -f "$HOME/.aisecurity/bin/dump_embeds" ] ; then
+  echo "Importing dump_embeds script"
+  cd "$config_path/bin" || echo "Error: unable to access $config_path/bin"
+  wget -O "dump_embeds.sh" "https://raw.githubusercontent.com/orangese/aisecurity/v0.9a/bin/dump_embeds.sh" || \
+  echo "Error: dumb_embeds.sh could not be downloaded"
+  sudo chmod +x "dump_embeds.sh"
+fi
