@@ -221,7 +221,7 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, logging, use_dynamic, use_picam, use_graphics, framerate,
-                                   resize, use_lcd, flip, use_keypad, pre_recorded_file, crop_face):
+                                   resize, use_lcd, flip, use_keypad):
         # INITS
         db_types = ["static"]
 
@@ -239,7 +239,7 @@ class FaceNet:
         else:
             mtcnn_width, mtcnn_height = width, height
 
-        cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip, pre_recorded_file=pre_recorded_file)
+        cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip)
         assert cap.isOpened(), "video capture failed to initialize"
 
         mtcnn = MTCNN(min_face_size=0.5 * (mtcnn_width + mtcnn_height) / 3)
@@ -284,9 +284,6 @@ class FaceNet:
                 if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
                     print("Face poorly detected")
                     continue
-
-                if crop_face:
-                    frame = isolate_face(result, frame)
 
                 # facial recognition
                 try:
@@ -347,19 +344,19 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, logging="firebase", use_dynamic=False, use_picam=False,
-                            use_graphics=True, framerate=20, resize=None, use_lcd=False, use_keypad=False, flip=0, pre_recorded_file=None, crop_face=False):
+                            use_graphics=True, framerate=20, resize=None, use_lcd=False, use_keypad=False, flip=0):
         assert width > 0 and height > 0, "width and height must be positive integers"
         assert not logging or logging == "mysql" or logging == "firebase", "only mysql and firebase database supported"
         assert 0 < framerate <= 120, "framerate must be between 0 and 120"
         assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
 
         run_async_method(self._real_time_recognize, width, height, logging, use_dynamic,
-                         use_picam, use_graphics, framerate, resize, use_lcd, flip, use_keypad, pre_recorded_file, crop_face)
+                         use_picam, use_graphics, framerate, resize, use_lcd, flip, use_keypad)
 
 
     # GRAPHICS
     @staticmethod
-    def get_video_cap(width, height, picamera, framerate, flip, pre_recorded_file):
+    def get_video_cap(width, height, picamera, framerate, flip, device=0):
         def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=640, display_height=360,
                                 framerate=20, flip=0):
             return (
@@ -374,7 +371,7 @@ class FaceNet:
                 _gstreamer_pipeline(display_width=width, display_height=height, framerate=framerate, flip=flip),
                 cv2.CAP_GSTREAMER)
         else:
-            cap = cv2.VideoCapture(pre_recorded_file if pre_recorded_file else 0)
+            cap = cv2.VideoCapture(device)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
             return cap
