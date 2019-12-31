@@ -75,3 +75,13 @@ def retrieve_embeds(path, encrypted=None):
         return DataEncryption.decrypt_data(data, ignore=None)
     else:
         return data
+
+
+if __name__ == "__main__":
+    from aisecurity.utils.paths import DATABASE
+
+    data = retrieve_embeds(DATABASE)
+    encrypted_data = DataEncryption.encrypt_data(data, ignore=["embeddings"])
+
+    with open("embeddings.json", "w+") as json_file:
+        json.dump(encrypted_data, json_file, indent=4, ensure_ascii=False)
