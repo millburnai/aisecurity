@@ -17,10 +17,12 @@ import signal
 
 # TIME LIMIT
 # ... why do we need this?
+class TimeoutException(Exception): pass
+
 @contextmanager
 def time_limit(seconds):
     def signal_handler(signum, frame):
-        raise ValueError("Timed out!")
+        raise TimeoutException("Timed out!")
 
     signal.signal(signal.SIGALRM, signal_handler)
     signal.alarm(seconds)
@@ -29,6 +31,7 @@ def time_limit(seconds):
         yield
     finally:
         signal.alarm(0)
+
 
 
 # PRINT HANDLING
