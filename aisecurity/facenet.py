@@ -50,6 +50,13 @@ class FaceNet:
         "vgg_face_2": {
             "input": "base_input:0",
             "output": "classifier_low_dim/Softmax:0"
+        },
+        "20180402-114759": {
+            "input": "input:0",
+            "output": "embeddings:0",
+            "phase_train": {
+                "phase_train:0": False
+            }
         }
     }
 
@@ -74,11 +81,13 @@ class FaceNet:
         self.__static_db = None  # must be filled in by user
         self.__dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
 
+        self.extra_tensors = []  # extra tensors for feed dict to sess.run
+
         self.HYPERPARAMS.update(hyperparams)
 
     def _keras_init(self, filepath):
         self.facenet = keras.models.load_model(filepath)
-        IMG_CONSTANTS["img_size"] = (self.facenet.input_shape[1], self.facenet.input_shape[1])
+        IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
 
     def _trt_init(self, filepath, input_name, output_name):
         assert tf.test.is_gpu_available(), "TF-TRT mode requires a CUDA-enabled GPU"
@@ -91,21 +100,31 @@ class FaceNet:
 
         tf.import_graph_def(trt_graph, name="")
 
-        self._io_tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
+        self._tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
 
         self.facenet = self.sess.graph
         IMG_CONSTANTS["img_size"] = tuple(self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3])
 
-    def _io_tensor_init(self, model_name, input_name, output_name):
+    def _tensor_init(self, model_name, input_name, output_name):
         self.input_name, self.output_name = None, None
+
         for model in self.CONSTANTS:
             if model in model_name:
                 self.input_name = self.CONSTANTS[model]["input"]
                 self.output_name = self.CONSTANTS[model]["output"]
+
+                extra_model_config = self.CONSTANTS[model]
+                extra_model_config.pop("input")
+                extra_model_config.pop("output")
+
+                for tensor, value in extra_model_config.items():
+                    self.extra_tensors.append({tensor: value})
+
         if not self.input_name:
             self.input_name = input_name
         elif not self.output_name:
             self.output_name = output_name
+
         assert self.input_name and self.output_name, "I/O tensors for {} not detected or provided".format(model_name)
 
 
@@ -154,6 +173,12 @@ class FaceNet:
             graph_def.ParseFromString(graph_file.read())
         return graph_def
 
+    def _make_feed_dict(self, imgs):
+        feed_dict = {self.input_name: imgs}
+        for tensor_dict in self.extra_tensors:
+            feed_dict.update(tensor_dict)
+        return feed_dict
+
     def get_embeds(self, data, *args, **kwargs):
         embeds = []
         for n in args:
@@ -174,7 +199,7 @@ class FaceNet:
             predict = lambda imgs: self.facenet.predict(imgs)
         elif self.MODE == "tf-trt":
             output_tensor = self.facenet.get_tensor_by_name(self.output_name)
-            predict = lambda imgs: self.sess.run(output_tensor, {self.input_name: imgs})
+            predict = lambda imgs: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(imgs))
 
         cropped_imgs = normalize(crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup))
         raw_embeddings = predict(cropped_imgs)
