@@ -44,19 +44,19 @@ class FaceNet:
     # CONSTANTS (FOR TF-TRT)
     CONSTANTS = {
         "ms_celeb_1m": {
-            "inputs": ["input_1"],
-            "outputs": ["Bottleneck_BatchNorm/batchnorm/add_1"]
+            "input": "input_1:0",
+            "output": "Bottleneck_BatchNorm/batchnorm/add_1:0"
         },
         "vgg_face_2": {
-            "inputs": ["base_input"],
-            "outputs": ["classifier_low_dim/Softmax"]
+            "input": "base_input:0",
+            "output": "classifier_low_dim/Softmax:0"
         }
     }
 
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.pb", input_name=None, output_name=None):
+    def __init__(self, filepath=CONFIG_HOME+"/models/ms_celeb_1m.pb", input_name=None, output_name=None, **hyperparams):
         assert os.path.exists(filepath), "{} not found".format(filepath)
 
         if ".pb" in filepath:
@@ -73,6 +73,8 @@ class FaceNet:
 
         self.__static_db = None  # must be filled in by user
         self.__dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
+
+        self.HYPERPARAMS.update(hyperparams)
 
     def _keras_init(self, filepath):
         self.facenet = keras.models.load_model(filepath)
@@ -98,8 +100,8 @@ class FaceNet:
         self.input_name, self.output_name = None, None
         for model in self.CONSTANTS:
             if model in model_name:
-                self.input_name = self.CONSTANTS[model]["inputs"][0] + ":0"
-                self.output_name = self.CONSTANTS[model]["outputs"][0] + ":0"
+                self.input_name = self.CONSTANTS[model]["input"]
+                self.output_name = self.CONSTANTS[model]["output"]
         if not self.input_name:
             self.input_name = input_name
         elif not self.output_name:
@@ -199,7 +201,7 @@ class FaceNet:
         for knn in knns:
             pred = knn.predict(embedding)[0]
             best_matches.append((pred, np.linalg.norm(embedding - data[pred])))
-        best_match, l2_dist = sorted(best_matches, key=lambda n: n[1])[0]
+        best_match, l2_dist = max(best_matches, key=lambda n: n[1])
         is_recognized = l2_dist <= FaceNet.HYPERPARAMS["alpha"]
 
         return embedding, is_recognized, best_match, l2_dist
