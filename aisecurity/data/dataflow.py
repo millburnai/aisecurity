@@ -13,6 +13,7 @@ import warnings
 
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.utils.misc import timer
+from aisecurity.utils.paths import CONFIG_HOME
 
 
 # LOAD ON THE FLY
@@ -75,6 +76,15 @@ def retrieve_embeds(path, encrypted=None):
         return DataEncryption.decrypt_data(data, ignore=None)
     else:
         return data
+
+
+def upload_to_dropbox(**items):
+    def _upload_to_dropbox(item, location):
+        # TODO: @22pilarskil: write this function
+        pass
+
+    for item, location in items.items():
+        _upload_to_dropbox(item, location)
 
 
 if __name__ == "__main__":

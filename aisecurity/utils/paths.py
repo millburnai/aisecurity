@@ -22,3 +22,6 @@ DATABASE = CONFIG["database_location"]
 
 KEY_DIR = CONFIG["key_directory"]
 KEY_FILE = CONFIG["key_location"]
+
+NAME_KEYS = json.load(open(KEY_FILE))["names"]
+EMBEDDING_KEYS = json.load(open(KEY_FILE))["embeddings"]
