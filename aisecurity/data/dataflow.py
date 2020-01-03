@@ -78,13 +78,11 @@ def retrieve_embeds(path, encrypted=None):
         return data
 
 
-def upload_to_dropbox(**items):
-    def _upload_to_dropbox(item, location):
-        # TODO: @22pilarskil: write this function
-        pass
+def upload_to_dropbox(dropbox_key, dump_path, file_path):
+    
+    os.chdir(CONFIG_HOME+"/bin")
+    os.system('sh dump_embeds.sh {} {} {}'.format(dropbox_key, dump_path, file_path))
 
-    for item, location in items.items():
-        _upload_to_dropbox(item, location)
 
 
 if __name__ == "__main__":
