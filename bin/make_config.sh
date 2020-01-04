@@ -18,14 +18,15 @@ config_path=$(pwd )
 echo "Adding aisecurity.json to .aisecurity"
 touch "$HOME/.aisecurity/aisecurity.json"
 
-printf '{\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_file.json",\n    "database_location": "%s/database/test.json",\n    "mysql_user": "root",\n    "mysql_password": "root"\n}\n' \
-"$config_path" "$config_path" "$config_path" > "$config_path/aisecurity.json"
+printf '{\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_file.json",\n    "database_location": "%s/database/test.json",\n    "database_info": "%s/database/test_info.json",\n    "mysql_user": "root",\n    "mysql_password": "root"\n}\n' \
+"$config_path" "$config_path" "$config_path" "$config_path" > "$config_path/aisecurity.json"
 
 if [ ! -d "$config_path/database" ] ; then
   echo "Making database and unknown directories"
   mkdir database
   cd "$config_path/database" || echo "Error: unable to access $config_path/database"
-  wget -O "test.json" https://www.dropbox.com/s/uhii2vj373y7odj/test.json?dl=0 || echo "Error: unable to download test.json"
+  wget -O "test.json" https://www.dropbox.com/s/uhii2vj373y7odj/test.json?dl=1 || echo "Error: unable to download test.json"
+  wget -O "test_info.json" https://www.dropbox.com/s/ihfmemt6sqdfj74/test_info.json?dl=1 || echo "Error: unable to download test_info.json"
 fi
 
 if [ ! -d "$config_path/models" ] ; then
