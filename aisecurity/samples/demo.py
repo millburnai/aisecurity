@@ -6,43 +6,19 @@ Demonstration of facial recognition system.
 
 """
 
+import tensorflow as tf
+from termcolor import cprint
 
-def demo(model="ms_celeb_1m", path=None, metric="euclidean", logging="firebase", use_dynamic=True, use_picam=False,
-         use_graphics=True, use_lcd=False, use_keypad=False, resize=None, flip=0, allow_gpu_growth=False, verbose=False):
+from aisecurity.facenet import FaceNet
+from aisecurity.utils.paths import CONFIG_HOME
 
-    # imports
-    if not verbose:
-        import os
 
-        os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-
-        import warnings
-
-        warnings.simplefilter(action="ignore", category=FutureWarning)
-        warnings.simplefilter(action="ignore", category=UserWarning)
-        warnings.simplefilter(action="ignore", category=RuntimeWarning)
-
-        import tensorflow as tf
-
-        try:
-            tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
-        except AttributeError:
-            tf.logging.set_verbosity(tf.logging.ERROR)
-    else:
-        import os
-        import warnings
-
-        import tensorflow as tf
+def demo(model="ms_celeb_1m", path=None, dist_metric="euclidean+l2_normalize", logging="firebase", use_dynamic=True,
+         use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False, resize=None, flip=0,
+         allow_gpu_growth=False):
 
     if allow_gpu_growth:
         tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
-
-    from termcolor import cprint
-
-    from aisecurity.facenet import FaceNet
-    from aisecurity.data.dataflow import retrieve_embeds
-    from aisecurity.utils.paths import DATABASE, CONFIG_HOME
-
 
     # demo
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
@@ -52,14 +28,10 @@ def demo(model="ms_celeb_1m", path=None, metric="euclidean", logging="firebase",
     except (OSError, AssertionError):
         facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.h5".format(model))
 
-    cprint("\nLoading encrypted database", attrs=["bold"], end="")
-    cprint("...", attrs=["bold", "blink"])
-    facenet.set_data(retrieve_embeds(DATABASE, encrypted="names"))
-
     input("\nPress ENTER to continue:")
     facenet.real_time_recognize(
-        metric=metric, logging=logging, use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics,
-        resize=resize, use_lcd=use_lcd, use_keypad=use_keypad, flip=flip
+        dist_metric=dist_metric, logging=logging, use_dynamic=use_dynamic, use_picam=use_picam,
+        use_graphics=use_graphics, resize=resize, use_lcd=use_lcd, use_keypad=use_keypad, flip=flip
     )
 
 
@@ -100,7 +72,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", help="name of facenet model (default: ms_celeb_1m)", type=str, default="ms_celeb_1m")
     parser.add_argument("--path_to_model", help="path to facenet model (default: ~/.aisecurity/models/ms_celeb_1m)",
                         type=str, default=None)
-    parser.add_argument("--metric", help="distance metric (default: euclidean)", type=str, default="euclidean")
+    parser.add_argument("--dist_metric", help="distance metric (default: euclidean)", type=str, default="euclidean")
     parser.add_argument("--logging", help="logging type, mysql or firebase (default: None)", type=none_or_str,
                         default=None)
     parser.add_argument("--use_dynamic", help="use dynamic database (default: True)", type=to_bool, default=True)
@@ -112,15 +84,12 @@ if __name__ == "__main__":
                         default=None)
     parser.add_argument("--flip", help="flip method: +1 = +90º rotation (default: 0)", type=to_int, default=0)
     parser.add_argument("--allow_gpu_growth", help="GPU growth (default: False)", type=to_bool, default=False)
-    parser.add_argument("--verbose", help="suppress warnings and TensorFlow output (default: False)", type=to_bool,
-                        default=False)
     args = parser.parse_args()
 
 
     # DEMO
     demo(
-        model=args.model, path=args.path_to_model, metric=args.metric, logging=args.logging,
+        model=args.model, path=args.path_to_model, dist_metric=args.dist_metric, logging=args.logging,
         use_dynamic=args.use_dynamic, use_picam=args.use_picam, use_graphics=args.use_graphics, resize=args.resize,
-        use_lcd=args.use_lcd, use_keypad=args.use_keypad, flip=args.flip, allow_gpu_growth=args.allow_gpu_growth,
-        verbose=args.verbose
+        use_lcd=args.use_lcd, use_keypad=args.use_keypad, flip=args.flip, allow_gpu_growth=args.allow_gpu_growth
     )
