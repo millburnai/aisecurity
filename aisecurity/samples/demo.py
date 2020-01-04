@@ -7,8 +7,8 @@ Demonstration of facial recognition system.
 """
 
 
-def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, use_picam=False, use_graphics=True,
-         use_lcd=False, use_keypad=False, resize=None, flip=0, allow_gpu_growth=False, verbose=False):
+def demo(model="ms_celeb_1m", path=None, metric="euclidean", logging="firebase", use_dynamic=True, use_picam=False,
+         use_graphics=True, use_lcd=False, use_keypad=False, resize=None, flip=0, allow_gpu_growth=False, verbose=False):
 
     # imports
     if not verbose:
@@ -57,9 +57,10 @@ def demo(model="ms_celeb_1m", path=None, logging="firebase", use_dynamic=True, u
     facenet.set_data(retrieve_embeds(DATABASE, encrypted="names"))
 
     input("\nPress ENTER to continue:")
-    facenet.real_time_recognize(logging=logging, use_dynamic=use_dynamic, use_picam=use_picam,
-                                use_graphics=use_graphics, resize=resize, use_lcd=use_lcd, use_keypad=use_keypad,
-                                flip=flip)
+    facenet.real_time_recognize(
+        metric=metric, logging=logging, use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics,
+        resize=resize, use_lcd=use_lcd, use_keypad=use_keypad, flip=flip
+    )
 
 
 if __name__ == "__main__":
@@ -99,6 +100,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", help="name of facenet model (default: ms_celeb_1m)", type=str, default="ms_celeb_1m")
     parser.add_argument("--path_to_model", help="path to facenet model (default: ~/.aisecurity/models/ms_celeb_1m)",
                         type=str, default=None)
+    parser.add_argument("--metric", help="distance metric (default: euclidean)", type=str, default="euclidean")
     parser.add_argument("--logging", help="logging type, mysql or firebase (default: None)", type=none_or_str,
                         default=None)
     parser.add_argument("--use_dynamic", help="use dynamic database (default: True)", type=to_bool, default=True)
@@ -116,6 +118,9 @@ if __name__ == "__main__":
 
 
     # DEMO
-    demo(model=args.model, path=args.path_to_model, logging=args.logging, use_dynamic=args.use_dynamic,
-         use_picam=args.use_picam, use_graphics=args.use_graphics, resize=args.resize, use_lcd=args.use_lcd,
-         use_keypad=args.use_keypad, flip=args.flip, allow_gpu_growth=args.allow_gpu_growth, verbose=args.verbose)
+    demo(
+        model=args.model, path=args.path_to_model, metric=args.metric, logging=args.logging,
+        use_dynamic=args.use_dynamic, use_picam=args.use_picam, use_graphics=args.use_graphics, resize=args.resize,
+        use_lcd=args.use_lcd, use_keypad=args.use_keypad, flip=args.flip, allow_gpu_growth=args.allow_gpu_growth,
+        verbose=args.verbose
+    )

@@ -4,7 +4,7 @@
 
 Facial recognition with FaceNet in Keras or TF-TRT.
 
-Paper: https://arxiv.org/pdf/1503.03832.pdf
+Reference paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
 
@@ -26,6 +26,7 @@ from termcolor import cprint
 from aisecurity.database import log
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
+from aisecurity.utils.metrics import DistMetric
 from aisecurity.utils.misc import timer, HidePrints, run_async_method
 from aisecurity.utils.paths import CONFIG_HOME
 from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces
@@ -189,6 +190,8 @@ class FaceNet:
                     embeds.append(self.predict([n], **kwargs))
             elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # n must be a vector
                 embeds.append(self.predict([n], **kwargs))
+            else:
+                warnings.warn("{} is not in data or suitable for input into facenet".format(n))
 
         return embeds if len(embeds) > 1 else embeds[0]
 
@@ -210,7 +213,7 @@ class FaceNet:
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
-    def _recognize(self, img, db_types=None, *args, **kwargs):
+    def _recognize(self, img, metric, db_types=None, *args, **kwargs):
         assert self.__static_db or self.__dynamic_db, "data must be provided"
 
         knns, data = [], {}
@@ -225,16 +228,16 @@ class FaceNet:
         best_matches = []
         for knn in knns:
             pred = knn.predict(embedding)[0]
-            best_matches.append((pred, np.linalg.norm(embedding - data[pred])))
+            best_matches.append((pred, metric(embedding, data[pred])))
         best_match, l2_dist = max(best_matches, key=lambda n: n[1])
         is_recognized = l2_dist <= FaceNet.HYPERPARAMS["alpha"]
 
         return embedding, is_recognized, best_match, l2_dist
 
     # FACIAL RECOGNITION
-    def recognize(self, img, verbose=True):
-        # img can be a path, image, database name, or embedding
-        _, is_recognized, best_match, l2_dist = self._recognize(img)
+    def recognize(self, img, metric=DistMetric("euclidean"), verbose=True):
+        _, is_recognized, best_match, l2_dist = self._recognize(img, metric)
+        # img can be a path, image, database name key, or embedding
 
         if verbose:
             if is_recognized:
@@ -247,8 +250,8 @@ class FaceNet:
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, logging, use_dynamic, use_picam, use_graphics, framerate,
-                                   resize, use_lcd, flip, use_keypad):
+    async def _real_time_recognize(self, width, height, metric, logging, use_dynamic, use_picam, use_graphics,
+                                   framerate, resize, use_lcd, flip, use_keypad):
         # INITS
         db_types = ["static"]
 
@@ -314,7 +317,7 @@ class FaceNet:
 
                 # facial recognition
                 try:
-                    embedding, is_recognized, best_match, l2_dist = self._recognize(frame, db_types, faces=face)
+                    embedding, is_recognized, best_match, l2_dist = self._recognize(frame, metric, db_types, faces=face)
                     print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
                 except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                     if "query data dimension" in str(error):
@@ -370,15 +373,22 @@ class FaceNet:
 
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, logging="firebase", use_dynamic=False, use_picam=False,
-                            use_graphics=True, framerate=20, resize=None, use_lcd=False, use_keypad=False, flip=0):
+    def real_time_recognize(self, width=640, height=360, metric=DistMetric("euclidean"), logging="firebase",
+                            use_dynamic=False, use_picam=False, use_graphics=True, framerate=20, resize=None,
+                            use_lcd=False, use_keypad=False, flip=0):
         assert width > 0 and height > 0, "width and height must be positive integers"
         assert not logging or logging == "mysql" or logging == "firebase", "only mysql and firebase database supported"
         assert 0 < framerate <= 120, "framerate must be between 0 and 120"
         assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
 
-        run_async_method(self._real_time_recognize, width, height, logging, use_dynamic,
-                         use_picam, use_graphics, framerate, resize, use_lcd, flip, use_keypad)
+        if isinstance(metric, str):
+            metric = DistMetric(metric)
+
+        run_async_method(
+            self._real_time_recognize, width=width, height=height, metric=metric, logging=logging,
+            use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics, framerate=framerate,
+            resize=resize, use_lcd=use_lcd, flip=flip, use_keypad=use_keypad
+        )
 
 
     # GRAPHICS
