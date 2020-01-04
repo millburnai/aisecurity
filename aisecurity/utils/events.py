@@ -1,8 +1,8 @@
 """
 
-"aisecurity.utils.misc"
+"aisecurity.utils.events"
 
-Miscellaneous tools.
+Miscellaneous tools for event handling, including timers, time limits, and print handling.
 
 """
 
