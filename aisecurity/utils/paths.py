@@ -19,6 +19,7 @@ if not os.path.exists(CONFIG_HOME + "/aisecurity.json"):
 CONFIG = json.load(open(CONFIG_HOME + "/aisecurity.json"))
 
 DATABASE = CONFIG["database_location"]
+DATABASE_INFO = json.load(open(CONFIG["database_info"]))
 
 KEY_DIR = CONFIG["key_directory"]
 KEY_FILE = CONFIG["key_location"]

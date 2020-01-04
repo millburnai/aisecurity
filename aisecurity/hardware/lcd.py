@@ -140,7 +140,7 @@ class LCDSimulation:
         self.message = None
 
     def __setattr__(self, key, value):
-        if key == "message" and value is not None:
+        if key == "message" and value:
             cprint(value, attrs=["bold"])
         super(LCDSimulation, self).__setattr__(key, value)
 
@@ -243,7 +243,7 @@ def progress_bar(lcd, expected_time, msg=None, marker="#", sess=None):
         @functools.wraps(func)
         def _func(*args, **kwargs):
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                if sess is not None:
+                if sess:
                     K.set_session(sess)
                 future = pool.submit(func, *args, **kwargs)
                 timed_progress_bar(future, expected_time, marker, msg)
