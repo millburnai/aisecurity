@@ -12,7 +12,7 @@ import tqdm
 import warnings
 
 from aisecurity.privacy.encryptions import DataEncryption
-from aisecurity.utils.misc import timer
+from aisecurity.utils.events import timer
 from aisecurity.utils.paths import CONFIG_HOME
 
 

@@ -1,3 +1,3 @@
-from . import metrics
-from . import misc
+from . import distance
+from . import events
 from . import paths

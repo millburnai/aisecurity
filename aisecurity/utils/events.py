@@ -2,36 +2,15 @@
 
 "aisecurity.utils.events"
 
-Miscellaneous tools for event handling, including timers, time limits, and print handling.
+Miscellaneous tools for time and event handling.
 
 """
 
 import asyncio
-from contextlib import contextmanager
 import functools
 import os
 import sys
 import time
-import signal
-
-
-# TIME LIMIT
-# ... why do we need this?
-class TimeoutException(Exception): pass
-
-@contextmanager
-def time_limit(seconds):
-    def signal_handler(signum, frame):
-        raise TimeoutException("Timed out!")
-
-    signal.signal(signal.SIGALRM, signal_handler)
-    signal.alarm(seconds)
-
-    try:
-        yield
-    finally:
-        signal.alarm(0)
-
 
 
 # PRINT HANDLING

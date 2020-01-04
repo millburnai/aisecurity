@@ -1,8 +1,8 @@
 """
 
-"aisecurity.utils.metrics"
+"aisecurity.utils.distance"
 
-Metrics for facial recognition.
+Distance metrics for facial recognition.
 
 """
 
@@ -29,9 +29,7 @@ class DistMetric:
     # INITS
     def __init__(self, mode, normalizations=None):
         if "+" in mode:  # ex: DistMetric("euclidean+subtract_mean")
-            mode_and_norms = mode.split("+")
-            self.mode = mode_and_norms[0]
-            self.normalizations = mode_and_norms[1:]
+            self.mode, *self.normalizations = mode.split("+")
         else:  # ex: DistMetric("euclidean", ["subtract_mean"])
             self.mode = mode
             self.normalizations = normalizations
