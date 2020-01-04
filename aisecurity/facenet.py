@@ -15,6 +15,7 @@ import warnings
 
 import cv2
 import keras
+from aisecurity.data.dataflow import retrieve_embeds
 from keras import backend as K
 import matplotlib.pyplot as plt
 from mtcnn.mtcnn import MTCNN
@@ -28,7 +29,7 @@ from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.events import timer, HidePrints, run_async_method
-from aisecurity.utils.paths import CONFIG_HOME
+from aisecurity.utils.paths import CONFIG_HOME, DATABASE_INFO, DATABASE
 from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces
 
 
@@ -66,10 +67,13 @@ class FaceNet:
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=CONFIG_HOME+"/models/ms_celeb_1m.pb", input_name=None, output_name=None, **hyperparams):
+    def __init__(self, filepath=CONFIG_HOME+"/models/ms_celeb_1m.pb", dist_metric=DATABASE_INFO["metric"], sess=None,
+                 input_name=None, output_name=None, **hyperparams):
         """Initializes FaceNet object
 
         :param filepath: path to model (default: CONFIG_HOME+"/models/ms_celeb_1m.pb")
+        :param dist_metric: DistMetric obj or str constructor (default: aisecurity.utils.paths.DATABASE_INFO["metric"])
+        :param sess: tf.Session to use (default: None)
         :param input_name: name of input tensor-- only required if using TF-TRT non-default model (default: None)
         :param output_name: name of output tensor-- only required if using TF-TRT non-default model (default: None)
         :param hyperparams: hyperparameters to override FaceNet.HYPERPARAMS
@@ -88,12 +92,16 @@ class FaceNet:
         if self.MODE == "keras":
             self._keras_init(filepath)
         elif self.MODE == "tf-trt":
-            self._trt_init(filepath, input_name, output_name)
+            self._trt_init(filepath, input_name, output_name, sess)
 
         self.__static_db = None  # must be filled in by user
         self.__dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
 
-        self.extra_tensors = []  # extra tensors for feed dict to sess.run
+        self.static_knn = None
+        self.dynamic_knn = None
+
+        self.set_dist_metric(dist_metric if dist_metric else "euclidean+l2_normalize")
+        self.set_data(retrieve_embeds(DATABASE))
 
         self.HYPERPARAMS.update(hyperparams)
 
@@ -107,12 +115,13 @@ class FaceNet:
         self.facenet = keras.models.load_model(filepath)
         IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
 
-    def _trt_init(self, filepath, input_name, output_name):
+    def _trt_init(self, filepath, input_name, output_name, sess):
         """Initializes a TF_TRT model
 
         :param filepath: path to model (.pb)
         :param input_name: name of input tensor
         :param output_name: name of output tensor
+        :param sess: tf.Session to enter
 
         """
 
@@ -120,9 +129,11 @@ class FaceNet:
 
         trt_graph = self.get_frozen_graph(filepath)
 
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        self.sess = tf.Session(config=config)
+        if sess:
+            self.sess = sess
+            K.set_session(self.sess)
+        else:
+            self.sess = K.get_session()
 
         tf.import_graph_def(trt_graph, name="")
 
@@ -130,6 +141,8 @@ class FaceNet:
 
         self.facenet = self.sess.graph
         IMG_CONSTANTS["img_size"] = tuple(self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3])
+
+        self.extra_tensors = []  # extra tensors for feed dict to sess.run
 
     def _tensor_init(self, model_name, input_name, output_name):
         """Initializes tensors (TF-TRT only)
@@ -163,14 +176,14 @@ class FaceNet:
 
 
     # MUTATORS
-    def set_data(self, data):
+    def set_data(self, data, config=None):
         """Sets data property
 
         :param data: new data in form {name: embedding vector, ...}
+        :param config: data config dict with the entry "metric": <DistMetric str constructor>
 
         """
-
-        assert data is not None, "data must be provided"
+        assert data, "data must be provided"
 
         def check_validity(data):
             for key in data.keys():
@@ -182,29 +195,59 @@ class FaceNet:
 
         self.__static_db = check_validity(data)
 
-        try:
-            self._train_knn(knn_types=["static"])
-            self.dynamic_knn = None
-        except ValueError:
-            raise ValueError("Current model incompatible with database")
+        if config and (config["metric"] != self.dist_metric.__repr__() or config["metric"] == "None"):
+            use_class_metric = False
+            if config["metric"] != "None":
+                warnings.warn("data was embedded with a different metric than is being used by this object")
+        else:
+            use_class_metric = True
 
-    def _train_knn(self, knn_types):
-        """Trains K-Nearest-Neighbors
+        self._train_knn(knn_types=["static"], use_class_metric=False)
+        # FIXME: DistMetric too slow to be used for K-NN
 
-        :param knn_types: types of K-NN to train
+
+    def set_dist_metric(self, dist_metric, train_knn=False):
+        """Sets distance metric for FaceNet
+
+        :param dist_metric: DistMetric object or str constructor
+        :param train_knn: whether or not to train K-NN with new metric (default: False)
 
         """
 
-        def knn_factory(data):
+        if not hasattr(self, "dist_metric") or dist_metric.__repr__() != self.dist_metric.__repr__():
+            if isinstance(dist_metric, DistMetric):
+                self.dist_metric = dist_metric
+            elif isinstance(dist_metric, str):
+                self.dist_metric = DistMetric(dist_metric)
+            else:
+                raise ValueError("{} not a supported dist metric".format(dist_metric))
+
+        if train_knn:
+            self._train_knn(knn_types=["static"], use_class_metric=True)
+
+
+    def _train_knn(self, knn_types, use_class_metric):
+        """Trains K-Nearest-Neighbors
+
+        :param knn_types: types of K-NN to train
+        :param use_class_metric: use self.dist_metric to train K-NN over default "minkowski" metric
+
+        """
+
+        def knn_factory(data, metric):
             names, embeddings = zip(*data.items())
-            knn = neighbors.KNeighborsClassifier(n_neighbors=len(names) // len(set(names)))
+            knn = neighbors.KNeighborsClassifier(n_neighbors=len(names) // len(set(names)), metric=metric)
             knn.fit(embeddings, names)
             return knn
 
-        if self.__static_db and "static" in knn_types:
-            self.static_knn = knn_factory(self.__static_db)
-        if self.__dynamic_db and "dynamic" in knn_types:
-            self.dynamic_knn = knn_factory(self.__dynamic_db)
+        try:
+            metric = self.dist_metric if use_class_metric else "minkowski"
+            if self.__static_db and "static" in knn_types:
+                self.static_knn = knn_factory(self.__static_db, metric)
+            if self.__dynamic_db and "dynamic" in knn_types:
+                self.dynamic_knn = knn_factory(self.__dynamic_db, metric)
+        except ValueError:
+            raise ValueError("Current model incompatible with database")
 
 
     # RETRIEVERS
@@ -245,6 +288,31 @@ class FaceNet:
             feed_dict.update(tensor_dict)
         return feed_dict
 
+    def predict(self, paths_or_imgs, margin=IMG_CONSTANTS["margin"], faces=None, checkup=False):
+        """Low-level predict function (don't use unless developing)
+
+        :param paths_or_imgs: paths or images to predict on
+        :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
+        :param faces: pre-detected MTCNN faces (makes `margin` param irrelevant) (default: None)
+        :param checkup: whether this is just a call to keep the GPU warm (default: False)
+        :returns: embeddings
+
+        """
+
+        l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
+
+        if self.MODE == "keras":
+            predict = lambda imgs: self.facenet.predict(imgs)
+        elif self.MODE == "tf-trt":
+            output_tensor = self.facenet.get_tensor_by_name(self.output_name)
+            predict = lambda imgs: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(imgs))
+
+        cropped_imgs = normalize(crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup))
+        raw_embeddings = predict(cropped_imgs)
+        normalized_embeddings = l2_normalize(raw_embeddings)
+
+        return normalized_embeddings
+
     def get_embeds(self, data, *args, **kwargs):
         """Gets embedding from various datatypes
 
@@ -268,39 +336,13 @@ class FaceNet:
 
         return embeds if len(embeds) > 1 else embeds[0]
 
-    def predict(self, paths_or_imgs, margin=IMG_CONSTANTS["margin"], faces=None, checkup=False):
-        """Low-level predict function (don't use unless developing)
-
-        :param paths_or_imgs: paths or images to predict on
-        :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
-        :param faces: pre-detected MTCNN faces (makes `margin` param irrelevant) (default: None)
-        :param checkup: whether this is just a call to keep the GPU warm (default: False)
-        :returns: L2-normalized embeddings
-
-        """
-
-        l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
-
-        if self.MODE == "keras":
-            predict = lambda imgs: self.facenet.predict(imgs)
-        elif self.MODE == "tf-trt":
-            output_tensor = self.facenet.get_tensor_by_name(self.output_name)
-            predict = lambda imgs: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(imgs))
-
-        cropped_imgs = normalize(crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup))
-        raw_embeddings = predict(cropped_imgs)
-        normalized_embeddings = l2_normalize(raw_embeddings)
-
-        return normalized_embeddings
-
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
-    def _recognize(self, img, metric, db_types=None, **kwargs):
+    def _recognize(self, img, db_types=None, **kwargs):
         """Facial recognition under the hood
 
         :param img: image array
-        :param metric: DistMetric object
         :param db_types: database types: "static" and/or "dynamic" (default: None)
         :param kwargs: named arguments to self.get_embeds (will be passed to self.predict)
         :returns: embedding, is recognized (bool), best match from database(s), distance
@@ -313,7 +355,7 @@ class FaceNet:
         if db_types is None or "static" in db_types:
             knns.append(self.static_knn)
             data.update(self.__static_db)
-        if db_types is not None and "dynamic" in db_types and self.dynamic_knn and self.__dynamic_db:
+        if db_types and "dynamic" in db_types and self.dynamic_knn and self.__dynamic_db:
             knns.append(self.dynamic_knn)
             data.update(self.__dynamic_db)
 
@@ -321,38 +363,37 @@ class FaceNet:
         best_matches = []
         for knn in knns:
             pred = knn.predict(embedding)[0]
-            best_matches.append((pred, metric(embedding, data[pred])))
+            best_matches.append((pred, self.dist_metric(embedding, data[pred])))
         best_match, dist = max(best_matches, key=lambda n: n[1])
         is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
         return embedding, is_recognized, best_match, dist
 
     # FACIAL RECOGNITION
-    def recognize(self, img, metric=DistMetric("euclidean"), verbose=True):
+    def recognize(self, img, verbose=True):
         """Facial recognition for a single image
 
         :param img: image array
-        :param metric: DistMetric object (default: DistMetric("euclidean"))
         :param verbose: verbose or not (default: True)
         :returns: is recognized (bool), best match from static database, distance
 
         """
 
-        _, is_recognized, best_match, dist = self._recognize(img, metric)
+        _, is_recognized, best_match, dist = self._recognize(img)
         # img can be a path, image, database name key, or embedding
 
         if verbose:
             if is_recognized:
-                print("Your image is a picture of \"{}\": distance of {}".format(best_match, dist))
+                print("Your image is a picture of \"{}\". {} of {}".format(best_match, self.dist_metric, dist))
             else:
-                print("Your image is not in the database. The best match is \"{}\" with a distance of ".format(
-                    best_match, dist))
+                print("Your image is not in the database. The best match is \"{}\". {} = {}".format(
+                    best_match, self.dist_metric, dist))
 
         return is_recognized, best_match, dist
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, metric, logging, use_dynamic, use_picam, use_graphics,
+    async def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
                                    use_lcd, use_keypad, framerate, resize, flip):
         """Real-time facial recognition under the hood (dev use only)
 
@@ -374,7 +415,6 @@ class FaceNet:
 
         # INITS
         db_types = ["static"]
-
         if use_dynamic:
             db_types.append("dynamic")
         if logging:
@@ -384,6 +424,8 @@ class FaceNet:
             lcd.init()
         if use_keypad:
             keypad.init()
+        if dist_metric:
+            self.set_dist_metric(dist_metric)
         if resize:
             mtcnn_width, mtcnn_height = width * resize, height * resize
         else:
@@ -428,8 +470,8 @@ class FaceNet:
 
                 # facial recognition
                 try:
-                    embedding, is_recognized, best_match, dist = self._recognize(frame, metric, db_types, faces=face)
-                    print("Distance: {} ({}){}".format(dist, best_match, " !" if not is_recognized else ""))
+                    embedding, is_recognized, best_match, dist = self._recognize(frame, db_types, faces=face)
+                    print("{}: {} ({}){}".format(self.dist_metric, dist, best_match, " !" if not is_recognized else ""))
                 except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                     if "query data dimension" in str(error):
                         raise ValueError("Current model incompatible with database")
@@ -488,14 +530,14 @@ class FaceNet:
 
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, metric=DistMetric("euclidean"), logging="firebase",
+    def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging="firebase",
                             use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
                             framerate=20, resize=None, flip=0):
         """Real-time facial recognition
 
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
-        :param metric: DistMetric object or str metric (default: DistMetric("euclidean"), same as "euclidean")
+        :param dist_metric: DistMetric object or str distance metric (default: "euclidean+l2_normalize")
         :param logging: logging type-- None, "firebase", or "mysql" (default: "firebase")
         :param use_dynamic: use dynamic database for visitors or not (default: False)
         :param use_picam: use picamera or not (default: False)
@@ -513,11 +555,11 @@ class FaceNet:
         assert 0 < framerate <= 120, "framerate must be between 0 and 120"
         assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
 
-        if isinstance(metric, str):
-            metric = DistMetric(metric)
+        if isinstance(dist_metric, str):
+            dist_metric = DistMetric(dist_metric)
 
         run_async_method(
-            self._real_time_recognize, width=width, height=height, metric=metric, logging=logging,
+            self._real_time_recognize, width=width, height=height, dist_metric=dist_metric, logging=logging,
             use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd,
             use_keypad=use_keypad, framerate=framerate, resize=resize, flip=flip
         )
@@ -700,7 +742,7 @@ class FaceNet:
 
             if use_dynamic:
                 self.__dynamic_db["visitor_{}".format(len(self.__dynamic_db) + 1)] = embedding.flatten()
-                self._train_knn(knn_types=["dynamic"])
+                self._train_knn(knn_types=["dynamic"], use_class_metric=True)
 
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
 
