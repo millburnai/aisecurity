@@ -291,16 +291,7 @@ class FaceNet:
             if use_picam:
                 # make sure computation is performed periodically to keep GPU "warm" (i.e., constantly active);
                 # otherwise, recognition times can be slow when spaced out by several minutes
-                next_check = log.THRESHOLDS["missed_frames"]
-                if frames == 0 or time.time() - computation_check > next_check:
-                    with HidePrints():
-                        self._recognize(frame, checkup=True)
-                    print("Regular computation check")
-                    computation_check = time.time()
-                    if use_lcd:
-                        lcd.LCD_DEVICE.clear()
-                elif not (time.time() - log.LAST_LOGGED > next_check or time.time() - log.UNK_LAST_LOGGED > next_check):
-                    computation_check = time.time()
+                computation_check = self.keep_gpu_warm(frame, frames, computation_check, use_lcd)
 
             # using MTCNN to detect faces
             result = mtcnn.detect_faces(frame)
@@ -362,6 +353,7 @@ class FaceNet:
             cv2.imshow("AI Security v0.9a", original_frame)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
+                # FIXME: doesn't escape when 'q' is pressed-- maybe because of async?
                 break
 
             frames += 1
@@ -531,3 +523,18 @@ class FaceNet:
                 self._train_knn(knn_types=["dynamic"])
 
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
+
+    # COMPUTATION CHECK
+    def keep_gpu_warm(self, frame, frames, computation_check, use_lcd):
+        next_check = log.THRESHOLDS["missed_frames"]
+        if frames == 0 or time.time() - computation_check > next_check:
+            with HidePrints():
+                self._recognize(frame, checkup=True)
+            print("Regular computation check")
+            computation_check = time.time()
+            if use_lcd:
+                lcd.LCD_DEVICE.clear()
+        elif not (time.time() - log.LAST_LOGGED > next_check or time.time() - log.UNK_LAST_LOGGED > next_check):
+            computation_check = time.time()
+
+        return computation_check
