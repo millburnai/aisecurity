@@ -32,8 +32,10 @@ from aisecurity.utils.paths import CONFIG_HOME
 from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces
 
 
-# FACENET
+# ---------------- FACENET ----------------
+
 class FaceNet:
+    """Class implementation of FaceNet"""
 
 
     # HYPERPARAMETERS
@@ -42,8 +44,8 @@ class FaceNet:
         "mtcnn_alpha": 0.9
     }
 
-    # CONSTANTS (FOR TF-TRT)
-    CONSTANTS = {
+    # TENSOR CONSTANTS (FOR TF-TRT)
+    TENSORS = {
         "ms_celeb_1m": {
             "input": "input_1:0",
             "output": "Bottleneck_BatchNorm/batchnorm/add_1:0"
@@ -65,6 +67,15 @@ class FaceNet:
     # INITS
     @timer(message="Model load time")
     def __init__(self, filepath=CONFIG_HOME+"/models/ms_celeb_1m.pb", input_name=None, output_name=None, **hyperparams):
+        """Initializes FaceNet object
+
+        :param filepath: path to model (default: CONFIG_HOME+"/models/ms_celeb_1m.pb")
+        :param input_name: name of input tensor-- only required if using TF-TRT non-default model (default: None)
+        :param output_name: name of output tensor-- only required if using TF-TRT non-default model (default: None)
+        :param hyperparams: hyperparameters to override FaceNet.HYPERPARAMS
+
+        """
+
         assert os.path.exists(filepath), "{} not found".format(filepath)
 
         if ".pb" in filepath:
@@ -87,10 +98,24 @@ class FaceNet:
         self.HYPERPARAMS.update(hyperparams)
 
     def _keras_init(self, filepath):
+        """Initializes a Keras model
+
+        :param filepath: path to model (.h5)
+
+        """
+
         self.facenet = keras.models.load_model(filepath)
         IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
 
     def _trt_init(self, filepath, input_name, output_name):
+        """Initializes a TF_TRT model
+
+        :param filepath: path to model (.pb)
+        :param input_name: name of input tensor
+        :param output_name: name of output tensor
+
+        """
+
         assert tf.test.is_gpu_available(), "TF-TRT mode requires a CUDA-enabled GPU"
 
         trt_graph = self.get_frozen_graph(filepath)
@@ -107,14 +132,22 @@ class FaceNet:
         IMG_CONSTANTS["img_size"] = tuple(self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3])
 
     def _tensor_init(self, model_name, input_name, output_name):
+        """Initializes tensors (TF-TRT only)
+
+        :param model_name: name of model
+        :param input_name: input tensor name
+        :param output_name: output tensor name
+
+        """
+
         self.input_name, self.output_name = None, None
 
-        for model in self.CONSTANTS:
+        for model in self.TENSORS:
             if model in model_name:
-                self.input_name = self.CONSTANTS[model]["input"]
-                self.output_name = self.CONSTANTS[model]["output"]
+                self.input_name = self.TENSORS[model]["input"]
+                self.output_name = self.TENSORS[model]["output"]
 
-                extra_model_config = self.CONSTANTS[model]
+                extra_model_config = self.TENSORS[model]
                 extra_model_config.pop("input")
                 extra_model_config.pop("output")
 
@@ -131,6 +164,12 @@ class FaceNet:
 
     # MUTATORS
     def set_data(self, data):
+        """Sets data property
+
+        :param data: new data in form {name: embedding vector, ...}
+
+        """
+
         assert data is not None, "data must be provided"
 
         def check_validity(data):
@@ -150,6 +189,12 @@ class FaceNet:
             raise ValueError("Current model incompatible with database")
 
     def _train_knn(self, knn_types):
+        """Trains K-Nearest-Neighbors
+
+        :param knn_types: types of K-NN to train
+
+        """
+
         def knn_factory(data):
             names, embeddings = zip(*data.items())
             knn = neighbors.KNeighborsClassifier(n_neighbors=len(names) // len(set(names)))
@@ -165,22 +210,50 @@ class FaceNet:
     # RETRIEVERS
     @property
     def data(self):
+        """Property for static database
+
+        :returns: self.__static_db
+
+        """
+
         return self.__static_db
 
     @staticmethod
     def get_frozen_graph(path):
+        """Gets frozen graph from .pb file (TF-TRT only)
+
+        :param path: path to .pb frozen graph file
+        :returns: tf.GraphDef object
+
+        """
+
         with tf.gfile.FastGFile(path, "rb") as graph_file:
             graph_def = tf.GraphDef()
             graph_def.ParseFromString(graph_file.read())
         return graph_def
 
     def _make_feed_dict(self, imgs):
+        """Makes feed dict for sess.run (TF-TRT only)
+
+        :param imgs: image input
+        :returns: feed dict
+
+        """
+
         feed_dict = {self.input_name: imgs}
         for tensor_dict in self.extra_tensors:
             feed_dict.update(tensor_dict)
         return feed_dict
 
     def get_embeds(self, data, *args, **kwargs):
+        """Gets embedding from various datatypes
+
+        :param data: data dictionary in form {name: embedding vector, ...}
+        :param args: data to embed. Can be a key in `data` param, a filepath, or an image array
+        :param kwargs: named arguments to self.predict
+        :returns: list of embeddings
+
+        """
         embeds = []
         for n in args:
             if isinstance(n, str):
@@ -188,7 +261,7 @@ class FaceNet:
                     embeds.append(data[n])
                 except KeyError:
                     embeds.append(self.predict([n], **kwargs))
-            elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # n must be a vector
+            elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # if n is not an embedding vector
                 embeds.append(self.predict([n], **kwargs))
             else:
                 warnings.warn("{} is not in data or suitable for input into facenet".format(n))
@@ -196,6 +269,16 @@ class FaceNet:
         return embeds if len(embeds) > 1 else embeds[0]
 
     def predict(self, paths_or_imgs, margin=IMG_CONSTANTS["margin"], faces=None, checkup=False):
+        """Low-level predict function (don't use unless developing)
+
+        :param paths_or_imgs: paths or images to predict on
+        :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
+        :param faces: pre-detected MTCNN faces (makes `margin` param irrelevant) (default: None)
+        :param checkup: whether this is just a call to keep the GPU warm (default: False)
+        :returns: L2-normalized embeddings
+
+        """
+
         l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
 
         if self.MODE == "keras":
@@ -213,7 +296,17 @@ class FaceNet:
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
-    def _recognize(self, img, metric, db_types=None, *args, **kwargs):
+    def _recognize(self, img, metric, db_types=None, **kwargs):
+        """Facial recognition under the hood
+
+        :param img: image array
+        :param metric: DistMetric object
+        :param db_types: database types: "static" and/or "dynamic" (default: None)
+        :param kwargs: named arguments to self.get_embeds (will be passed to self.predict)
+        :returns: embedding, is recognized (bool), best match from database(s), distance
+
+        """
+
         assert self.__static_db or self.__dynamic_db, "data must be provided"
 
         knns, data = [], {}
@@ -224,34 +317,61 @@ class FaceNet:
             knns.append(self.dynamic_knn)
             data.update(self.__dynamic_db)
 
-        embedding = self.get_embeds(data, img, *args, **kwargs)
+        embedding = self.get_embeds(data, img, **kwargs)
         best_matches = []
         for knn in knns:
             pred = knn.predict(embedding)[0]
             best_matches.append((pred, metric(embedding, data[pred])))
-        best_match, l2_dist = max(best_matches, key=lambda n: n[1])
-        is_recognized = l2_dist <= FaceNet.HYPERPARAMS["alpha"]
+        best_match, dist = max(best_matches, key=lambda n: n[1])
+        is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
-        return embedding, is_recognized, best_match, l2_dist
+        return embedding, is_recognized, best_match, dist
 
     # FACIAL RECOGNITION
     def recognize(self, img, metric=DistMetric("euclidean"), verbose=True):
-        _, is_recognized, best_match, l2_dist = self._recognize(img, metric)
+        """Facial recognition for a single image
+
+        :param img: image array
+        :param metric: DistMetric object (default: DistMetric("euclidean"))
+        :param verbose: verbose or not (default: True)
+        :returns: is recognized (bool), best match from static database, distance
+
+        """
+
+        _, is_recognized, best_match, dist = self._recognize(img, metric)
         # img can be a path, image, database name key, or embedding
 
         if verbose:
             if is_recognized:
-                print("Your image is a picture of \"{}\": L2 distance of {}".format(best_match, l2_dist))
+                print("Your image is a picture of \"{}\": distance of {}".format(best_match, dist))
             else:
-                print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
-                    best_match, l2_dist))
+                print("Your image is not in the database. The best match is \"{}\" with a distance of ".format(
+                    best_match, dist))
 
-        return is_recognized, best_match, l2_dist
+        return is_recognized, best_match, dist
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, metric, logging, use_dynamic, use_picam, use_graphics,
-                                   framerate, resize, use_lcd, flip, use_keypad):
+                                   use_lcd, use_keypad, framerate, resize, flip):
+        """Real-time facial recognition under the hood (dev use only)
+
+        :param width: width of frame (only matters if use_graphics is True)
+        :param height: height of frame (only matters if use_graphics is True)
+        :param metric: DistMetric object
+        :param logging: logging type-- None, "firebase", or "mysql"
+        :param use_dynamic: use dynamic database for visitors or not
+        :param use_picam: use picamera or not
+        :param use_graphics: display video feed or not
+        :param use_lcd: use LCD or not. If LCD is not connected, will default to LCD simulation and warn
+        :param use_keypad: use keypad or not. If keypad not connected, will default to False and warn
+        :param framerate: frame rate (recommended <120)
+        :param resize: resize scale (float between 0. and 1.)
+        :param flip: flip method: +1 = +90º rotation
+        :returns: number of frames elapsed
+
+        """
+
         # INITS
         db_types = ["static"]
 
@@ -278,7 +398,7 @@ class FaceNet:
         missed_frames = 0
         frames = 0
 
-        computation_check = time.time()
+        last_gpu_checkup = time.time()
 
         # CAM LOOP
         while True:
@@ -291,7 +411,7 @@ class FaceNet:
             if use_picam:
                 # make sure computation is performed periodically to keep GPU "warm" (i.e., constantly active);
                 # otherwise, recognition times can be slow when spaced out by several minutes
-                computation_check = self.keep_gpu_warm(frame, frames, computation_check, use_lcd)
+                last_gpu_checkup = self.keep_gpu_warm(frame, frames, last_gpu_checkup, use_lcd)
 
             # using MTCNN to detect faces
             result = mtcnn.detect_faces(frame)
@@ -308,8 +428,8 @@ class FaceNet:
 
                 # facial recognition
                 try:
-                    embedding, is_recognized, best_match, l2_dist = self._recognize(frame, metric, db_types, faces=face)
-                    print("L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
+                    embedding, is_recognized, best_match, dist = self._recognize(frame, metric, db_types, faces=face)
+                    print("Distance: {} ({}){}".format(dist, best_match, " !" if not is_recognized else ""))
                 except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                     if "query data dimension" in str(error):
                         raise ValueError("Current model incompatible with database")
@@ -339,9 +459,9 @@ class FaceNet:
                     #  3. keypad.monitor(0) should be replaced with a reset or flush function if that's what it does
 
                 if logging and frames > 5:  # five frames before logging starts
-                    self.log_activity(is_recognized, best_match, logging, use_dynamic, embedding)
+                    self.log_activity(is_recognized, best_match, use_dynamic, embedding)
 
-                    log.L2_DISTS.append(l2_dist)
+                    log.DISTS.append(dist)
 
             else:
                 missed_frames += 1
@@ -350,7 +470,8 @@ class FaceNet:
                     log.flush_current(mode=["known", "unknown"], flush_times=False)
                 print("No face detected")
 
-            cv2.imshow("AI Security v0.9a", original_frame)
+            if use_graphics:
+                cv2.imshow("AI Security v0.9a", original_frame)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 # FIXME: doesn't escape when 'q' is pressed-- maybe because of async?
@@ -363,11 +484,30 @@ class FaceNet:
         cap.release()
         cv2.destroyAllWindows()
 
+        return frames
+
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, metric=DistMetric("euclidean"), logging="firebase",
-                            use_dynamic=False, use_picam=False, use_graphics=True, framerate=20, resize=None,
-                            use_lcd=False, use_keypad=False, flip=0):
+                            use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
+                            framerate=20, resize=None, flip=0):
+        """Real-time facial recognition
+
+        :param width: width of frame (only matters if use_graphics is True) (default: 640)
+        :param height: height of frame (only matters if use_graphics is True) (default: 360)
+        :param metric: DistMetric object or str metric (default: DistMetric("euclidean"), same as "euclidean")
+        :param logging: logging type-- None, "firebase", or "mysql" (default: "firebase")
+        :param use_dynamic: use dynamic database for visitors or not (default: False)
+        :param use_picam: use picamera or not (default: False)
+        :param use_graphics: display video feed or not (default: True)
+        :param use_lcd: use LCD or not. If LCD isn't connected, will default to LCD simulation and warn (default: False)
+        :param use_keypad: use keypad or not. If keypad not connected, will default to False and warn (default: False)
+        :param framerate: frame rate, only matters if use_picamera is True (recommended <120) (default: 20)
+        :param resize: resize scale (float between 0. and 1.) (default: None)
+        :param flip: flip method: +1 = +90º rotation (default: 0)
+
+        """
+
         assert width > 0 and height > 0, "width and height must be positive integers"
         assert not logging or logging == "mysql" or logging == "firebase", "only mysql and firebase database supported"
         assert 0 < framerate <= 120, "framerate must be between 0 and 120"
@@ -378,14 +518,26 @@ class FaceNet:
 
         run_async_method(
             self._real_time_recognize, width=width, height=height, metric=metric, logging=logging,
-            use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics, framerate=framerate,
-            resize=resize, use_lcd=use_lcd, flip=flip, use_keypad=use_keypad
+            use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd,
+            use_keypad=use_keypad, framerate=framerate, resize=resize, flip=flip
         )
 
 
     # GRAPHICS
     @staticmethod
     def get_video_cap(width, height, picamera, framerate, flip, device=0):
+        """Initializes cv2.VideoCapture object
+
+        :param width: width of frame
+        :param height: height of frame
+        :param picamera: use picamera or not
+        :param framerate: framerate, recommended <120
+        :param flip: flip method: +1 = +90º rotation (default: 0)
+        :param device: VideoCapture will use /dev/video{`device`} (default: 0)
+        :returns: cv2.VideoCapture object
+
+        """
+
         def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=640, display_height=360,
                                 framerate=20, flip=0):
             return (
@@ -407,6 +559,19 @@ class FaceNet:
 
     @staticmethod
     def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize):
+        """Adds graphics to a frame
+
+        :param frame: frame as array
+        :param overlay: overlay as array
+        :param person: MTCNN detection dict
+        :param width: width of frame
+        :param height: height of frame
+        :param is_recognized: whether face was recognized or not
+        :param best_match: best match from database
+        :param resize: resize scale factor, from 0. to 1.
+
+        """
+
         line_thickness = round(1e-6 * width * height + 1.5)
         radius = round((1e-6 * width * height + 1.5) / 2.)
         font_size = 4.5e-7 * width * height + 0.5
@@ -466,6 +631,13 @@ class FaceNet:
 
     # DISPLAY
     def show_embeds(self, encrypted=False, single=False):
+        """Shows self.data in visual form
+
+        :param encrypted: encrypt data keys (names) before displaying (default: False)
+        :param single: show only a single name/embedding pair (default: False)
+
+        """
+
         assert self.data, "data must be provided to show embeddings"
 
         def closest_multiples(n):
@@ -496,8 +668,16 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, is_recognized, best_match, logging_type, use_dynamic, embedding):
-        firebase = True if logging_type == "firebase" else False
+    def log_activity(self, is_recognized, best_match, use_dynamic, embedding):
+        """Logs facial recognition activity
+
+        :param is_recognized: whether face was recognized or not
+        :param best_match: best match from database
+        :param mode: logging type: "firebase" or "mysql"
+        :param use_dynamic: use dynamic database or not
+        :param embedding: embedding vector
+
+        """
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
         mode = lambda d: max(d.keys(), key=lambda key: len(d[key]))
@@ -507,14 +687,14 @@ class FaceNet:
         if log.NUM_RECOGNIZED >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.LAST_LOGGED):
             if log.get_percent_diff(best_match, log.CURRENT_LOG) <= log.THRESHOLDS["percent_diff"]:
                 recognized_person = mode(log.CURRENT_LOG)
-                log.log_person(recognized_person, times=log.CURRENT_LOG[recognized_person], firebase=firebase)
+                log.log_person(recognized_person, times=log.CURRENT_LOG[recognized_person])
 
                 cprint("Regular activity logged ({})".format(best_match), color="green", attrs=["bold"])
 
                 lcd.add_lcd_display(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
         elif log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.UNK_LAST_LOGGED):
-            log.log_unknown("<DEPRECATED>", firebase=firebase)
+            log.log_unknown("<DEPRECATED>")
 
             cprint("Unknown activity logged", color="red", attrs=["bold"])
 
@@ -524,17 +704,28 @@ class FaceNet:
 
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
 
+
     # COMPUTATION CHECK
-    def keep_gpu_warm(self, frame, frames, computation_check, use_lcd):
+    def keep_gpu_warm(self, frame, frames, last_gpu_checkup, use_lcd):
+        """Keeps GPU computations running so that facial recognition speed stays constant. Only needed on Jetson Nano
+
+        :param frame: frame as array
+        :param frames: number of frames elapsed
+        :param last_gpu_checkup: last computation check time
+        :param use_lcd: use LCD or not
+        :returns: this computation check time
+
+        """
+
         next_check = log.THRESHOLDS["missed_frames"]
-        if frames == 0 or time.time() - computation_check > next_check:
+        if frames == 0 or time.time() - last_gpu_checkup > next_check:
             with HidePrints():
                 self._recognize(frame, checkup=True)
             print("Regular computation check")
-            computation_check = time.time()
+            last_gpu_checkup = time.time()
             if use_lcd:
                 lcd.LCD_DEVICE.clear()
         elif not (time.time() - log.LAST_LOGGED > next_check or time.time() - log.UNK_LAST_LOGGED > next_check):
-            computation_check = time.time()
+            last_gpu_checkup = time.time()
 
-        return computation_check
+        return last_gpu_checkup
