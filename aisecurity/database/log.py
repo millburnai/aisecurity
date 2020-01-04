@@ -19,10 +19,6 @@ from aisecurity.utils.paths import CONFIG_HOME, CONFIG
 
 
 # SETUP
-DATABASE = None
-CURSOR = None
-FIREBASE = None
-
 THRESHOLDS = {
     "num_recognized": 3,
     "num_unknown": 3,
@@ -31,22 +27,29 @@ THRESHOLDS = {
     "missed_frames": 10,
 }
 
+MODE = None
+
+DATABASE = None
+CURSOR = None
+FIREBASE = None
+
 NUM_RECOGNIZED, NUM_UNKNOWN = None, None
 LAST_LOGGED, UNK_LAST_LOGGED = None, None
-CURRENT_LOG, L2_DISTS = None, None
+CURRENT_LOG, DISTS = None, None
 
 USE_SERVER = None
 
 
 # LOGGING INIT AND HELPERS
 def init(flush=False, thresholds=None, logging="firebase"):
-    global NUM_RECOGNIZED, NUM_UNKNOWN, LAST_LOGGED, UNK_LAST_LOGGED, CURRENT_LOG, L2_DISTS, THRESHOLDS
-    global DATABASE, CURSOR, FIREBASE
+    global NUM_RECOGNIZED, NUM_UNKNOWN, LAST_LOGGED, UNK_LAST_LOGGED, CURRENT_LOG, DISTS, THRESHOLDS
+    global MODE, DATABASE, CURSOR, FIREBASE
+
+    MODE = logging
 
     NUM_RECOGNIZED, NUM_UNKNOWN = 0, 0
     LAST_LOGGED, UNK_LAST_LOGGED = time.time(), time.time()
-    CURRENT_LOG, L2_DISTS = {}, []
-
+    CURRENT_LOG, DISTS = {}, []
 
     if logging == "mysql":
 
@@ -78,6 +81,10 @@ def init(flush=False, thresholds=None, logging="firebase"):
             DATABASE = FIREBASE.database()
         except FileNotFoundError:
             raise FileNotFoundError(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
+
+    else:
+        MODE = None
+        warnings.warn("{} not a supported logging option. No logging will occur".format(logging))
 
     if thresholds:
         THRESHOLDS = {**THRESHOLDS, **thresholds}
@@ -123,7 +130,7 @@ def get_percent_diff(item, log):
 def update_current_logs(is_recognized, best_match):
     global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN
 
-    if len(L2_DISTS) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
+    if len(DISTS) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
         flush_current(mode=["unknown", "known"])
 
     if is_recognized:
@@ -145,16 +152,16 @@ def update_current_logs(is_recognized, best_match):
 
 
 # LOGGING FUNCTIONS
-def log_person(student_name, times, firebase=True):
+def log_person(student_name, times):
     now = get_now(sum(times) / len(times))
 
-    if not firebase:
+    if MODE == "mysql":
         add = "INSERT INTO Activity (id, name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
             get_id(student_name), student_name.replace("_", " ").title(), *now)
         CURSOR.execute(add)
         DATABASE.commit()
 
-    else:
+    elif MODE == "firebase":
         data = {
             "id": get_id(student_name),
             "name": student_name.replace("_", " ").title(),
@@ -166,16 +173,16 @@ def log_person(student_name, times, firebase=True):
     flush_current(mode="known")
 
 
-def log_unknown(path_to_img, firebase=True):
+def log_unknown(path_to_img):
     now = get_now(time.time())
 
-    if not firebase:
+    if MODE == "mysql":
         add = "INSERT INTO Unknown (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
             path_to_img, *now)
         CURSOR.execute(add)
         DATABASE.commit()
 
-    else:
+    elif MODE == "firebase":
         data = {
             "path_to_img": path_to_img,
             "date": now[0],
@@ -187,7 +194,7 @@ def log_unknown(path_to_img, firebase=True):
 
 
 def flush_current(mode="known", flush_times=True):
-    global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN, L2_DISTS, LAST_LOGGED, UNK_LAST_LOGGED
+    global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN, DISTS, LAST_LOGGED, UNK_LAST_LOGGED
 
     if "known" in mode:
         CURRENT_LOG = {}
@@ -195,7 +202,7 @@ def flush_current(mode="known", flush_times=True):
         if flush_times:
             LAST_LOGGED = time.time()
     if "unknown" in mode:
-        L2_DISTS = []
+        DISTS = []
         NUM_UNKNOWN = 0
         if flush_times:
             UNK_LAST_LOGGED = time.time()
