@@ -67,12 +67,11 @@ class FaceNet:
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=CONFIG_HOME+"/models/ms_celeb_1m.pb", dist_metric=DATABASE_INFO["metric"], sess=None,
-                 input_name=None, output_name=None, **hyperparams):
+    def __init__(self, filepath=CONFIG_HOME+"/models/ms_celeb_1m.pb", sess=None, input_name=None, output_name=None,
+                 **hyperparams):
         """Initializes FaceNet object
 
         :param filepath: path to model (default: CONFIG_HOME+"/models/ms_celeb_1m.pb")
-        :param dist_metric: DistMetric obj or str constructor (default: aisecurity.utils.paths.DATABASE_INFO["metric"])
         :param sess: tf.Session to use (default: None)
         :param input_name: name of input tensor-- only required if using TF-TRT non-default model (default: None)
         :param output_name: name of output tensor-- only required if using TF-TRT non-default model (default: None)
@@ -100,8 +99,8 @@ class FaceNet:
         self.static_knn = None
         self.dynamic_knn = None
 
-        self.set_dist_metric(dist_metric if dist_metric else "euclidean+l2_normalize")
-        self.set_data(retrieve_embeds(DATABASE))
+        self.set_data(retrieve_embeds(DATABASE), config=DATABASE_INFO)
+        self.set_dist_metric("auto")
 
         self.HYPERPARAMS.update(hyperparams)
 
@@ -180,7 +179,7 @@ class FaceNet:
         """Sets data property
 
         :param data: new data in form {name: embedding vector, ...}
-        :param config: data config dict with the entry "metric": <DistMetric str constructor>
+        :param config: data config dict with the entry "metric": <DistMetric str constructor> (default: None)
 
         """
         assert data, "data must be provided"
@@ -195,57 +194,58 @@ class FaceNet:
 
         self.__static_db = check_validity(data)
 
-        if config and (config["metric"] != self.dist_metric.__repr__() or config["metric"] == "None"):
-            use_class_metric = False
-            if config["metric"] != "None":
-                warnings.warn("data was embedded with a different metric than is being used by this object")
+        self._train_knn(knn_types=["static"])
+
+        if config is None:
+            warnings.warn("data config missing. Distance metric not detected")
         else:
-            use_class_metric = True
+            self.data_config = config
 
-        self._train_knn(knn_types=["static"], use_class_metric=False)
-        # FIXME: DistMetric too slow to be used for K-NN
-
-
-    def set_dist_metric(self, dist_metric, train_knn=False):
+    def set_dist_metric(self, dist_metric):
         """Sets distance metric for FaceNet
 
-        :param dist_metric: DistMetric object or str constructor
-        :param train_knn: whether or not to train K-NN with new metric (default: False)
+        :param dist_metric: DistMetric object or str constructor, or "auto" to detect from self.data_config
 
         """
 
-        if not hasattr(self, "dist_metric") or dist_metric.__repr__() != self.dist_metric.__repr__():
-            if isinstance(dist_metric, DistMetric):
-                self.dist_metric = dist_metric
-            elif isinstance(dist_metric, str):
-                self.dist_metric = DistMetric(dist_metric)
+        if dist_metric == "auto":
+            self.dist_metric = DistMetric(self.data_config["metric"])
+        else:
+            if not hasattr(self, "dist_metric") or dist_metric.__repr__() != self.dist_metric.__repr__():
+                if isinstance(dist_metric, DistMetric):
+                    self.dist_metric = dist_metric
+                elif isinstance(dist_metric, str):
+                    self.dist_metric = DistMetric(dist_metric)
+                else:
+                    raise ValueError("{} not a supported dist metric".format(dist_metric))
+            if hasattr(self, "data_config") and hasattr(self, "dist_metric"):
+                if self.data_config["metric"] != self.dist_metric.__repr__():
+                    warnings.warn("data config metric ({}) is not the same as this object's DistMetric ({})".format(
+                        self.data_config["metric"], self.dist_metric.__repr__())
+                    )
             else:
-                raise ValueError("{} not a supported dist metric".format(dist_metric))
+                warnings.warn("Data config not found. Metric check cannot be performed")
 
-        if train_knn:
-            self._train_knn(knn_types=["static"], use_class_metric=True)
-
-
-    def _train_knn(self, knn_types, use_class_metric):
+    def _train_knn(self, knn_types):
         """Trains K-Nearest-Neighbors
 
         :param knn_types: types of K-NN to train
-        :param use_class_metric: use self.dist_metric to train K-NN over default "minkowski" metric
 
         """
 
-        def knn_factory(data, metric):
+        def knn_factory(data):
             names, embeddings = zip(*data.items())
-            knn = neighbors.KNeighborsClassifier(n_neighbors=len(names) // len(set(names)), metric=metric)
+            knn = neighbors.KNeighborsClassifier(n_neighbors=len(names) // len(set(names)))
+            # always use minkowski distance, other metrics are just normalizing before minkowski to act
+            # as the desired metric (ex: cosine)
             knn.fit(embeddings, names)
             return knn
 
         try:
-            metric = self.dist_metric if use_class_metric else "minkowski"
             if self.__static_db and "static" in knn_types:
-                self.static_knn = knn_factory(self.__static_db, metric)
+                self.static_knn = knn_factory(self.__static_db)
             if self.__dynamic_db and "dynamic" in knn_types:
-                self.dynamic_knn = knn_factory(self.__dynamic_db, metric)
+                self.dynamic_knn = knn_factory(self.__dynamic_db)
         except ValueError:
             raise ValueError("Current model incompatible with database")
 
@@ -295,7 +295,7 @@ class FaceNet:
         :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
         :param faces: pre-detected MTCNN faces (makes `margin` param irrelevant) (default: None)
         :param checkup: whether this is just a call to keep the GPU warm (default: False)
-        :returns: embeddings
+        :returns: normalized embeddings
 
         """
 
@@ -307,7 +307,7 @@ class FaceNet:
 
         cropped_imgs = normalize(crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup))
         raw_embeddings = predict(cropped_imgs)
-        normalized_embeddings = self.dist_metric.apply_norms(raw_embeddings)
+        normalized_embeddings = self.dist_metric(raw_embeddings)
 
         return normalized_embeddings
 
@@ -361,7 +361,7 @@ class FaceNet:
         best_matches = []
         for knn in knns:
             pred = knn.predict(embedding)[0]
-            best_matches.append((pred, self.dist_metric(embedding, data[pred])))
+            best_matches.append((pred, self.dist_metric(embedding, data[pred], mode="calc+apply_norms")))
         best_match, dist = max(best_matches, key=lambda n: n[1])
         is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
@@ -552,9 +552,6 @@ class FaceNet:
         assert not logging or logging == "mysql" or logging == "firebase", "only mysql and firebase database supported"
         assert 0 < framerate <= 120, "framerate must be between 0 and 120"
         assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
-
-        if isinstance(dist_metric, str):
-            dist_metric = DistMetric(dist_metric)
 
         run_async_method(
             self._real_time_recognize, width=width, height=height, dist_metric=dist_metric, logging=logging,
