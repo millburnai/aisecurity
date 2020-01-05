@@ -168,24 +168,44 @@ class DistMetric:
 
 
 if __name__ == "__main__":
-    for i, n in np.random.random((10, 2)):
-        test_case = [np.array([i]).reshape(-1, 1), np.array([n]).reshape(-1, 1)]
+    for trial_num, test in enumerate(np.random.random((10, 128, 1))):
+        data = np.random.random((100, 1))
 
-        dist_metric = DistMetric("euclidean+subtract_mean")
-        print("(DistMetric)", dist_metric, ":", dist_metric(*test_case))
+        differences = {}
 
-        dist_metric = DistMetric("euclidean+l2_normalize")
-        print("(DistMetric)", dist_metric, ":", dist_metric(*test_case))
+        dist_metric = DistMetric("euclidean+subtract_mean", data=data)
+        result = dist_metric(test)
+        true_value = test - np.mean(data)
+        differences[dist_metric.__repr__()] = np.sum(true_value - result)
 
-        dist_metric = DistMetric("euclidean+subtract_mean+l2_normalize")
-        print("(DistMetric)", dist_metric, ":", dist_metric(*test_case))
+        dist_metric = DistMetric("euclidean+l2_normalize", data=data)
+        result = dist_metric(test)
+        true_value = DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test)
+        differences[dist_metric.__repr__()] = np.sum(true_value - result)
 
-        norm = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6))
-        subtract_mean = lambda a, b: (a-np.mean(np.concatenate([a, b]), axis=0),b-np.mean(np.concatenate([a, b]), axis=0))
-        a, b = subtract_mean(test_case[0], test_case[1])
+        dist_metric = DistMetric("euclidean+subtract_mean+l2_normalize", data=data)
+        result = dist_metric(test)
+        true_value = DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test - np.mean(data))
+        differences[dist_metric.__repr__()] = np.sum(true_value - result)
 
-        print("Euclidean, subtract_mean :", np.linalg.norm(a - b))
-        print("Euclidean, l2_normalize :", np.linalg.norm(norm(test_case[0]) - norm(test_case[1])))
-        print("Euclidean, subtract_mean, l2_normalize :", np.linalg.norm(norm(a) - norm(b)))
+        dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean", data=data)
+        result = dist_metric(test)
+        true_value = DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data)
+        differences[dist_metric.__repr__()] = np.sum(true_value - result)
 
-        print("\n")
+        second_test = np.random.random(test.shape)
+        dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean+sigmoid", data=data)
+        result = dist_metric(test, second_test, mode="calc+apply_norms")
+        true_value = DistMetric.NORMALIZATIONS["sigmoid"]["func"](
+            np.linalg.norm(
+                DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data) -
+                (DistMetric.NORMALIZATIONS["l2_normalize"]["func"](second_test) - np.mean(data))
+            )
+        )
+        differences[dist_metric.__repr__()] = np.sum(true_value - result)
+
+        for metric in differences:
+            if differences[metric] != 0:
+                print("Error - {}: difference of {}".format(metric, differences[metric]))
+        else:
+            print("Test {} finished without error".format(trial_num + 1))
