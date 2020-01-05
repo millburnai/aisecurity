@@ -72,7 +72,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", help="name of facenet model (default: ms_celeb_1m)", type=str, default="ms_celeb_1m")
     parser.add_argument("--path_to_model", help="path to facenet model (default: ~/.aisecurity/models/ms_celeb_1m)",
                         type=str, default=None)
-    parser.add_argument("--dist_metric", help="distance metric (default: euclidean)", type=str, default="euclidean")
+    parser.add_argument("--dist_metric", help="distance metric (default: auto)", type=str, default="auto")
     parser.add_argument("--logging", help="logging type, mysql or firebase (default: None)", type=none_or_str,
                         default=None)
     parser.add_argument("--use_dynamic", help="use dynamic database (default: True)", type=to_bool, default=True)
