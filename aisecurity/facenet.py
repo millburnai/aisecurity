@@ -365,7 +365,7 @@ class FaceNet:
         best_matches = []
         for knn in knns:
             pred = knn.predict(embedding)[0]
-            best_matches.append((pred, self.dist_metric(embedding, data[pred], mode="calc+apply_norms")))
+            best_matches.append((pred, self.dist_metric(embedding, data[pred], mode="calc")))
         best_match, dist = max(best_matches, key=lambda n: n[1])
         is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
