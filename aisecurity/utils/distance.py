@@ -165,6 +165,11 @@ class DistMetric:
         return self.__str__()
 
 
+    # RETRIEVERS
+    def get_config(self):
+        return self.__str__().replace("Distance (", "").replace(")", "")
+
+
 if __name__ == "__main__":
     for trial_num, test in enumerate(np.random.random((10, 128, 1))):
         data = np.random.random((100, 1))
@@ -174,22 +179,22 @@ if __name__ == "__main__":
         dist_metric = DistMetric("euclidean+subtract_mean", data=data)
         result = dist_metric(test)
         true_value = test - np.mean(data)
-        differences[dist_metric.__repr__()] = np.sum(true_value - result)
+        differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+l2_normalize", data=data)
         result = dist_metric(test)
         true_value = DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test)
-        differences[dist_metric.__repr__()] = np.sum(true_value - result)
+        differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+subtract_mean+l2_normalize", data=data)
         result = dist_metric(test)
         true_value = DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test - np.mean(data))
-        differences[dist_metric.__repr__()] = np.sum(true_value - result)
+        differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean", data=data)
         result = dist_metric(test)
         true_value = DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data)
-        differences[dist_metric.__repr__()] = np.sum(true_value - result)
+        differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         second_test = np.random.random(test.shape)
         dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean+sigmoid", data=data)
@@ -200,7 +205,7 @@ if __name__ == "__main__":
                 (DistMetric.NORMALIZATIONS["l2_normalize"]["func"](second_test) - np.mean(data))
             )
         )
-        differences[dist_metric.__repr__()] = np.sum(true_value - result)
+        differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         for metric in differences:
             if differences[metric] != 0:
