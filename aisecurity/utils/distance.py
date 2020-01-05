@@ -22,6 +22,12 @@ _CHECKS = {
 # DISTMETRIC
 class DistMetric:
 
+    DISTS = {
+        # dists are the transformations to be applied before Euclidean distance is calculated
+        # ex: for "euclidean", no transformation is applied --> lambda a, b: (a, b)
+        "euclidean": lambda a, b: (a, b),
+        "cosine": lambda a, b: (a, b)  # not done yet
+    }
 
     NORMALIZATIONS = {
         # normalizations are applied before mode lambdas
@@ -43,14 +49,6 @@ class DistMetric:
         }
     }
 
-    MODES = {
-        # modes are the transformations to be applied before Euclidean distance is calculated
-        # ex: for "euclidean", no transformation is applied --> lambda a, b: (a, b)
-        "euclidean": lambda a, b: (a, b),
-        "cosine": lambda a, b: (a, b)
-    }
-
-
 
     # INITS
     def __init__(self, mode, normalizations=None, data=None):
@@ -64,7 +62,7 @@ class DistMetric:
                 self.mode = mode
                 self.normalizations = normalizations if normalizations else []
 
-            assert self.mode in self.MODES, "supported modes are {}".format(list(self.MODES.keys()))
+            assert self.mode in self.DISTS, "supported modes are {}".format(list(self.DISTS.keys()))
             assert self.normalizations is None or all(norm in self.NORMALIZATIONS for norm in self.normalizations), \
                 "supported normalizations are {}".format(list(self.NORMALIZATIONS.keys()))
 
@@ -77,12 +75,12 @@ class DistMetric:
             try:
                 assert isinstance(self.__call__(*test_case), float)
             except Exception:
-                raise ValueError("check failed: check that custom mode and norm are in the correct format")
+                raise ValueError("check failed: check that custom mode and normalizations are in the correct format")
 
             warnings.warn("custom mode and normalizations are not supported in FaceNet")
 
         # data setting
-        if any(self.NORMALIZATIONS[norm]["use_stat"] for norm in self.normalizations):
+        if any(self.NORMALIZATIONS[norm_id]["use_stat"] for norm_id in self.normalizations):
             assert data is not None, "data must be provided for normalizations that use data statistics"
 
             self.stats = {
@@ -156,8 +154,8 @@ class DistMetric:
     def __str__(self):
         result = "Distance ("
         result += self.mode.__str__()  # __str__ to account for possibility of mode/normalizations being custom funcs
-        for norm in self.normalizations:
-            result += "+{}".format(norm.__str__())
+        for norm_id in self.normalizations:
+            result += "+{}".format(norm_id.__str__())
         result += ")"
         return result
 
