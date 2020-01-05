@@ -11,38 +11,58 @@ Distance metrics for facial recognition.
 import warnings
 
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
 
 
+# HELPERS
+_CHECKS = {
+    "is_vector": lambda x: x.ndim <= 2 and (1 in x.shape or x.ndim == 1),
+    "is_float_like": lambda x: isinstance(x, float) or isinstance(x, np.float),
+    "is_shape_equal": lambda a, b: np.array(a).shape == np.array(b).shape
+}
+
+
+# DISTMETRIC
 class DistMetric:
 
-    # AVAILABLE MODES
-    MODES = {
-        "euclidean": lambda a, b: np.linalg.norm(a - b),
-        "cosine": lambda a, b: cosine_similarity(a, b).item()
-    }
 
     NORMALIZATIONS = {
+        # normalizations are applied before mode lambdas
+        # ex: for "cosine+l2_normalize", L2 normalization is applied, then cosine normalization, then L2 distance
         "subtract_mean": {
-            "state": 2,
-            "func": lambda a, b: (a, b, np.mean(np.concatenate([a, b]), axis=0)),
-            "operation": lambda a, b, res: (a - res, b - res)
+            "apply_to": _CHECKS["is_vector"],
+            "use_stat": True,
+            "func": lambda x, stats: x - stats["mean"]
         },
         "l2_normalize": {
-            "state": 2,
-            "func:": lambda a, b: map(
-                lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6)), (a, b)
-            )
+            "apply_to": _CHECKS["is_vector"],
+            "use_stat": False,
+            "func": lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6))
+        },
+        "sigmoid": {
+            "apply_to": _CHECKS["is_float_like"],
+            "use_stat": False,
+            "func": lambda x: 1. / (1. + np.exp(-x))
         }
     }
 
+    MODES = {
+        # modes are the transformations to be applied before Euclidean distance is calculated
+        # ex: for "euclidean", no transformation is applied --> lambda a, b: (a, b)
+        "euclidean": lambda a, b: (a, b),
+        "cosine": lambda a, b: (a, b)
+    }
+
+
 
     # INITS
-    def __init__(self, mode, normalizations=None):
-        if isinstance(mode, str):  # if mode and norms are from defaults
-            if "+" in mode:  # ex: DistMetric("euclidean+subtract_mean+l2_normalize")
+    def __init__(self, mode, normalizations=None, data=None):
+        # if mode and norms are from defaults
+        if isinstance(mode, str):
+            if "+" in mode:
+                # ex: DistMetric("euclidean+subtract_mean+l2_normalize")
                 self.mode, *self.normalizations = mode.split("+")
-            else:  # ex: DistMetric("euclidean", ["subtract_mean", "l2_normalize"])
+            else:
+                # ex: DistMetric("euclidean", ["subtract_mean", "l2_normalize"])
                 self.mode = mode
                 self.normalizations = normalizations if normalizations else []
 
@@ -50,7 +70,8 @@ class DistMetric:
             assert self.normalizations is None or all(norm in self.NORMALIZATIONS for norm in self.normalizations), \
                 "supported normalizations are {}".format(list(self.NORMALIZATIONS.keys()))
 
-        elif callable(mode):  # if custom mode and norms are provided
+        # if custom mode and norms are provided
+        elif callable(mode):
             self.mode = mode
             self.normalizations = normalizations
 
@@ -62,50 +83,77 @@ class DistMetric:
 
             warnings.warn("custom mode and normalizations are not supported in FaceNet")
 
+        # data setting
+        if any(self.NORMALIZATIONS[norm]["use_stat"] for norm in self.normalizations):
+            assert data is not None, "data must be provided for normalizations that use data statistics"
+
+            self.stats = {
+                "mean": np.mean(data),
+                "std": np.std(data)
+            }
+
+        self.data = data
+
 
     # HELPER FUNCTIONS
-    def apply_norms(self, *args):
-        normalized = args
+    def apply_norms(self, arg):
+        normalized = arg
 
-        for norm in self.normalizations:
+        for norm_id in self.normalizations:
             try:
-                functional_norm = self.NORMALIZATIONS[norm]
+                functional_dict = self.NORMALIZATIONS[norm_id]
             except (KeyError, TypeError):  # will arise if custom funcs provided
-                functional_norm = norm
+                functional_dict = norm_id
 
-            actions = functional_norm.copy()
-            state = actions.pop("state")
+            actions = functional_dict.copy()
+            apply_to = actions.pop("apply_to")
+            use_stat = actions.pop("use_stat")
 
-            if state == len(args):
+            if apply_to(arg):
                 tmp = normalized
+                args = []
+
+                if use_stat:
+                    args.append(self.stats)
+
                 for action in actions.values():
-                    tmp = action(*tmp)
+                    tmp = action(tmp, *args)
+
                 normalized = tmp
 
         if hasattr(normalized, "__len__"):
-            assert len(normalized) == len(args), "mismatch between length of normalized and length of original args"
-            return normalized if len(normalized) != 1 else normalized[0]
-        return normalized
+            check_passes =  _CHECKS["is_shape_equal"](normalized, arg)
+        else:
+            check_passes = _CHECKS["is_float_like"](normalized)
 
-    def dist(self, a, b):
-        try:
-            return self.MODES[self.mode](a, b)
-        except (KeyError, TypeError):
-            return self.mode(a, b)
+        assert check_passes, "mismatch between normalized and original arg"
+
+        return normalized
 
 
     # MAGIC FUNCTIONS
-    def __call__(self, a, b):
-        a, b = np.array(a), np.array(b)
-        shape = a.shape if a.shape != () else (-1, 1)
-        a = a.reshape(shape)
-        b = b.reshape(shape)
+    def __call__(self, *args, mode="apply_norm"):
+        if mode == "apply_norm":
+            assert len(args) == 1, "'apply_norm' mode requires one arg only, got {} args".format(len(args))
 
-        a, b = self.apply_norms(a, b)
-        dist = self.dist(a, b)
-        dist = self.apply_norms(dist)
+            arg = args[0]
+            arg = arg.reshape(np.array(arg).shape if np.array(arg).shape != () else (-1, 1))
 
-        return dist
+            return self.apply_norms(arg)
+
+        elif "calc" in mode:
+            # always use the Euclidean norm because the K-NN algorithm will always use it (pyfuncs are too slow)
+            assert len(args) == 2, "'calc' mode requires two args only, got {} arg(s)".format(len(args))
+
+            a, b = args
+
+            if "apply_norm" in mode:
+                a, b = self.__call__(a), self.__call__(b)
+
+            return self.apply_norms(np.linalg.norm(a - b))
+
+        else:
+            raise ValueError("supported modes are 'calc+{}' and 'apply_norm'")
 
     def __str__(self):
         result = "Distance ("
