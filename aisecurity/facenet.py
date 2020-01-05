@@ -41,7 +41,7 @@ class FaceNet:
 
     # HYPERPARAMETERS
     HYPERPARAMS = {
-        "alpha": 0.75,
+        "alpha": 0.75,  # 0.9 for cosine+l2_normalize
         "mtcnn_alpha": 0.9
     }
 
@@ -299,8 +299,6 @@ class FaceNet:
 
         """
 
-        l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), K.epsilon()))
-
         if self.MODE == "keras":
             predict = lambda imgs: self.facenet.predict(imgs)
         elif self.MODE == "tf-trt":
@@ -309,7 +307,7 @@ class FaceNet:
 
         cropped_imgs = normalize(crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup))
         raw_embeddings = predict(cropped_imgs)
-        normalized_embeddings = l2_normalize(raw_embeddings)
+        normalized_embeddings = self.dist_metric.apply_norms(raw_embeddings)
 
         return normalized_embeddings
 

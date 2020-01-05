@@ -6,6 +6,8 @@ Distance metrics for facial recognition.
 
 """
 
+# FIXME: @orangese: this should be implemented as a preprocessing class, NOT a distance metric!
+
 import warnings
 
 import numpy as np
@@ -17,7 +19,7 @@ class DistMetric:
     # AVAILABLE MODES
     MODES = {
         "euclidean": lambda a, b: np.linalg.norm(a - b),
-        "cosine": lambda a, b: cosine_similarity(a, b)
+        "cosine": lambda a, b: cosine_similarity(a, b).item()
     }
 
     NORMALIZATIONS = {
@@ -28,8 +30,8 @@ class DistMetric:
         },
         "l2_normalize": {
             "state": 2,
-            "func:": lambda a, b: (a / np.sqrt(np.maximum(np.sum(np.square(a), axis=-1, keepdims=True), 1e-6)),
-                                   b / np.sqrt(np.maximum(np.sum(np.square(b), axis=-1, keepdims=True), 1e-6)),
+            "func:": lambda a, b: map(
+                lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6)), (a, b)
             )
         }
     }
@@ -48,7 +50,7 @@ class DistMetric:
             assert self.normalizations is None or all(norm in self.NORMALIZATIONS for norm in self.normalizations), \
                 "supported normalizations are {}".format(list(self.NORMALIZATIONS.keys()))
 
-        elif callable(mode):  # if custom mode and maybe norms are provided
+        elif callable(mode):  # if custom mode and norms are provided
             self.mode = mode
             self.normalizations = normalizations
 
@@ -56,7 +58,7 @@ class DistMetric:
             try:
                 assert isinstance(self.__call__(*test_case), float)
             except Exception:
-                raise ValueError("test failed: check that custom mode and norm are in the correct format")
+                raise ValueError("check failed: check that custom mode and norm are in the correct format")
 
             warnings.warn("custom mode and normalizations are not supported in FaceNet")
 
