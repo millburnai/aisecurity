@@ -6,8 +6,6 @@ Distance metrics for facial recognition.
 
 """
 
-# FIXME: @orangese: this should be implemented as a preprocessing class, NOT a distance metric!
-
 import warnings
 
 import numpy as np
