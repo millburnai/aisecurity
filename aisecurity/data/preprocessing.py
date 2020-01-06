@@ -16,7 +16,7 @@ import numpy as np
 # CONSTANTS
 IMG_CONSTANTS = {
     "margin": 10,
-    "img_size": (None, None),
+    "img_size": (160, 160),
     "mtcnn": MTCNN(),
     "cascade": cv2.CascadeClassifier(CONFIG_HOME + "/models/haarcascade_frontalface_default.xml")
 }
