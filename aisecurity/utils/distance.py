@@ -171,7 +171,6 @@ class DistMetric:
                 return np.array([self.__call__(arg) for arg in args])
 
         elif "calc" in mode:
-            # always use the Euclidean norm because the K-NN algorithm will always use it (pyfuncs are too slow)
             assert len(args) == 2, "'calc' requires two args only, got {} arg(s)".format(len(args))
 
             if "norm" in mode:
@@ -191,7 +190,13 @@ class DistMetric:
                             if norm_id not in ignore[idx]:
                                 args[idx] = self._apply_norm(norm_id, args[idx])
 
-            return self.apply_norms(np.linalg.norm(args[0] - args[1]))
+            a, b = self.DISTS[self.dist](*args)
+
+            # always use the Euclidean norm because the K-NN algorithm will always use it (pyfuncs are too slow)
+            dist = np.linalg.norm(a - b)
+            normalized_dist = self.apply_norms(dist)
+
+            return normalized_dist
 
         else:
             raise ValueError("supported modes are 'calc', 'norm', and 'calc+norm'")
