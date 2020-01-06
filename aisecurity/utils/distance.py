@@ -62,8 +62,8 @@ class DistMetric:
         ),
         "cosine": construct_dist(
             lambda a, b: (
-                a - np.mean(a) / np.maximum(np.std(a), 1e-6),
-                b - np.mean(b) / np.maximum(np.std(b), 1e-6)
+                (a - np.mean(a)) / np.maximum(np.std(a), 1e-6),
+                (b - np.mean(b)) / np.maximum(np.std(b), 1e-6)
             )  # not so sure this is right... has to be a transformation s.t. x^T x = 1 for all x in a, b
         )
     }

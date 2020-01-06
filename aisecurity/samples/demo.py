@@ -13,9 +13,8 @@ from aisecurity.facenet import FaceNet
 from aisecurity.utils.paths import CONFIG_HOME
 
 
-def demo(model="ms_celeb_1m", path=None, dist_metric="euclidean+l2_normalize", logging="firebase", use_dynamic=True,
-         use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False, resize=None, flip=0,
-         allow_gpu_growth=False):
+def demo(model="ms_celeb_1m", path=None, dist_metric="auto", logging=None, use_dynamic=True, use_picam=False,
+         use_graphics=True, use_lcd=False, use_keypad=False, resize=None, flip=0, allow_gpu_growth=False):
 
     if allow_gpu_growth:
         tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
@@ -23,12 +22,14 @@ def demo(model="ms_celeb_1m", path=None, dist_metric="euclidean+l2_normalize", l
     # demo
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
+
     try:
         facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.pb".format(model))
     except (OSError, AssertionError):
         facenet = FaceNet(path if path else CONFIG_HOME + "/models/{}.h5".format(model))
 
     input("\nPress ENTER to continue:")
+
     facenet.real_time_recognize(
         dist_metric=dist_metric, logging=logging, use_dynamic=use_dynamic, use_picam=use_picam,
         use_graphics=use_graphics, resize=resize, use_lcd=use_lcd, use_keypad=use_keypad, flip=flip
