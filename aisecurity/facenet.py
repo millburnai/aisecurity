@@ -210,19 +210,19 @@ class FaceNet:
 
         if "auto" in dist_metric:
             if "+" in dist_metric:
-                self.dist_metric = DistMetric(self.data_config["metric"] + dist_metric[dist_metric.find("+"):])
+                constructor = self.data_config["metric"] + dist_metric[dist_metric.find("+"):]
+                self.dist_metric = DistMetric(constructor, data=list(self.data.values()), axis=0)
             else:
-                self.dist_metric = DistMetric(self.data_config["metric"])
+                self.dist_metric = DistMetric(self.data_config["metric"], data=list(self.data.values()), axis=0)
         else:
-            if not hasattr(self, "dist_metric") or dist_metric.get_config() != self.dist_metric.get_config():
-                if isinstance(dist_metric, DistMetric):
-                    self.dist_metric = dist_metric
-                elif isinstance(dist_metric, str):
-                    self.dist_metric = DistMetric(dist_metric)
-                else:
-                    raise ValueError("{} not a supported dist metric".format(dist_metric))
+            if isinstance(dist_metric, DistMetric):
+                self.dist_metric = dist_metric
+            elif isinstance(dist_metric, str):
+                self.dist_metric = DistMetric(dist_metric, data=list(self.data.values()), axis=0)
+            else:
+                raise ValueError("{} not a supported dist metric".format(dist_metric))
 
-        if hasattr(self, "data_config") and hasattr(self, "dist_metric"):
+        if hasattr(self, "data_config"):
             if self.data_config["metric"] != self.dist_metric.get_config():
                 warnings.warn("this object's DistMetric ({}) is not the same as the data config metric ({}) ".format(
                     self.dist_metric.get_config(), self.data_config["metric"]
