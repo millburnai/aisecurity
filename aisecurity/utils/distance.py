@@ -6,8 +6,6 @@ Distance metrics for facial recognition.
 
 """
 
-import warnings
-
 import numpy as np
 
 
@@ -28,8 +26,11 @@ _CHECKS = {
 # FUNCTIONAL DICT CONSTRUCTORS
 def construct_dist(func):
     def test(test_case):
-        res = func(*test_case)
-        assert isinstance(res, tuple) and len(res) == 2, "func must take two arrays as input and return two arrays"
+        try:
+            res = func(*test_case)
+            assert isinstance(res, tuple) and len(res) == 2, "func must take two arrays as input and return two arrays"
+        except Exception:
+            raise ValueError("test failed: check that func takes two arrays as input and return two arrays")
 
     test_case = np.random.random((2, ))
     test(test_case)
@@ -64,7 +65,7 @@ class DistMetric:
             lambda a, b: (
                 (a - np.mean(a)) / np.maximum(np.std(a), 1e-6),
                 (b - np.mean(b)) / np.maximum(np.std(b), 1e-6)
-            )  # not so sure this is right... has to be a transformation s.t. x^T x = 1 for all x in a, b
+            )  # definitely not right... has to be a transformation s.t. x^T x = 1 for all x in a, b
         )
     }
 
@@ -191,10 +192,23 @@ class DistMetric:
 
 
 if __name__ == "__main__":
+    from sklearn.metrics.pairwise import cosine_similarity
+
     for trial_num, test in enumerate(np.random.random((10, 128, 1))):
         data = np.random.random((100, 1))
+        second_test = np.random.random(test.shape)
 
         differences = {}
+
+        dist_metric = DistMetric("cosine", data=data)
+        result = dist_metric(test, second_test, mode="calc")
+        true_value = cosine_similarity(test, second_test)
+        differences[dist_metric.get_config()] = np.sum(true_value - result)
+
+        dist_metric = DistMetric("euclidean+subtract_mean", data=data)
+        result = dist_metric(test)
+        true_value = test - np.mean(data)
+        differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+subtract_mean", data=data)
         result = dist_metric(test)
@@ -216,7 +230,6 @@ if __name__ == "__main__":
         true_value = DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data)
         differences[dist_metric.get_config()] = np.sum(true_value - result)
 
-        second_test = np.random.random(test.shape)
         dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean+sigmoid", data=data)
         result = dist_metric(test, second_test, mode="calc+apply_norms")
         true_value = DistMetric.NORMALIZATIONS["sigmoid"]["func"](
