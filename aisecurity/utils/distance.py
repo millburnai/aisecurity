@@ -118,27 +118,35 @@ class DistMetric:
 
 
     # HELPER FUNCTIONS
+    def _apply_norm(self, norm_id, arg, normalized=None):
+        if normalized is None:
+            normalized = arg
+
+        functional_dict = self.NORMALIZATIONS[norm_id]
+
+        actions = functional_dict.copy()
+        apply_to = actions.pop("apply_to")
+        use_stat = actions.pop("use_stat")
+
+        if apply_to(arg):
+            tmp = normalized
+            args = []
+
+            if use_stat:
+                args.append(self.stats)
+
+            for action in actions.values():
+                tmp = action(tmp, *args)
+
+            normalized = tmp
+
+        return normalized
+
     def apply_norms(self, arg):
         normalized = arg
 
         for norm_id in self.normalizations:
-            functional_dict = self.NORMALIZATIONS[norm_id]
-
-            actions = functional_dict.copy()
-            apply_to = actions.pop("apply_to")
-            use_stat = actions.pop("use_stat")
-
-            if apply_to(arg):
-                tmp = normalized
-                args = []
-
-                if use_stat:
-                    args.append(self.stats)
-
-                for action in actions.values():
-                    tmp = action(tmp, *args)
-
-                normalized = tmp
+            normalized = self._apply_norm(norm_id, arg, normalized)
 
         if hasattr(normalized, "__len__"):
             check_passes =  _CHECKS["is_shape_equal"](normalized, arg)
@@ -151,28 +159,42 @@ class DistMetric:
 
 
     # MAGIC FUNCTIONS
-    def __call__(self, *args, mode="apply_norm"):
-        if mode == "apply_norm":
-            assert len(args) == 1, "'apply_norm' dist requires one arg only, got {} args".format(len(args))
+    def __call__(self, *args, mode="norm", ignore=None):
+        if mode == "norm":
+            if len(args) == 1:
+                arg = args[0]
+                arg = arg.reshape(np.array(arg).shape if np.array(arg).shape != () else (-1, 1))
 
-            arg = args[0]
-            arg = arg.reshape(np.array(arg).shape if np.array(arg).shape != () else (-1, 1))
+                return self.apply_norms(arg)
 
-            return self.apply_norms(arg)
+            else:
+                return np.array([self.__call__(arg) for arg in args])
 
         elif "calc" in mode:
             # always use the Euclidean norm because the K-NN algorithm will always use it (pyfuncs are too slow)
-            assert len(args) == 2, "'calc' dist requires two args only, got {} arg(s)".format(len(args))
+            assert len(args) == 2, "'calc' requires two args only, got {} arg(s)".format(len(args))
 
-            a, b = args
+            if "norm" in mode:
+                args = list(args)
 
-            if "apply_norm" in mode:
-                a, b = self.__call__(a), self.__call__(b)
+                if ignore is None:
+                    ignore = {}
 
-            return self.apply_norms(np.linalg.norm(a - b))
+                # applying norm list arg by arg
+                for idx, arg in enumerate(args):
+                    if idx not in ignore.keys():
+                        args[idx] = self.__call__(args[idx])
+
+                    else:
+                        # applying norms one by one for the 'ignore' arg
+                        for norm_id in self.get_config().split("+")[1:]:  # cfg[0] is 'dist' mode
+                            if norm_id not in ignore[idx]:
+                                args[idx] = self._apply_norm(norm_id, args[idx])
+
+            return self.apply_norms(np.linalg.norm(args[0] - args[1]))
 
         else:
-            raise ValueError("supported modes are 'calc+{}' and 'apply_norm'")
+            raise ValueError("supported modes are 'calc', 'norm', and 'calc+norm'")
 
     def __str__(self):
         result = "Distance ("
