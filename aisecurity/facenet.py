@@ -225,14 +225,12 @@ class FaceNet:
             raise ValueError("{} not a supported dist metric".format(dist_metric))
 
         # check against data config
-        if hasattr(self, "cfg_dist_metric") and self.cfg_dist_metric != self.dist_metric.get_config():
+        if self.cfg_dist_metric != self.dist_metric.get_config():
             self.ignore = {0: self.dist_metric.get_config(), 1: self.cfg_dist_metric}
             warnings.warn("provided DistMetric ({}) is not the same as the data config metric ({}) ".format(
                 self.dist_metric.get_config(), self.cfg_dist_metric
             ))
         else:
-            if not hasattr(self, "cfg_dist_metric"):
-                warnings.warn("Data config not found. Metric check cannot be performed")
             self.ignore = {0: self.dist_metric}
 
     def _train_knn(self, knn_types):
