@@ -49,16 +49,18 @@ class FaceNet:
     TENSORS = {
         "ms_celeb_1m": {
             "input": "input_1:0",
-            "output": "Bottleneck_BatchNorm/batchnorm/add_1:0"
+            "output": "Bottleneck_BatchNorm/batchnorm/add_1:0",
+            "extras": {}
         },
         "vgg_face_2": {
             "input": "base_input:0",
-            "output": "classifier_low_dim/Softmax:0"
+            "output": "classifier_low_dim/Softmax:0",
+            "extras": {}
         },
         "20180402-114759": {
-            "input": "input:0",
+            "input": "batch_join:0",
             "output": "embeddings:0",
-            "phase_train": {
+            "extras": {
                 "phase_train:0": False
             }
         }
@@ -126,7 +128,7 @@ class FaceNet:
 
         assert tf.test.is_gpu_available(), "TF-TRT mode requires a CUDA-enabled GPU"
 
-        trt_graph = self.get_frozen_graph(filepath)
+        graph_def = self.get_frozen_graph(filepath)
 
         if sess:
             self.sess = sess
@@ -134,14 +136,19 @@ class FaceNet:
         else:
             self.sess = K.get_session()
 
-        tf.import_graph_def(trt_graph, name="")
+        tf.import_graph_def(graph_def, name="")
 
+        self.extra_tensors = []  # extra tensors for feed dict to sess.run
         self._tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
 
         self.facenet = self.sess.graph
-        IMG_CONSTANTS["img_size"] = tuple(self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3])
+        try:
+            IMG_CONSTANTS["img_size"] = tuple(
+                self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3]
+            )
+        except ValueError:
+            warnings.warn("Input tensor size not detected")
 
-        self.extra_tensors = []  # extra tensors for feed dict to sess.run
 
     def _tensor_init(self, model_name, input_name, output_name):
         """Initializes tensors (TF-TRT only)
@@ -156,14 +163,12 @@ class FaceNet:
 
         for model in self.TENSORS:
             if model in model_name:
-                self.input_name = self.TENSORS[model]["input"]
-                self.output_name = self.TENSORS[model]["output"]
+                tensors = self.TENSORS[model]
 
-                extra_model_config = self.TENSORS[model]
-                extra_model_config.pop("input")
-                extra_model_config.pop("output")
+                self.input_name = tensors["input"]
+                self.output_name = tensors["output"]
 
-                for tensor, value in extra_model_config.items():
+                for tensor, value in tensors["extras"].items():
                     self.extra_tensors.append({tensor: value})
 
         if not self.input_name:
@@ -225,13 +230,14 @@ class FaceNet:
             raise ValueError("{} not a supported dist metric".format(dist_metric))
 
         # check against data config
+        self.ignore = {0: self.dist_metric.get_config()}
         if self.cfg_dist_metric != self.dist_metric.get_config():
-            self.ignore = {0: self.dist_metric.get_config(), 1: self.cfg_dist_metric}
-            warnings.warn("provided DistMetric ({}) is not the same as the data config metric ({}) ".format(
-                self.dist_metric.get_config(), self.cfg_dist_metric
-            ))
-        else:
-            self.ignore = {0: self.dist_metric}
+            self.ignore.update({1: self.cfg_dist_metric})
+            warnings.warn(
+                "provided DistMetric ({}) is not the same as the data config metric ({}) ".format(
+                    self.dist_metric.get_config(), self.cfg_dist_metric
+                )
+            )
 
     def _train_knn(self, knn_types):
         """Trains K-Nearest-Neighbors
@@ -470,13 +476,15 @@ class FaceNet:
                 face = person["box"]
 
                 if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
-                    print("Face poorly detected")
+                    print("{}% face detection confidence is too low".format(round(person["confidence"] * 100, 2)))
                     continue
 
                 # facial recognition
                 try:
                     embedding, is_recognized, best_match, dist = self._recognize(frame, db_types, faces=face)
-                    print("{}: {} ({}){}".format(self.dist_metric, dist, best_match, " !" if not is_recognized else ""))
+                    print("{}: {} ({}){}".format(
+                        self.dist_metric, round(dist, 4), best_match, " !" if not is_recognized else "")
+                    )
                 except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
                     if "query data dimension" in str(error):
                         raise ValueError("Current model incompatible with database")
