@@ -200,6 +200,7 @@ class FaceNet:
             warnings.warn("data config missing. Distance metric not detected")
         else:
             self.data_config = config
+            self.cfg_dist_metric = self.data_config["metric"]
 
     def set_dist_metric(self, dist_metric):
         """Sets distance metric for FaceNet
@@ -208,27 +209,31 @@ class FaceNet:
 
         """
 
-        if "auto" in dist_metric:
-            if "+" in dist_metric:
-                constructor = self.data_config["metric"] + dist_metric[dist_metric.find("+"):]
-                self.dist_metric = DistMetric(constructor, data=list(self.data.values()), axis=0)
+        # set distance metric
+        if isinstance(dist_metric, DistMetric):
+            self.dist_metric = dist_metric
+        elif isinstance(dist_metric, str):
+            if "auto" in dist_metric:
+                if "+" in dist_metric:
+                    constructor = self.cfg_dist_metric + dist_metric[dist_metric.find("+"):]
+                else:
+                    constructor = self.cfg_dist_metric
             else:
-                self.dist_metric = DistMetric(self.data_config["metric"], data=list(self.data.values()), axis=0)
+                constructor = dist_metric
+            self.dist_metric = DistMetric(constructor, data=list(self.data.values()), axis=0)
         else:
-            if isinstance(dist_metric, DistMetric):
-                self.dist_metric = dist_metric
-            elif isinstance(dist_metric, str):
-                self.dist_metric = DistMetric(dist_metric, data=list(self.data.values()), axis=0)
-            else:
-                raise ValueError("{} not a supported dist metric".format(dist_metric))
+            raise ValueError("{} not a supported dist metric".format(dist_metric))
 
-        if hasattr(self, "data_config"):
-            if self.data_config["metric"] != self.dist_metric.get_config():
-                warnings.warn("this object's DistMetric ({}) is not the same as the data config metric ({}) ".format(
-                    self.dist_metric.get_config(), self.data_config["metric"]
-                ))
+        # check against data config
+        if hasattr(self, "cfg_dist_metric") and self.cfg_dist_metric != self.dist_metric.get_config():
+            self.ignore = {0: self.dist_metric.get_config(), 1: self.cfg_dist_metric}
+            warnings.warn("provided DistMetric ({}) is not the same as the data config metric ({}) ".format(
+                self.dist_metric.get_config(), self.cfg_dist_metric
+            ))
         else:
-            warnings.warn("Data config not found. Metric check cannot be performed")
+            if not hasattr(self, "cfg_dist_metric"):
+                warnings.warn("Data config not found. Metric check cannot be performed")
+            self.ignore = {0: self.dist_metric}
 
     def _train_knn(self, knn_types):
         """Trains K-Nearest-Neighbors
@@ -297,7 +302,7 @@ class FaceNet:
 
         :param paths_or_imgs: paths or images to predict on
         :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
-        :param faces: pre-detected MTCNN faces (makes `margin` param irrelevant) (default: None)
+        :param faces: pre-detected MTCNN faces (makes 'margin' param irrelevant) (default: None)
         :param checkup: whether this is just a call to keep the GPU warm (default: False)
         :returns: normalized embeddings
 
@@ -319,7 +324,7 @@ class FaceNet:
         """Gets embedding from various datatypes
 
         :param data: data dictionary in form {name: embedding vector, ...}
-        :param args: data to embed. Can be a key in `data` param, a filepath, or an image array
+        :param args: data to embed. Can be a key in 'data' param, a filepath, or an image array
         :param kwargs: named arguments to self.predict
         :returns: list of embeddings
 
@@ -365,7 +370,7 @@ class FaceNet:
         best_matches = []
         for knn in knns:
             pred = knn.predict(embedding)[0]
-            best_matches.append((pred, self.dist_metric(embedding, data[pred], mode="calc")))
+            best_matches.append((pred, self.dist_metric(embedding, data[pred], mode="calc+norm", ignore=self.ignore)))
         best_match, dist = max(best_matches, key=lambda n: n[1])
         is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
@@ -574,7 +579,7 @@ class FaceNet:
         :param picamera: use picamera or not
         :param framerate: framerate, recommended <120
         :param flip: flip method: +1 = +90º rotation (default: 0)
-        :param device: VideoCapture will use /dev/video{`device`} (default: 0)
+        :param device: VideoCapture will use /dev/video{'device'} (default: 0)
         :returns: cv2.VideoCapture object
 
         """
