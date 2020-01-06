@@ -214,9 +214,13 @@ class DistMetric:
 
 
 if __name__ == "__main__":
+    from time import time
+
     from sklearn.metrics.pairwise import cosine_similarity
 
     for trial_num, test in enumerate(np.random.random((10, 128, 1))):
+        start = time()
+
         data = np.random.random((100, 1))
         second_test = np.random.random(test.shape)
 
@@ -252,18 +256,33 @@ if __name__ == "__main__":
         true_value = DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data)
         differences[dist_metric.get_config()] = np.sum(true_value - result)
 
+        dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean", data=data)
+        result = dist_metric(test, second_test)
+        true_value = np.array([
+            DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data),
+            DistMetric.NORMALIZATIONS["l2_normalize"]["func"](second_test) - np.mean(data)
+        ])
+        differences[dist_metric.get_config() + "+{recursive}"] = np.sum(np.sum(true_value) - np.sum(result))
+
+
         dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean+sigmoid", data=data)
-        result = dist_metric(test, second_test, mode="calc+apply_norms")
+        result = dist_metric(test, second_test, mode="calc+norm")
         true_value = DistMetric.NORMALIZATIONS["sigmoid"]["func"](
             np.linalg.norm(
-                DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data) -
+                (DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data)) -
                 (DistMetric.NORMALIZATIONS["l2_normalize"]["func"](second_test) - np.mean(data))
             )
         )
         differences[dist_metric.get_config()] = np.sum(true_value - result)
 
+        dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean", data=data)
+        result = dist_metric(test, second_test, mode="calc+norm",
+                             ignore={0: "euclidean+l2_normalize+subtract_mean", 1: "euclidean+l2_normalize"})
+        true_value = np.linalg.norm(test - (second_test - np.mean(data)))
+        differences[dist_metric.get_config() + "+ignore"] = np.sum(true_value - result)
+
         for metric in differences:
-            if differences[metric] != 0:
-                print("Error - {}: difference of {}".format(metric, differences[metric]))
+            if differences[metric] != 0.:
+                print("Error - {}: difference of {}".format(metric, np.round(differences[metric], 5)))
         else:
-            print("Test {} finished without error".format(trial_num + 1))
+            print("Test {} finished without error ({}s)".format(trial_num + 1, round(time() - start, 5)))
