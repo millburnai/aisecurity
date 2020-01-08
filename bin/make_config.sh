@@ -25,7 +25,7 @@ if [ ! -d "$config_path/database" ] ; then
   echo "Making database and unknown directories"
   mkdir database
   cd "$config_path/database" || echo "Error: unable to access $config_path/database"
-  wget -O "test.json" https://www.dropbox.com/s/uhii2vj373y7odj/test.json?dl=1 || echo "Error: unable to download test.json"
+  wget -O "test.json" https://www.dropbox.com/s/umjku76xppc0396/test.json?dl=1 || echo "Error: unable to download test.json"
   wget -O "test_info.json" https://www.dropbox.com/s/ihfmemt6sqdfj74/test_info.json?dl=1 || echo "Error: unable to download test_info.json"
 fi
 
