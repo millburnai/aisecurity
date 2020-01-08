@@ -639,11 +639,21 @@ class FaceNet:
                 return 0, 255, 0  # green
 
         def add_box_and_label(frame, origin, corner, color, line_thickness, best_match, font_size, thickness):
+            # bounding box
             cv2.rectangle(frame, origin, corner, color, line_thickness)
+
             # label box
-            cv2.rectangle(frame, (origin[0], corner[1] - 35), corner, color, cv2.FILLED)
-            cv2.putText(frame, best_match.replace("_", " ").title(), (origin[0] + 6, corner[1] - 6),
-                        cv2.FONT_HERSHEY_DUPLEX, font_size, (255, 255, 255), thickness)  # white text
+            label = best_match.replace("_", " ").title()
+            font = cv2.FONT_HERSHEY_DUPLEX
+
+            (width, height), _ = cv2.getTextSize(label, font, font_size, thickness)
+
+            box_x = max(corner[0], origin[0] + width + 6)
+            cv2.rectangle(frame, (origin[0], corner[1] - 35), (box_x, corner[1]), color, cv2.FILLED)
+
+            # label
+            cv2.putText(frame, label, (origin[0] + 6, corner[1] - 6), font, font_size, (255, 255, 255), thickness)
+
 
         def add_features(overlay, features, radius, color, line_thickness):
             cv2.circle(overlay, (features["left_eye"]), radius, color, line_thickness)
