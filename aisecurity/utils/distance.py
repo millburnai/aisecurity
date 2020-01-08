@@ -7,44 +7,37 @@ Distance metrics for facial recognition.
 """
 
 import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 # LAMBDA DICTS
-_FORMAT = {
-    "apply_to": lambda x: callable(x),
-    "use_stat": lambda x: isinstance(x, bool),
-    "func": lambda x: callable(x)
-}
 
+# OFTEN-USED CHECKS
 _CHECKS = {
     "is_vector": lambda x: x.ndim <= 2 and (1 in x.shape or x.ndim == 1),
     "is_float_like": lambda x: isinstance(x, float) or isinstance(x, np.float),
     "is_shape_equal": lambda a, b: np.array(a).shape == np.array(b).shape
 }
 
+# NORM TESTS
+_NORM_FORMAT = {
+    "apply_to": lambda x: callable(x),
+    "use_stat": lambda x: isinstance(x, bool),
+    "func": lambda x: callable(x)
+}
+
+# DIST TESTS
+_DIST_FORMAT = {
+    "norm": lambda x: callable(x),
+    "calc": lambda x: callable(x)
+}
+
 
 # FUNCTIONAL DICT CONSTRUCTORS
-def construct_dist(func):
-    def test(test_case):
-        try:
-            res = func(*test_case)
-            assert isinstance(res, tuple) and len(res) == 2, "func must take two arrays as input and return two arrays"
-        except Exception:
-            raise ValueError("test failed: check that func takes two arrays as input and return two arrays")
-
-    test_case = np.random.random((2, ))
-    test(test_case)
-
-    test_case = np.random.random((2, 1))
-    test(test_case)
-
-    return func
-
-
-def construct_norm(**kwargs):
+def _test_format(format, **kwargs):
     checked = kwargs.copy()
 
-    for value, test in _FORMAT.items():
+    for value, test in format.items():
         assert value in kwargs and test(kwargs[value]), "{} is missing or failed test".format(value)
         kwargs.pop(value)
     assert all(callable(extra) for extra in kwargs)
@@ -52,26 +45,39 @@ def construct_norm(**kwargs):
     return checked
 
 
+def construct_dist(**kwargs):
+    return _test_format(_DIST_FORMAT, **kwargs)
+
+
+def construct_norm(**kwargs):
+    return _test_format(_NORM_FORMAT, **kwargs)
+
+
 # DISTMETRIC
 class DistMetric:
 
     DISTS = {
-        # dists are the transformations to be applied before Euclidean distance is calculated
-        # ex: for "euclidean", no transformation is applied --> lambda a, b: (a, b)
+        # "norm" describes the transformations to be applied before Euclidean distance is calculated
+        # "calc" is the actual calculation of distance
+        # note: composition of "norm" and np.linalg.norm will produce same K-NN ordering as passing "calc" as metric
+        # into K-NN but will not necessarily output the same distance
         "euclidean": construct_dist(
-            lambda a, b: (a, b)
+            norm=lambda x: x,
+            calc=lambda a, b: np.linalg.norm(a - b)
         ),
         "cosine": construct_dist(
-            lambda a, b: (
-                (a - np.mean(a)) / np.maximum(np.std(a), 1e-6),
-                (b - np.mean(b)) / np.maximum(np.std(b), 1e-6)
-            )  # definitely not right... has to be a transformation s.t. x^T x = 1 for all x in a, b
+            # definitely not right... has to be a transformation s.t. x^T x = 1 for all x in a, b
+            norm=lambda x: x / np.linalg.norm(x),
+            calc=lambda a, b: cosine_similarity(a.reshape(-1, 1), b.reshape(-1, 1))
         )
     }
 
     NORMALIZATIONS = {
         # normalizations are applied before dist lambdas
         # ex: for "cosine+l2_normalize", L2 normalization is applied, then cosine normalization, then Euclidean distance
+        # "apply_to": what type of objects to apply to (callable)
+        # "use_stat": use statistics like mean and std (requires data to be supplied
+        # "func": norm func
         "subtract_mean": construct_norm(
             apply_to= _CHECKS["is_vector"],
             use_stat=True,
@@ -165,10 +171,13 @@ class DistMetric:
                 arg = args[0]
                 arg = arg.reshape(np.array(arg).shape if np.array(arg).shape != () else (-1, 1))
 
-                return self.apply_norms(arg)
+                normalized = self.apply_norms(arg)
 
             else:
-                return np.array([self.__call__(arg) for arg in args])
+                normalized = [self.__call__(arg) for arg in args]
+
+            dist_normalized = np.array([self.DISTS[self.dist]["norm"](arr) for arr in normalized])
+            return dist_normalized
 
         elif "calc" in mode:
             assert len(args) == 2, "'calc' requires two args only, got {} arg(s)".format(len(args))
@@ -190,10 +199,7 @@ class DistMetric:
                             if norm_id not in ignore[idx]:
                                 args[idx] = self._apply_norm(norm_id, args[idx])
 
-            a, b = self.DISTS[self.dist](*args)
-
-            # always use the Euclidean norm because the K-NN algorithm will always use it (pyfuncs are too slow)
-            dist = np.linalg.norm(a - b)
+            dist = self.DISTS[self.dist]["calc"](*args)
             normalized_dist = self.apply_norms(dist)
 
             return normalized_dist
