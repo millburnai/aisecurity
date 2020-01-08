@@ -18,19 +18,13 @@ Note that TensorFlow 2.0 is not yet supported, as `mtcnn` is not compatible with
 
 Current version: `python3 -m pip install "git+https://github.com/orangese/aisecurity.git@v0.9a"`
 
-Keras version: `python3 -m pip install "git+https://github.com/orangese/aisecurity.git@keras"`
-
-TF-TRT version: `python3 -m pip install "git+https://github.com/orangese/aisecurity.git@tf-trt"`
-
 Pure TensorRT version [__broken__]: `python3 -m pip install "git+https://github.com/orangese/aisecurity.git@tensorrt"`
 
 After installing, you might want to change the key location settings in `~/.aisecurity/config.json`, which is installed with the `aisecurity` package.
 
 ## Upgrade
 
-Keras version: `python3 -m pip install --upgrade "git+https://github.com/orangese/aisecurity.git@keras"`
-
-TF-TRT version: `python3 -m pip install --upgrade "git+https://github.com/orangese/aisecurity.git@tf-trt"`
+Current version: `python3 -m pip install --upgrade "git+https://github.com/orangese/aisecurity.git@v0.9a"`
 
 Pure TensorRT version [__broken__]: `python3 -m pip install --upgrade "git+https://github.com/orangese/aisecurity.git@tensorrt"`
 
