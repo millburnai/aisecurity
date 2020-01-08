@@ -11,9 +11,9 @@ import os
 import tqdm
 import warnings
 
-from aisecurity.privacy.encryptions import DataEncryption
+from aisecurity.privacy.encryptions import DataEncryption, _KEY_FILES
 from aisecurity.utils.events import timer
-from aisecurity.utils.paths import CONFIG_HOME, DATABASE_INFO
+from aisecurity.utils.paths import DATABASE_INFO
 
 
 # LOAD ON THE FLY
@@ -67,26 +67,41 @@ def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=
 
 
 @timer(message="Data retrieval time")
-def retrieve_embeds(path):
+def retrieve_embeds(path, encrypted=DATABASE_INFO["encrypted"], name_keys=_KEY_FILES["names"],
+                    embedding_keys=_KEY_FILES["embeddings"]):
     with open(path, "r") as json_file:
         data = json.load(json_file)
 
-    encrypted = DATABASE_INFO["encrypted"]
     ignore = ["names", "embeddings"]
-
     if encrypted == "all":
         encrypted = ["names", "embeddings"]
     for item in encrypted:
         ignore.remove(item)
 
-    return DataEncryption.decrypt_data(data, ignore=ignore)
+    return DataEncryption.decrypt_data(data, ignore=ignore, name_keys=name_keys, embedding_keys=embedding_keys)
 
 
 if __name__ == "__main__":
-    from aisecurity.utils.paths import DATABASE
+    import editdistance
 
-    data = retrieve_embeds(DATABASE)
-    encrypted_data = DataEncryption.encrypt_data(data, ignore=["embeddings"])
+    data = retrieve_embeds("/home/ryan/.aisecurity/database/embeddings.json", encrypted=["names"],
+                           name_keys="/home/ryan/.aisecurity/keys/name_keys.txt",
+                           embedding_keys="/home/ryan/.aisecurity/keys/embedding_keys.txt")
 
-    with open("embeddings.json", "w+") as json_file:
-        json.dump(encrypted_data, json_file, indent=4, ensure_ascii=False)
+    with open("/home/ryan/scratchpad/aisecurity/people.txt", "r") as file:
+        aisecurity_students = file.readlines()
+
+    filtered_data = {}
+    for student in aisecurity_students:
+        closest_match, _ = min(
+            [(person, editdistance.eval(student, person)) for person in data.keys()],
+            key=lambda t: t[1]
+        )
+        filtered_data[student.strip("\n")] = data[closest_match]
+
+    filtered_data["ryan_park"] = data["ryan_park"]
+    filtered_data["liam_pilarski"] = data["liam_pilarski"]
+
+    encrypted_data = DataEncryption.encrypt_data(filtered_data, ignore=["embeddings"])
+    with open("/home/ryan/.aisecurity/database/test.json", "w") as file:
+        json.dump(encrypted_data, file, indent=4, ensure_ascii=False)

@@ -44,34 +44,34 @@ def require_permission(func):
 
 # GENERATING ENCRYPTION INFO
 @require_permission
-def generate_key(key_type):
-    open(_KEY_FILES[key_type], "w").close()
-    with open(_KEY_FILES[key_type], "wb") as keys:
+def generate_key(key_file):
+    open(key_file, "w").close()
+    with open(key_file, "wb") as keys:
         key = get_random_bytes(_BIT_ENCRYPTION)
         keys.write(key)
 
 
 @require_permission
-def generate_cipher(key_type, alloc_mem):
-    key = get_key(key_type)
+def generate_cipher(key_file, alloc_mem):
+    key = get_key(key_file)
     cipher = AES.new(key, AES.MODE_EAX)
     if alloc_mem:
-        with open(_KEY_FILES[key_type], "ab") as keys:
+        with open(key_file, "ab") as keys:
             keys.write(cipher.nonce)
     return cipher
 
 
 # RETRIEVALS
 @require_permission
-def get_key(key_type):
-    with open(_KEY_FILES[key_type], "rb") as keys:
+def get_key(key_file):
+    with open(key_file, "rb") as keys:
         key = b"".join(keys.readlines())[:_BIT_ENCRYPTION]
     return key
 
 
 @require_permission
-def get_nonce(key_type, position):
-    with open(_KEY_FILES[key_type], "rb") as keys:
+def get_nonce(key_file, position):
+    with open(key_file, "rb") as keys:
         joined_nonces = b"".join(keys.readlines())[_BIT_ENCRYPTION:]
         nonce = joined_nonces[position * _BIT_ENCRYPTION:(position + 1) * _BIT_ENCRYPTION]
     return nonce
@@ -83,8 +83,8 @@ def encrypt(data, cipher):
     return cipher_text
 
 
-def decrypt(cipher_text, key_type, position):
-    decrypt_cipher = AES.new(get_key(key_type), AES.MODE_EAX, nonce=get_nonce(key_type, position))
+def decrypt(cipher_text, position, key_file):
+    decrypt_cipher = AES.new(get_key(key_file), AES.MODE_EAX, nonce=get_nonce(key_file, position))
     return decrypt_cipher.decrypt(cipher_text)
 
 
@@ -92,19 +92,21 @@ def decrypt(cipher_text, key_type, position):
 class DataEncryption:
 
     @staticmethod
-    def encrypt_data(data, ignore=None, decryptable=True):
+    def encrypt_data(data, ignore=None, decryptable=True, name_key_file=_KEY_FILES["names"],
+                     embeddings_key_file=_KEY_FILES["embeddings"]):
         if ignore is None:
             ignore = []
         if decryptable:
-            generate_key("names")
-            generate_key("embeddings")
+            generate_key(name_key_file)
+            generate_key(embeddings_key_file)
 
         encrypted = {}
         for person in data:
-            name_cipher = generate_cipher("names", alloc_mem=decryptable)
-            embedding_cipher = generate_cipher("embeddings", alloc_mem=decryptable)
+            name_cipher = generate_cipher(name_key_file, alloc_mem=decryptable)
+            embedding_cipher = generate_cipher(embeddings_key_file, alloc_mem=decryptable)
 
             encrypted_name, encrypted_embed = person, data[person]
+
             if isinstance(encrypted_embed, np.ndarray):
                 encrypted_embed = encrypted_embed.reshape(-1,).tolist()
 
@@ -121,7 +123,7 @@ class DataEncryption:
         return encrypted
 
     @staticmethod
-    def decrypt_data(data, ignore=None):
+    def decrypt_data(data, ignore=None, name_keys=_KEY_FILES["names"], embedding_keys=_KEY_FILES["embeddings"]):
         if ignore is None:
             ignore = []
 
@@ -129,10 +131,10 @@ class DataEncryption:
         for nonce_pos, encrypted_name in enumerate(data):
             name, embed = encrypted_name, data[encrypted_name]
             if "names" not in ignore:
-                name = decrypt(bytes([ord(c) for c in encrypted_name]), key_type="names", position=nonce_pos)
+                name = decrypt(bytes([ord(c) for c in encrypted_name]), nonce_pos, name_keys)
                 name = name.decode("utf8")
             if "embeddings" not in ignore:
-                byte_embed = decrypt(bytes(data[encrypted_name]), key_type="embeddings", position=nonce_pos)
+                byte_embed = decrypt(bytes(data[encrypted_name]), nonce_pos, embedding_keys)
                 embed = np.array(list(struct.unpack("%sd" % (len(byte_embed) // 8), byte_embed)), dtype=np.float32)
                 # using double precision (C long doubles not available), hence int division by 8 (double is 8 bits)
 
