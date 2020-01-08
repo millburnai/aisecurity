@@ -12,7 +12,7 @@ setup(
     python_requires=">=3.5.0",
     install_requires=["adafruit-circuitpython-charlcd", "keras", "matplotlib", "mtcnn",
                       "mysql-connector-python", "Pyrebase", "pycryptodome", "scikit-learn", "requests"],
-    scripts=["bin/make_config.sh", "bin/make_keys.sh", "bin/dump_embeds.sh"],
+    scripts=["bin/drop.sql", "bin/make_config.sh", "bin/make_keys.sh"],
     packages=find_packages(),
     zip_safe=False
 )

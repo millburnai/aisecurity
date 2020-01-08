@@ -67,7 +67,7 @@ function update_json {
     touch "$json_path"
   fi
 
-  printf '{\n    "names": "%stest_name_keys.txt",\n    "embeddings": "%stest_embedding_keys.txt"\n}\n' "$key_dir" "$key_dir" \
+  printf '{\n    "names": "%s/test_name_keys.txt",\n    "embeddings": "%s/test_embedding_keys.txt"\n}\n' "$key_dir" "$key_dir" \
   > "$json_path"
 }
 
