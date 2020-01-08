@@ -15,7 +15,6 @@ import warnings
 
 import cv2
 import keras
-from aisecurity.data.dataflow import retrieve_embeds
 from keras import backend as K
 import matplotlib.pyplot as plt
 from mtcnn.mtcnn import MTCNN
@@ -24,12 +23,13 @@ from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
 
+from aisecurity.data.dataflow import retrieve_embeds
 from aisecurity.database import log
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.events import timer, HidePrints, run_async_method
-from aisecurity.utils.paths import CONFIG_HOME, DATABASE_INFO, DATABASE
+from aisecurity.utils.paths import DATABASE_INFO, DATABASE, DEFAULT_MODEL
 from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces
 
 
@@ -69,11 +69,10 @@ class FaceNet:
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=CONFIG_HOME+"/models/ms_celeb_1m.pb", sess=None, input_name=None, output_name=None,
-                 **hyperparams):
+    def __init__(self, filepath=DEFAULT_MODEL, sess=None, input_name=None, output_name=None, **hyperparams):
         """Initializes FaceNet object
 
-        :param filepath: path to model (default: CONFIG_HOME+"/models/ms_celeb_1m.pb")
+        :param filepath: path to model (default: aisecurity.utils.paths.DEFAULT_MODEL)
         :param sess: tf.Session to use (default: None)
         :param input_name: name of input tensor-- only required if using TF-TRT non-default model (default: None)
         :param output_name: name of output tensor-- only required if using TF-TRT non-default model (default: None)
@@ -405,7 +404,7 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
-                                   use_lcd, use_keypad, framerate, resize, flip):
+                                   use_lcd, use_keypad, framerate, resize, flip, device):
         """Real-time facial recognition under the hood (dev use only)
 
         :param width: width of frame (only matters if use_graphics is True)
@@ -420,6 +419,7 @@ class FaceNet:
         :param framerate: frame rate (recommended <120)
         :param resize: resize scale (float between 0. and 1.)
         :param flip: flip method: +1 = +90º rotation
+        :param device: camera device (/dev/video{device})
         :returns: number of frames elapsed
 
         """
@@ -442,7 +442,7 @@ class FaceNet:
         else:
             mtcnn_width, mtcnn_height = width, height
 
-        cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip)
+        cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip, device=device)
         assert cap.isOpened(), "video capture failed to initialize"
 
         mtcnn = MTCNN(min_face_size=0.5 * (mtcnn_width + mtcnn_height) / 3)
@@ -543,15 +543,15 @@ class FaceNet:
 
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging="firebase",
+    def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
                             use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
-                            framerate=20, resize=None, flip=0):
+                            framerate=20, resize=None, flip=0, device=0):
         """Real-time facial recognition
 
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
         :param dist_metric: DistMetric object or str distance metric (default: "euclidean+l2_normalize")
-        :param logging: logging type-- None, "firebase", or "mysql" (default: "firebase")
+        :param logging: logging type-- None, "firebase", or "mysql" (default: None)
         :param use_dynamic: use dynamic database for visitors or not (default: False)
         :param use_picam: use picamera or not (default: False)
         :param use_graphics: display video feed or not (default: True)
@@ -560,6 +560,7 @@ class FaceNet:
         :param framerate: frame rate, only matters if use_picamera is True (recommended <120) (default: 20)
         :param resize: resize scale (float between 0. and 1.) (default: None)
         :param flip: flip method: +1 = +90º rotation (default: 0)
+        :param device: camera device (/dev/video{device}) (default: 0)
 
         """
 
@@ -571,7 +572,7 @@ class FaceNet:
         run_async_method(
             self._real_time_recognize, width=width, height=height, dist_metric=dist_metric, logging=logging,
             use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd,
-            use_keypad=use_keypad, framerate=framerate, resize=resize, flip=flip
+            use_keypad=use_keypad, framerate=framerate, resize=resize, flip=flip, device=device
         )
 
 
