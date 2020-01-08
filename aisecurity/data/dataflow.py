@@ -82,11 +82,6 @@ def retrieve_embeds(path):
     return DataEncryption.decrypt_data(data, ignore=ignore)
 
 
-def upload_to_dropbox(dropbox_key, dump_path, file_path):
-    os.chdir(CONFIG_HOME+"/bin")
-    os.system("sh dump_embeds.sh {} {} {}".format(dropbox_key, dump_path, file_path))
-
-
 if __name__ == "__main__":
     from aisecurity.utils.paths import DATABASE
 
