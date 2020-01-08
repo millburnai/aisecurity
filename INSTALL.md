@@ -16,6 +16,8 @@
 
 Note that TensorFlow 2.0 is not yet supported, as `mtcnn` is not compatible with it.
 
+Current version: `python3 -m pip install "git+https://github.com/orangese/aisecurity.git@v0.9a"`
+
 Keras version: `python3 -m pip install "git+https://github.com/orangese/aisecurity.git@keras"`
 
 TF-TRT version: `python3 -m pip install "git+https://github.com/orangese/aisecurity.git@tf-trt"`
