@@ -10,8 +10,8 @@ setup(
     author_email="22parkr@millburn.org, 22pilarskil@millburn.org",
     license=None,
     python_requires=">=3.5.0",
-    install_requires=["adafruit-circuitpython-charlcd", "keras", "matplotlib", "mtcnn",
-                      "mysql-connector-python", "Pyrebase", "pycryptodome", "requests"],
+    install_requires=["adafruit-circuitpython-charlcd", "keras", "matplotlib", "mysql-connector-python",
+                      "Pyrebase", "pycryptodome", "requests"],
     scripts=["bin/drop.sql", "bin/make_config.sh", "bin/make_keys.sh"],
     packages=find_packages(),
     zip_safe=False
