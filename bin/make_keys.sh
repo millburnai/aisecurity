@@ -21,7 +21,7 @@ function mk_key_files {
   key_loc=$1
 
   if [ ! -d "$key_loc/test_name_keys.txt" ] ; then
-    wget -O "test_name_keys.txt" "https://www.dropbox.com/s/yxebmo4gm0qq7nj/test_name_keys.txt?dl=1" || \
+    curl -Lo "test_name_keys.txt" "https://www.dropbox.com/s/yxebmo4gm0qq7nj/test_name_keys.txt?dl=1" || \
     echo "test_name_keys.txt could not be accessed"
     echo "test_name_keys.txt created in $key_loc"
   else
@@ -29,7 +29,7 @@ function mk_key_files {
   fi
 
   if [ ! -d "$key_loc/test_embedding_keys.txt" ] ; then
-    wget -O "test_embedding_keys.txt" "https://www.dropbox.com/s/kl5s77evy8m9mpm/test_embedding_keys.txt?dl=1" || \
+    curl -Lo "test_embedding_keys.txt" "https://www.dropbox.com/s/kl5s77evy8m9mpm/test_embedding_keys.txt?dl=1" || \
     echo "test_embedding_keys.txt could not be accessed"
     echo "test_embedding_keys.txt created in $key_loc"
   else
