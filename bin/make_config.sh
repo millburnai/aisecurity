@@ -25,8 +25,8 @@ if [ ! -d "$config_path/database" ] ; then
   echo "Making database and unknown directories"
   mkdir database
   cd "$config_path/database" || echo "Error: unable to access $config_path/database"
-  wget -O "test.json" https://www.dropbox.com/s/umjku76xppc0396/test.json?dl=1 || echo "Error: unable to download test.json"
-  wget -O "test_info.json" https://www.dropbox.com/s/ihfmemt6sqdfj74/test_info.json?dl=1 || echo "Error: unable to download test_info.json"
+  curl -Lo "test.json" https://www.dropbox.com/s/umjku76xppc0396/test.json?dl=1 || echo "Error: unable to download test.json"
+  curl -Lo "test_info.json" https://www.dropbox.com/s/ihfmemt6sqdfj74/test_info.json?dl=1 || echo "Error: unable to download test_info.json"
 fi
 
 if [ ! -d "$config_path/models" ] ; then
@@ -34,9 +34,9 @@ if [ ! -d "$config_path/models" ] ; then
   cd "$config_path" || echo "Error: unable to access $config_path"
   mkdir models
   cd models || echo "Error: unable to access $config_path/models"
-  wget -O "ms_celeb_1m.h5" "https://www.dropbox.com/s/i4r3jbnzuzcc9fh/ms_celeb_1m.h52?dl=1" \
+  curl -Lo "ms_celeb_1m.h5" "https://www.dropbox.com/s/i4r3jbnzuzcc9fh/ms_celeb_1m.h52?dl=1" \
   || echo "Error: MS-Celeb-1M model could not be downloaded"
-  wget -O "haarcascade_frontalface_default.xml" "https://www.dropbox.com/s/zhb4cn9idl6rrvm/haarcascade_frontalface_default.xml?dl=1" \
+  curl -Lo "haarcascade_frontalface_default.xml" "https://www.dropbox.com/s/zhb4cn9idl6rrvm/haarcascade_frontalface_default.xml?dl=1" \
   || echo "Error: haarcascade model could not be downloaded"
 fi
 
