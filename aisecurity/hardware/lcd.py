@@ -42,7 +42,7 @@ try:
     from adafruit_character_lcd.character_lcd_i2c import Character_LCD_I2C as character_lcd
     import board
     import busio
-except (NotImplementedError, ModuleNotFoundError):
+except (NotImplementedError, ModuleNotFoundError, ValueError): #ValueError- a different mode has already been set
     warnings.warn("LCD not found")
 
 try:
