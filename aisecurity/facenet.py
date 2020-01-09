@@ -429,7 +429,7 @@ class FaceNet:
         if use_dynamic:
             db_types.append("dynamic")
         if logging:
-            log.init(flush=True, logging=logging)
+            log.init(logging, flush=True)
             log.server_init()
         if use_lcd:
             lcd.init()
@@ -763,7 +763,7 @@ class FaceNet:
 
             if use_dynamic:
                 self.__dynamic_db["visitor_{}".format(len(self.__dynamic_db) + 1)] = embedding.flatten()
-                self._train_knn(knn_types=["dynamic"], use_class_metric=True)
+                self._train_knn(knn_types=["dynamic"])
 
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
 

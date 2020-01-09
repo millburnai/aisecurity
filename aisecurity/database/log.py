@@ -41,7 +41,7 @@ USE_SERVER = None
 
 
 # LOGGING INIT AND HELPERS
-def init(flush=False, thresholds=None, logging="firebase"):
+def init(logging, flush=False, thresholds=None):
     global NUM_RECOGNIZED, NUM_UNKNOWN, LAST_LOGGED, UNK_LAST_LOGGED, CURRENT_LOG, DISTS, THRESHOLDS
     global MODE, DATABASE, CURSOR, FIREBASE
 
@@ -79,8 +79,18 @@ def init(flush=False, thresholds=None, logging="firebase"):
         try:
             FIREBASE = pyrebase.initialize_app(json.load(open(CONFIG_HOME + "/logging/firebase.json")))
             DATABASE = FIREBASE.database()
-        except FileNotFoundError:
-            raise FileNotFoundError(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
+        except (FileNotFoundError, json.JSONDecodeError):
+            raise ValueError(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
+
+    elif logging == "django":
+        # TODO: fill in init for django logging
+        try:
+            # initialize django database
+            # for now, hardcode any links/ip addresses that you might need to use to connect to a db
+            pass
+        except Exception:
+            # replace Exception with correct django error that might occur
+            raise Exception("django logging not able to be initialized")
 
     else:
         MODE = None
@@ -131,7 +141,7 @@ def update_current_logs(is_recognized, best_match):
     global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN
 
     if len(DISTS) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
-        flush_current(mode=["unknown", "known"])
+        flush_current(mode="unknown+known")
 
     if is_recognized:
         now = time.time()
@@ -170,6 +180,12 @@ def log_person(student_name, times):
         }
         DATABASE.child("known").child(*get_now(time.time())).set(data)
 
+    elif MODE == "django":
+        student_id = get_id(student_name)
+        student_name = student_name.replace("_", " ").title()
+        # TODO: log {*now: student_id, student_name} in django db
+        pass
+
     flush_current(mode="known")
 
 
@@ -189,6 +205,10 @@ def log_unknown(path_to_img):
             "time": now[1]
         }
         DATABASE.child("unknown").child(*get_now(time.time())).set(data)
+
+    elif MODE == "django":
+        # TODO: log {*get_now(time.time()): path_to_img} in django db
+        pass
 
     flush_current(mode="unknown")
 
