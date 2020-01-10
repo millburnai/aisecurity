@@ -4,7 +4,7 @@ setup(
     name="aisecurity",
     version="0.9a",
     description="CSII AI facial recognition.",
-    long_description=open("README.md").read(),
+    long_description=open("README.md", encoding="utf-8").read(),
     url="https://github.com/orangese/aisecurity",
     author="Ryan Park, Liam Pilarski",
     author_email="22parkr@millburn.org, 22pilarskil@millburn.org",
