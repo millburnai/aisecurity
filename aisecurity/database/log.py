@@ -184,6 +184,10 @@ def log_person(student_name, times):
         student_id = get_id(student_name)
         student_name = student_name.replace("_", " ").title()
         # TODO: log {*now: student_id, student_name} in django db
+            # DJANGO: s = StudentLog(student_id=student_id, name=student_name, time=datetime.datetime.now()) 
+            #         s.save()
+            # from models.py; import studentlog, datetime
+        
         pass
 
     flush_current(mode="known")
@@ -208,6 +212,9 @@ def log_unknown(path_to_img):
 
     elif MODE == "django":
         # TODO: log {*get_now(time.time()): path_to_img} in django db
+            # DJANGO: u = UnknownLog(time=datetime.datetime.now(), path_to_img=path_to_img)
+            #         u.save()
+            # from models.py; import datetime, unknownlog
         pass
 
     flush_current(mode="unknown")
