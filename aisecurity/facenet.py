@@ -1,106 +1,204 @@
-
 """
 
 "aisecurity.facenet"
 
-Facial recognition with FaceNet in NVIDIA's TensorRT 6.0.1.5.
-Paper: https://arxiv.org/pdf/1503.03832.pdf
+Facial recognition with FaceNet in Keras or TF-TRT.
+
+Reference paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
 
 import asyncio
+import os
+import time
 import warnings
 
+import cv2
+import keras
+from keras import backend as K
 import matplotlib.pyplot as plt
-import pycuda.driver as cuda
-import pycuda.autoinit
+from mtcnn.mtcnn import MTCNN
+import numpy as np
 from sklearn import neighbors
+import tensorflow as tf
 from termcolor import cprint
 
-from aisecurity import log
-from aisecurity.extras.paths import CONFIG_HOME
-from aisecurity.preprocessing import *
+from aisecurity.data.dataflow import retrieve_embeds
+from aisecurity.database import log
+from aisecurity.optim import engine
+from aisecurity.privacy.encryptions import DataEncryption
+from aisecurity.hardware import keypad, lcd
+from aisecurity.utils.distance import DistMetric
+from aisecurity.utils.events import timer, HidePrints, run_async_method
+from aisecurity.utils.paths import DATABASE_INFO, DEFAULT_MODEL
+from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces
 
 
-# FACENET
-class FaceNet(object):
+################################ FaceNet ###############################
+class FaceNet:
+    """Class implementation of FaceNet"""
 
 
     # HYPERPARAMETERS
     HYPERPARAMS = {
-        "alpha": 0.7,
-        "mtcnn_alpha": 0.99
+        "alpha": 0.75,  # 0.9 for cosine+l2_normalize
+        "mtcnn_alpha": 0.9
     }
 
-
-    # CONSTANTS
-    CONSTANTS = {
+    # TENSOR CONSTANTS (FOR TF-TRT)
+    TENSORS = {
         "ms_celeb_1m": {
-            "inputs": ["input_1"],
-            "outputs": ["Bottleneck_BatchNorm/batchnorm/add_1"]
+            "input": "input_1:0",
+            "output": "Bottleneck_BatchNorm/batchnorm/add_1:0",
+            "extras": {}
         },
         "vgg_face_2": {
-            "inputs": ["base_input"],
-            "outputs": ["classifier_low_dim/Softmax"]
+            "input": "base_input:0",
+            "output": "classifier_low_dim/Softmax:0",
+            "extras": {}
+        },
+        "20180402-114759": {
+            "input": "batch_join:0",
+            "output": "embeddings:0",
+            "extras": {
+                "phase_train:0": False
+            }
         }
     }
 
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=CONFIG_HOME + "/models/ms_celeb_1m.engine", input_name=None, output_name=None,
-                 input_shape=None):
+    def __init__(self, filepath=DEFAULT_MODEL, sess=None, input_name=None, output_name=None, input_shape=None,
+                 **hyperparams):
+        """Initializes FaceNet object
+
+        :param filepath: path to model (default: aisecurity.utils.paths.DEFAULT_MODEL)
+        :param sess: tf.Session to use (default: None)
+        :param input_name: name of input tensor-- only required if using (TF)TRT non-default model (default: None)
+        :param output_name: name of output tensor-- only required if using (TF)TRT non-default model (default: None)
+        :param input_shape: input shape-- only required if using (TF)TRT non-default model (default: None)
+        :param hyperparams: hyperparameters to override FaceNet.HYPERPARAMS
+
+        """
+
         assert os.path.exists(filepath), "{} not found".format(filepath)
-        assert filepath.endswith(".engine"), "convert {} to a serialized engine before usage".format(filepath)
 
-        # build engine
-        self._build_cuda_engine(filepath, input_name, output_name, input_shape)
+        if ".pb" in filepath:
+            self.MODE = "tf-trt"
+            self._tf_trt_init(filepath, input_name, output_name, sess, input_shape)
+        elif ".h5" in filepath:
+            self.MODE = "keras"
+            self._keras_init(filepath)
+        elif ".engine" in filepath:
+            self.MODE = "trt"
+            self._trt_init(filepath, input_name, output_name, input_shape)
+        else:
+            raise TypeError("model must be a .h5 or a frozen .pb file")
 
-        # allocate memory
-        self._allocate_buffers()
+        self._static_db = None  # must be filled in by user
+        self._dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
 
-        # setting constants
-        CONSTANTS["model"] = "ms_celeb_1m"# self.model_name
+        self.static_knn = None
+        self.dynamic_knn = None
 
-        # data init
-        self.__static_db = None  # must be filled in by user
-        self.__dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
+        self.set_data(retrieve_embeds(), config=DATABASE_INFO)
+        self.set_dist_metric("auto")
 
-    def _build_cuda_engine(self, filepath, input_name, output_name, input_shape):
-        self.engine_manager = CudaEngineManager()
-        self.engine_manager.read_cuda_engine(filepath)
+        self.HYPERPARAMS.update(hyperparams)
 
-        self.engine = self.engine_manager.engine
-        self.network = self.engine_manager.network
+    # KERAS INIT
+    def _keras_init(self, filepath):
+        """Initializes a Keras model
 
-        self._io_tensor_init(filepath, input_name, output_name)
-        self._input_shape_init(filepath, input_shape=input_shape)
+        :param filepath: path to model (.h5)
 
+        """
 
-    def _io_tensor_init(self, filepath, input_name, output_name):
+        self.facenet = keras.models.load_model(filepath)
+        IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
+
+    # TF-TRT INIT
+    def _tf_trt_init(self, filepath, input_name, output_name, sess, input_shape):
+        """Initializes a TF-TRT model
+
+        :param filepath: path to model (.pb)
+        :param input_name: name of input tensor
+        :param output_name: name of output tensor
+        :param sess: tf.Session to enter
+        :param input_shape: input shape for facenet
+
+        """
+
+        graph_def = self.get_frozen_graph(filepath)
+
+        if sess:
+            self.sess = sess
+            K.set_session(self.sess)
+        else:
+            self.sess = K.get_session()
+
+        tf.import_graph_def(graph_def, name="")
+
+        self.extra_tensors = []  # extra tensors for feed dict to sess.run
+        self._tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
+
+        self.facenet = self.sess.graph
+        try:
+            if input_shape is not None:
+                IMG_CONSTANTS["img_size"] = input_shape
+            else:
+                IMG_CONSTANTS["img_size"] = tuple(
+                    self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3]
+                )
+        except ValueError:
+            warnings.warn("Input tensor size not detected")
+
+    def _tensor_init(self, model_name, input_name, output_name):
+        """Initializes tensors (TF-TRT or TRT modes only)
+
+        :param model_name: name of model
+        :param input_name: input tensor name
+        :param output_name: output tensor name
+
+        """
+
         self.input_name, self.output_name = None, None
-        for model in self.CONSTANTS:
-            if model in filepath:
-                self.model_name = model
-                self.input_name = self.CONSTANTS[model]["inputs"][0]
-                self.output_name = self.CONSTANTS[model]["outputs"][0]
+
+        for model in self.TENSORS:
+            if model in model_name:
+                tensors = self.TENSORS[model]
+
+                self.input_name = tensors["input"]
+                self.output_name = tensors["output"]
+
+                for tensor, value in tensors["extras"].items():
+                    self.extra_tensors.append({tensor: value})
+
         if not self.input_name:
             self.input_name = input_name
         elif not self.output_name:
             self.output_name = output_name
-        assert self.input_name and self.output_name, "I/O tensors for {} not detected or provided".format(filepath)
 
-    def _input_shape_init(self, filepath, input_shape=None):
-        for model in CONSTANTS["img_size"]:
-            if model in filepath:
-                self.input_shape = CONSTANTS["img_size"][model]
-        if input_shape:
-            self.input_shape = input_shape
+        assert self.input_name and self.output_name, "I/O tensors for {} not detected or provided".format(model_name)
+
+    # TRT INIT
+    def _trt_init(self, filepath, input_name, output_name, input_shape):
+        assert engine.INIT_SUCCESS, "tensorrt or pycuda import failed: trt mode not available"
+
+        self.facenet = engine.CudaEngineManager(filepath, input_name, output_name, input_shape)
+        IMG_CONSTANTS["img_size"] = tuple(reversed(self.facenet.input_shape))
 
 
     # MUTATORS
-    def set_data(self, data):
-        assert data is not None, "data must be provided"
+    def set_data(self, data, config=None):
+        """Sets data property
+
+        :param data: new data in form {name: embedding vector, ...}
+        :param config: data config dict with the entry "metric": <DistMetric str constructor> (default: None)
+
+        """
+        assert data, "data must be provided"
 
         def check_validity(data):
             for key in data.keys():
@@ -110,221 +208,419 @@ class FaceNet(object):
                 assert is_vector, "each data[key] must be a vectorized embedding"
             return data
 
-        self.__static_db = check_validity(data)
+        self._static_db = check_validity(data)
 
-        try:
-            self._train_knn(knn_types=["static"])
-            self.dynamic_knn = None
-        except ValueError:
-            raise ValueError("Current model incompatible with database")
+        self._train_knn(knn_types=["static"])
+
+        if config is None:
+            warnings.warn("data config missing. Distance metric not detected")
+        else:
+            self.data_config = config
+            self.cfg_dist_metric = self.data_config["metric"]
+
+    def set_dist_metric(self, dist_metric):
+        """Sets distance metric for FaceNet
+
+        :param dist_metric: DistMetric object or str constructor, or "auto+{whatever}" to detect from self.data_config
+
+        """
+
+        # set distance metric
+        if isinstance(dist_metric, DistMetric):
+            self.dist_metric = dist_metric
+        elif isinstance(dist_metric, str):
+            if "auto" in dist_metric:
+                if "+" in dist_metric:
+                    constructor = self.cfg_dist_metric + dist_metric[dist_metric.find("+"):]
+                else:
+                    constructor = self.cfg_dist_metric
+            else:
+                constructor = dist_metric
+            self.dist_metric = DistMetric(constructor, data=list(self.data.values()), axis=0)
+        else:
+            raise ValueError("{} not a supported dist metric".format(dist_metric))
+
+        # check against data config
+        self.ignore = {0: self.dist_metric.get_config()}
+        if self.cfg_dist_metric != self.dist_metric.get_config():
+            self.ignore.update({1: self.cfg_dist_metric})
+            warnings.warn(
+                "provided DistMetric ({}) is not the same as the data config metric ({}) ".format(
+                    self.dist_metric.get_config(), self.cfg_dist_metric
+                )
+            )
 
     def _train_knn(self, knn_types):
+        """Trains K-Nearest-Neighbors
+
+        :param knn_types: types of K-NN to train
+
+        """
+
         def knn_factory(data):
             names, embeddings = zip(*data.items())
             knn = neighbors.KNeighborsClassifier(n_neighbors=len(names) // len(set(names)))
+            # always use minkowski distance, other metrics are just normalizing before minkowski to act
+            # as the desired metric (ex: cosine)
             knn.fit(embeddings, names)
             return knn
 
-        if self.__static_db and "static" in knn_types:
-            self.static_knn = knn_factory(self.__static_db)
-        if self.__dynamic_db and "dynamic" in knn_types:
-            self.dynamic_knn = knn_factory(self.__dynamic_db)
+        try:
+            if self._static_db and "static" in knn_types:
+                self.static_knn = knn_factory(self._static_db)
+            if self._dynamic_db and "dynamic" in knn_types:
+                self.dynamic_knn = knn_factory(self._dynamic_db)
+        except ValueError:
+            raise ValueError("Current model incompatible with database")
 
 
     # RETRIEVERS
     @property
     def data(self):
-        return self.__static_db
+        """Property for static database
+
+        :returns: self._static_db
+
+        """
+
+        return self._static_db
+
+    @staticmethod
+    def get_frozen_graph(path):
+        """Gets frozen graph from .pb file (TF-TRT only)
+
+        :param path: path to .pb frozen graph file
+        :returns: tf.GraphDef object
+
+        """
+
+        with tf.gfile.FastGFile(path, "rb") as graph_file:
+            graph_def = tf.GraphDef()
+            graph_def.ParseFromString(graph_file.read())
+        return graph_def
+
+    def _make_feed_dict(self, imgs):
+        """Makes feed dict for sess.run (TF-TRT only)
+
+        :param imgs: image input
+        :returns: feed dict
+
+        """
+
+        feed_dict = {self.input_name: imgs}
+        for tensor_dict in self.extra_tensors:
+            feed_dict.update(tensor_dict)
+        return feed_dict
+
+    def predict(self, paths_or_imgs, margin=IMG_CONSTANTS["margin"], faces=None, checkup=False):
+        """Low-level predict function (don't use unless developing)
+
+        :param paths_or_imgs: paths or images to predict on
+        :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
+        :param faces: pre-detected MTCNN faces (makes 'margin' param irrelevant) (default: None)
+        :param checkup: whether this is just a call to keep the GPU warm (default: False)
+        :returns: normalized embeddings
+
+        """
+
+        if self.MODE == "keras":
+            predict = lambda imgs: self.facenet.predict(imgs)
+        elif self.MODE == "tf-trt":
+            output_tensor = self.facenet.get_tensor_by_name(self.output_name)
+            predict = lambda imgs: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(imgs))
+        elif self.MODE == "trt":
+            predict = lambda imgs: self.facenet.inference(imgs, output_shape=(-1, 1))
+
+        cropped_imgs = normalize(crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup))
+        raw_embeddings = predict(cropped_imgs)
+        normalized_embeddings = self.dist_metric(raw_embeddings)
+
+        return normalized_embeddings
 
     def get_embeds(self, data, *args, **kwargs):
+        """Gets embedding from various datatypes
+
+        :param data: data dictionary in form {name: embedding vector, ...}
+        :param args: data to embed. Can be a key in 'data' param, a filepath, or an image array
+        :param kwargs: named arguments to self.predict
+        :returns: list of embeddings
+
+        """
         embeds = []
         for n in args:
             if isinstance(n, str):
                 try:
-                    n = data[n]
+                    embeds.append(data[n])
                 except KeyError:
-                    n = self.predict([n], margin=CONSTANTS["margin"], **kwargs)
-            elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # n must be a vector
-                n = self.predict([n], margin=CONSTANTS["margin"], **kwargs)
-            embeds.append(n)
+                    embeds.append(self.predict([n], **kwargs))
+            elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # if n is not an embedding vector
+                embeds.append(self.predict([n], **kwargs))
+            else:
+                warnings.warn("{} is not in data or suitable for input into facenet".format(n))
+
         return embeds if len(embeds) > 1 else embeds[0]
-
-    def predict(self, paths_or_imgs, margin=10, faces=None):
-        def buffer_ready(arr):
-            arr = arr.astype(trt.nptype(CudaEngineManager.CONSTANTS["dtype"]))
-            arr = arr.transpose(0, 3, 1, 2).ravel()
-            return arr
-
-        l2_normalize = lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6))
-        aligned_imgs = whiten(align_imgs(self.model_name, paths_or_imgs, margin, faces=faces))
-
-        np.copyto(self.h_input, buffer_ready(aligned_imgs))
-
-        cuda.memcpy_htod(self.d_input, self.h_input)
-        self.context.execute(batch_size=1, bindings=[int(self.d_input), int(self.d_output)])
-        cuda.memcpy_dtoh(self.h_output, self.d_output)
-
-        normalized_embeddings = l2_normalize(self.h_output)
-
-        return normalized_embeddings
 
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
-    def _recognize(self, img, faces=None, db_types=None):
-        assert self.__static_db or self.__dynamic_db, "data must be provided"
+    def recognize(self, img, db_types=None, **kwargs):
+        """Facial recognition
+
+        :param img: image array
+        :param db_types: database types: "static" and/or "dynamic" (default: None)
+        :param kwargs: named arguments to self.get_embeds (will be passed to self.predict)
+        :returns: embedding, is recognized (bool), best match from database(s), distance
+
+        """
+
+        assert self._static_db or self._dynamic_db, "data must be provided"
 
         knns, data = [], {}
         if db_types is None or "static" in db_types:
             knns.append(self.static_knn)
-            data.update(self.__static_db)
-        if "dynamic" in db_types and self.dynamic_knn and self.__dynamic_db:
+            data.update(self._static_db)
+        if db_types and "dynamic" in db_types and self.dynamic_knn and self._dynamic_db:
             knns.append(self.dynamic_knn)
-            data.update(self.__dynamic_db)
+            data.update(self._dynamic_db)
 
-        embedding = self.get_embeds(data, img, faces=faces)
+        embedding = self.get_embeds(data, img, **kwargs)
+
         best_matches = []
-        for knn in reversed(knns):
-            pred = knn.predict(embedding.reshape(1, -1))[0]
-            best_matches.append((pred, np.linalg.norm(embedding - data[pred])))
-        best_match, l2_dist = sorted(best_matches, key=lambda n: n[1])[0]
-        is_recognized = l2_dist <= FaceNet.HYPERPARAMS["alpha"]
+        for knn in knns:
+            pred = knn.predict(embedding)[0]
+            dist = self.dist_metric(embedding, data[pred], mode="calc+norm", ignore=self.ignore)
 
-        return embedding, is_recognized, best_match, l2_dist
+            best_matches.append((pred, dist))
 
-    # FACIAL RECOGNITION
-    def recognize(self, img, verbose=True):
-        # img can be a path, image, database name, or embedding
-        _, is_recognized, best_match, l2_dist = self._recognize(img)
+        best_match, dist = max(best_matches, key=lambda n: n[1])
+        is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
-        if verbose:
-            if is_recognized:
-                print("Your image is a picture of \"{}\": L2 distance of {}".format(best_match, l2_dist))
-            else:
-                print("Your image is not in the database. The best match is \"{}\" with an L2 distance of ".format(
-                    best_match, l2_dist))
-
-        return is_recognized, best_match, l2_dist
+        return embedding, is_recognized, best_match, dist
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, use_log, use_dynamic, use_picam, use_graphics):
+    async def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
+                                   use_lcd, use_keypad, framerate, resize, flip, device):
+        """Real-time facial recognition under the hood (dev use only)
+
+        :param width: width of frame (only matters if use_graphics is True)
+        :param height: height of frame (only matters if use_graphics is True)
+        :param metric: DistMetric object
+        :param logging: logging type-- None, "firebase", or "mysql"
+        :param use_dynamic: use dynamic database for visitors or not
+        :param use_picam: use picamera or not
+        :param use_graphics: display video feed or not
+        :param use_lcd: use LCD or not. If LCD is not connected, will default to LCD simulation and warn
+        :param use_keypad: use keypad or not. If keypad not connected, will default to False and warn
+        :param framerate: frame rate (recommended <120)
+        :param resize: resize scale (float between 0. and 1.)
+        :param flip: flip method: +1 = +90º rotation
+        :param device: camera device (/dev/video{device})
+        :returns: number of frames elapsed
+
+        """
+
+        # INITS
         db_types = ["static"]
         if use_dynamic:
             db_types.append("dynamic")
-        if use_log:
-            log.init(flush=True)
+        if logging:
+            log.init(logging, flush=True)
+            log.server_init()
+        if use_lcd:
+            lcd.init()
+        if use_keypad:
+            keypad.init()
+        if dist_metric:
+            self.set_dist_metric(dist_metric)
+        if resize:
+            mtcnn_width, mtcnn_height = width * resize, height * resize
+        else:
+            mtcnn_width, mtcnn_height = width, height
 
-        mtcnn = MTCNN(min_face_size=0.5 * (width + height) / 3)  # face needs to fill at least 1/3 of the frame
+        cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip, device=device)
+        assert cap.isOpened(), "video capture failed to initialize"
 
-        cap = self.get_video_cap(width, height, picamera=use_picam)
+        mtcnn = MTCNN(min_face_size=0.5 * (mtcnn_width + mtcnn_height) / 3)
+        # face needs to fill at least 1/3 of the frame
 
         missed_frames = 0
-        l2_dists = []
+        frames = 0
 
-        start = time.time()
+        last_gpu_checkup = time.time()
 
+        # CAM LOOP
         while True:
             _, frame = cap.read()
+            original_frame = frame.copy()
+
+            if resize:
+                frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
+
+            if use_picam:
+                # make sure computation is performed periodically to keep GPU "warm" (i.e., constantly active);
+                # otherwise, recognition times can be slow when spaced out by several minutes
+                last_gpu_checkup = self.keep_gpu_warm(frame, frames, last_gpu_checkup, use_lcd)
+
+            # using MTCNN to detect faces
             result = mtcnn.detect_faces(frame)
 
             if result:
-                overlay = frame.copy()
+                overlay = original_frame.copy()
 
-                for person in result:
-                    # using MTCNN to detect faces
-                    face = person["box"]
+                person = max(result, key=lambda person: person["confidence"])
+                face = person["box"]
 
-                    # facial recognition
-                    try:
-                        embedding, is_recognized, best_match, l2_dist = self._recognize(frame, face, db_types)
-                        print(
-                            "L2 distance: {} ({}){}".format(l2_dist, best_match, " !" if not is_recognized else ""))
-                        if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
-                            continue
-                    except (
-                    ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
-                        if "query data dimension" in str(error):
-                            raise ValueError("Current model incompatible with database")
-                        elif "empty" in str(error):
-                            print("Image refresh rate too high")
-                        else:
-                            raise error
-                        continue
+                if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
+                    print("{}% face detection confidence is too low".format(round(person["confidence"] * 100, 2)))
+                    continue
 
-                    # add graphics
-                    if use_graphics:
-                        self.add_graphics(frame, overlay, person, width, height, is_recognized, best_match)
+                # facial recognition
+                try:
+                    embedding, is_recognized, best_match, dist = self.recognize(frame, db_types, faces=face)
+                    print("{}: {} ({}){}".format(
+                        self.dist_metric, round(dist, 4), best_match, " !" if not is_recognized else "")
+                    )
+                except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+                    if "query data dimension" in str(error):
+                        raise ValueError("Current model incompatible with database")
+                    elif "empty" in str(error):
+                        print("Image refresh rate too high")
+                    elif "opencv" in str(error):
+                        print("Failed to capture frame")
+                    else:
+                        raise error
+                    continue
 
-                    if time.time() - start > 5.:  # wait 5 seconds before logging starts
+                # add graphics, lcd, and do logging
+                if use_graphics:
+                    self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match, resize)
 
-                        # update dynamic database
-                        if use_dynamic:
-                            self.dynamic_update(embedding, l2_dists)
+                if use_lcd and is_recognized:
+                    lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
-                        # log activity
-                        if use_log:
-                            self.log_activity(is_recognized, best_match, frame, log_unknown=True)
+                if use_keypad:
+                    pass
+                    # if is_recognized:
+                    #     run_async_method(keypad.monitor)
+                    # elif last_best_match != best_match:
+                    #     keypad.CONFIG["continue"] = False
+                    # FIXME:
+                    #  1. above lines should be changed and use log.current_log instead of making another local var
+                    #  2. use of 3 is ambiguous-- add to keypad.CONFIG)
+                    #  3. keypad.monitor(0) should be replaced with a reset or flush function if that's what it does
 
-                        l2_dists.append(l2_dist)
+                if logging and frames > 5:  # five frames before logging starts
+                    self.log_activity(is_recognized, best_match, use_dynamic, embedding)
+
+                    log.DISTS.append(dist)
 
             else:
                 missed_frames += 1
                 if missed_frames > log.THRESHOLDS["missed_frames"]:
                     missed_frames = 0
-                    log.flush_current()
-                    l2_dists = []
+                    log.flush_current(mode=["known", "unknown"], flush_times=False)
                 print("No face detected")
 
-            cv2.imshow("AI Security v1.0a", frame)
-
-            await asyncio.sleep(1e-6)
+            if use_graphics:
+                cv2.imshow("AI Security v0.9a", original_frame)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
+                # FIXME: doesn't escape when 'q' is pressed-- maybe because of async?
                 break
+
+            frames += 1
+            await asyncio.sleep(1e-6)
 
         cap.release()
         cv2.destroyAllWindows()
 
+        return frames
+
+
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=500, height=250, use_log=True, use_dynamic=False, use_picam=False,
-                            use_graphics=True):
+    def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
+                            use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
+                            framerate=20, resize=None, flip=0, device=0):
+        """Real-time facial recognition
 
-        async def async_helper(recognize_func, *args, **kwargs):
-            await recognize_func(*args, **kwargs)
+        :param width: width of frame (only matters if use_graphics is True) (default: 640)
+        :param height: height of frame (only matters if use_graphics is True) (default: 360)
+        :param dist_metric: DistMetric object or str distance metric (default: "euclidean+l2_normalize")
+        :param logging: logging type-- None, "firebase", or "mysql" (default: None)
+        :param use_dynamic: use dynamic database for visitors or not (default: False)
+        :param use_picam: use picamera or not (default: False)
+        :param use_graphics: display video feed or not (default: True)
+        :param use_lcd: use LCD or not. If LCD isn't connected, will default to LCD simulation and warn (default: False)
+        :param use_keypad: use keypad or not. If keypad not connected, will default to False and warn (default: False)
+        :param framerate: frame rate, only matters if use_picamera is True (recommended <120) (default: 20)
+        :param resize: resize scale (float between 0. and 1.) (default: None)
+        :param flip: flip method: +1 = +90º rotation (default: 0)
+        :param device: camera device (/dev/video{device}) (default: 0)
 
-        loop = asyncio.new_event_loop()
-        task = loop.create_task(async_helper(self._real_time_recognize, width, height, use_log,
-                                             use_dynamic=use_dynamic, use_graphics=use_graphics,
-                                             use_picam=use_picam))
-        loop.run_until_complete(task)
+        """
+
+        assert width > 0 and height > 0, "width and height must be positive integers"
+        assert not logging or logging == "mysql" or logging == "firebase", "only mysql and firebase database supported"
+        assert 0 < framerate <= 120, "framerate must be between 0 and 120"
+        assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
+
+        run_async_method(
+            self._real_time_recognize, width=width, height=height, dist_metric=dist_metric, logging=logging,
+            use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd,
+            use_keypad=use_keypad, framerate=framerate, resize=resize, flip=flip, device=device
+        )
+
 
     # GRAPHICS
     @staticmethod
-    def get_video_cap(width, height, picamera):
-        def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=1280, display_height=720,
-                                framerate=30, flip_method=0):
+    def get_video_cap(width, height, picamera, framerate, flip, device=0):
+        """Initializes cv2.VideoCapture object
+
+        :param width: width of frame
+        :param height: height of frame
+        :param picamera: use picamera or not
+        :param framerate: framerate, recommended <120
+        :param flip: flip method: +1 = +90º rotation (default: 0)
+        :param device: VideoCapture will use /dev/video{'device'} (default: 0)
+        :returns: cv2.VideoCapture object
+
+        """
+
+        def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=640, display_height=360,
+                                framerate=20, flip=0):
             return (
-                    "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
-                    " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
-                    " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
-                    % (capture_width, capture_height, framerate, flip_method, display_width, display_height)
+                "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
+                " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
+                " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
+                % (capture_width, capture_height, framerate, flip, display_width, display_height)
             )
 
         if picamera:
             return cv2.VideoCapture(
-                _gstreamer_pipeline(
-                    capture_width=width, capture_height=height, display_width=width, display_height=height),
-                cv2.CAP_GSTREAMER
-            )
+                _gstreamer_pipeline(display_width=width, display_height=height, framerate=framerate, flip=flip),
+                cv2.CAP_GSTREAMER)
         else:
-            cap = cv2.VideoCapture(0)
+            cap = cv2.VideoCapture(device)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
             return cap
 
     @staticmethod
-    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match):
+    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize):
+        """Adds graphics to a frame
+
+        :param frame: frame as array
+        :param overlay: overlay as array
+        :param person: MTCNN detection dict
+        :param width: width of frame
+        :param height: height of frame
+        :param is_recognized: whether face was recognized or not
+        :param best_match: best match from database
+        :param resize: resize scale factor, from 0. to 1.
+
+        """
+
         line_thickness = round(1e-6 * width * height + 1.5)
         radius = round((1e-6 * width * height + 1.5) / 2.)
         font_size = 4.5e-7 * width * height + 0.5
@@ -338,61 +634,69 @@ class FaceNet(object):
             else:
                 return 0, 255, 0  # green
 
-        def add_box_and_label(frame, corner, box, color, line_thickness, best_match, font_size, thickness):
-            cv2.rectangle(frame, corner, box, color, line_thickness)
-            cv2.putText(frame, best_match.replace("_", " ").title(), corner, cv2.FONT_HERSHEY_SIMPLEX, font_size,
-                        color, thickness)
+        def add_box_and_label(frame, origin, corner, color, line_thickness, best_match, font_size, thickness):
+            # bounding box
+            cv2.rectangle(frame, origin, corner, color, line_thickness)
 
-        def add_key_points(overlay, key_points, radius, color, line_thickness):
-            cv2.circle(overlay, (key_points["left_eye"]), radius, color, line_thickness)
-            cv2.circle(overlay, (key_points["right_eye"]), radius, color, line_thickness)
-            cv2.circle(overlay, (key_points["nose"]), radius, color, line_thickness)
-            cv2.circle(overlay, (key_points["mouth_left"]), radius, color, line_thickness)
-            cv2.circle(overlay, (key_points["mouth_right"]), radius, color, line_thickness)
+            # label box
+            label = best_match.replace("_", " ").title()
+            font = cv2.FONT_HERSHEY_DUPLEX
 
-            cv2.line(overlay, key_points["left_eye"], key_points["nose"], color, radius)
-            cv2.line(overlay, key_points["right_eye"], key_points["nose"], color, radius)
-            cv2.line(overlay, key_points["mouth_left"], key_points["nose"], color, radius)
-            cv2.line(overlay, key_points["mouth_right"], key_points["nose"], color, radius)
+            (width, height), __ = cv2.getTextSize(label, font, font_size, thickness)
 
-        key_points = person["keypoints"]
+            box_x = max(corner[0], origin[0] + width + 6)
+            cv2.rectangle(frame, (origin[0], corner[1] - 35), (box_x, corner[1]), color, cv2.FILLED)
+
+            # label
+            cv2.putText(frame, label, (origin[0] + 6, corner[1] - 6), font, font_size, (255, 255, 255), thickness)
+
+
+        def add_features(overlay, features, radius, color, line_thickness):
+            cv2.circle(overlay, (features["left_eye"]), radius, color, line_thickness)
+            cv2.circle(overlay, (features["right_eye"]), radius, color, line_thickness)
+            cv2.circle(overlay, (features["nose"]), radius, color, line_thickness)
+            cv2.circle(overlay, (features["mouth_left"]), radius, color, line_thickness)
+            cv2.circle(overlay, (features["mouth_right"]), radius, color, line_thickness)
+
+            cv2.line(overlay, features["left_eye"], features["nose"], color, radius)
+            cv2.line(overlay, features["right_eye"], features["nose"], color, radius)
+            cv2.line(overlay, features["mouth_left"], features["nose"], color, radius)
+            cv2.line(overlay, features["mouth_right"], features["nose"], color, radius)
+
+        features = person["keypoints"]
         x, y, height, width = person["box"]
+
+        if resize:
+            scale_factor = 1. / resize
+
+            scale = lambda x: tuple(round(element * scale_factor) for element in x)
+            features = {feature: scale(features[feature]) for feature in features}
+
+            scale = lambda *xs: tuple(round(x * scale_factor) for x in xs)
+            x, y, height, width = scale(x, y, height, width)
 
         color = get_color(is_recognized, best_match)
 
-        margin = CONSTANTS["margin"]
-        corner = (x - margin // 2, y - margin // 2)
-        box = (x + height + margin // 2, y + width + margin // 2)
+        margin = IMG_CONSTANTS["margin"]
+        origin = (x - margin // 2, y - margin // 2)
+        corner = (x + height + margin // 2, y + width + margin // 2)
 
-
-        add_key_points(overlay, key_points, radius, color, line_thickness)
-
+        add_features(overlay, features, radius, color, line_thickness)
         cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
 
         text = best_match if is_recognized else ""
-        add_box_and_label(frame, corner, box, color, line_thickness, text, font_size, thickness=1)
+        add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
 
     # DISPLAY
-    def summary(self):
-        for i in range(self.network.num_layers):
-            layer = self.network.get_layer(i)
-
-            print("\nLAYER {}".format(i))
-            print("===========================================")
-
-            layer_input = layer.get_input(0)
-            if layer_input:
-                print("\tInput Name:  {}".format(layer_input.name))
-                print("\tInput Shape: {}".format(layer_input.shape))
-
-            layer_output = layer.get_output(0)
-            if layer_output:
-                print("\tOutput Name:  {}".format(layer_output.name))
-                print("\tOutput Shape: {}".format(layer_output.shape))
-            print("===========================================")
-
     def show_embeds(self, encrypted=False, single=False):
+        """Shows self.data in visual form
+
+        :param encrypted: encrypt data keys (names) before displaying (default: False)
+        :param single: show only a single name/embedding pair (default: False)
+
+        """
+
         assert self.data, "data must be provided to show embeddings"
 
         def closest_multiples(n):
@@ -414,7 +718,7 @@ class FaceNet(object):
             try:
                 plt.title(person)
             except TypeError:
-                warnings.warn("encrypted data cannot be displayed due to presence of non-UTF8-decodable values")
+                warnings.warn("encrypted name cannot be displayed due to presence of non-UTF8-decodable values")
             plt.axis("off")
             plt.show()
 
@@ -423,62 +727,64 @@ class FaceNet(object):
 
 
     # LOGGING
-    @staticmethod
-    def log_activity(is_recognized, best_match, frame, log_unknown=True):
+    def log_activity(self, is_recognized, best_match, use_dynamic, embedding):
+        """Logs facial recognition activity
+
+        :param is_recognized: whether face was recognized or not
+        :param best_match: best match from database
+        :param mode: logging type: "firebase" or "mysql"
+        :param use_dynamic: use dynamic database or not
+        :param embedding: embedding vector
+
+        """
 
         cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
-
-        def get_mode(d):
-            max_key = list(d.keys())[0]
-            for key in d:
-                if len(d[key]) > len(d[max_key]):
-                    max_key = key
-            return max_key
+        mode = lambda d: max(d.keys(), key=lambda key: len(d[key]))
 
         log.update_current_logs(is_recognized, best_match)
 
-        if log.num_recognized >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.last_logged):
-            if log.get_percent_diff(best_match) <= log.THRESHOLDS["percent_diff"]:
-                recognized_person = get_mode(log.current_log)
-                log.log_person(recognized_person, times=log.current_log[recognized_person])
-                cprint("Regular activity logged", color="green", attrs=["bold"])
+        if log.NUM_RECOGNIZED >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.LAST_LOGGED):
+            if log.get_percent_diff(best_match, log.CURRENT_LOG) <= log.THRESHOLDS["percent_diff"]:
+                recognized_person = mode(log.CURRENT_LOG)
+                log.log_person(recognized_person, times=log.CURRENT_LOG[recognized_person])
 
-        if log_unknown and log.num_unknown >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.unk_last_logged):
-            path = CONFIG_HOME + "/database/unknown/{}.jpg".format(len(os.listdir(CONFIG_HOME + "/database/unknown")))
-            log.log_unknown(path)
+                lcd.add_lcd_display(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
-            # recording unknown images is deprecated and will be removed/changed later
-            cv2.imwrite(path, frame)
-            cprint("Unknown activity logged", color="red", attrs=["bold"])
+        elif log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.UNK_LAST_LOGGED):
+            log.log_unknown("<DEPRECATED>")
 
-
-    # DYNAMIC DATABASE
-    def dynamic_update(self, embedding, l2_dists):
-        previous_frames = l2_dists[-log.THRESHOLDS["num_unknown"]:]
-        filtered = list(filter(lambda x: x > self.HYPERPARAMS["alpha"], previous_frames))
-
-        if len(l2_dists) >= log.THRESHOLDS["num_unknown"] and len(filtered) > 0:
-            mostly_unknown = len(filtered) / len(previous_frames) >= 1. - log.THRESHOLDS["percent_diff"]
-
-            if mostly_unknown and np.std(filtered) <= log.THRESHOLDS["percent_diff"] / 2.:
-                self.__dynamic_db["visitor_{}".format(len(self.__dynamic_db) + 1)] = embedding.flatten()
+            if use_dynamic:
+                self._dynamic_db["visitor_{}".format(len(self._dynamic_db) + 1)] = embedding.flatten()
                 self._train_knn(knn_types=["dynamic"])
-                log.flush_current()
+
+                cprint("Visitor activity logged", color="magenta", attrs=["bold"])
 
 
-    # MEMORY ALLOCATION
-    def _allocate_buffers(self):
-        # determine dimensions and create page-locked memory buffers (i.e. won't be swapped to disk) to hold host i/o
-        self.h_input = cuda.pagelocked_empty(
-            trt.volume(self.engine.get_binding_shape(0)),
-            dtype=trt.nptype(self.engine_manager.CONSTANTS["dtype"]))
-        self.h_output = cuda.pagelocked_empty(
-            trt.volume(self.engine.get_binding_shape(1)),
-            dtype=trt.nptype(self.engine_manager.CONSTANTS["dtype"]))
+    # COMPUTATION CHECK
+    def keep_gpu_warm(self, frame, frames, last_gpu_checkup, use_lcd):
+        """Keeps GPU computations running so that facial recognition speed stays constant. Only needed on Jetson Nano
 
-        # allocate device memory for inputs and outputs
-        self.d_input = cuda.mem_alloc(self.h_input.nbytes)
-        self.d_output = cuda.mem_alloc(self.h_output.nbytes)
+        :param frame: frame as array
+        :param frames: number of frames elapsed
+        :param last_gpu_checkup: last computation check time
+        :param use_lcd: use LCD or not
+        :returns: this computation check time
 
-        # create execution context
-        self.context = self.engine.create_execution_context()
+        """
+
+        next_check = log.THRESHOLDS["missed_frames"]
+
+        if frames == 0 or time.time() - last_gpu_checkup > next_check:
+            with HidePrints():
+                self.recognize(frame, checkup=True)
+            print("Regular computation check")
+
+            last_gpu_checkup = time.time()
+
+            if use_lcd:
+                lcd.LCD_DEVICE.clear()
+
+        elif not (time.time() - log.LAST_LOGGED > next_check or time.time() - log.UNK_LAST_LOGGED > next_check):
+            last_gpu_checkup = time.time()
+
+        return last_gpu_checkup
