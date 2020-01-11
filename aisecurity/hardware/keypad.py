@@ -13,7 +13,7 @@ import asyncio
 import requests
 
 
-# ---------------- INITS ----------------
+################################ INITS ################################
 
 # AUTOINIT
 from aisecurity.hardware.lcd import GPIO, LCD_DEVICE
@@ -52,7 +52,7 @@ def init():
         USE_KEYPAD = False
 
 
-# ---------------- FUNCTIONS ----------------
+################################ FUNCTIONS ################################
 def submit(student_id):
     params = {
         "id": str(student_id),
