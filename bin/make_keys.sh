@@ -20,20 +20,20 @@ function mk_key_files {
 
   key_loc=$1
 
-  if [ ! -d "$key_loc/name_keys.txt" ] ; then
-    wget -O "name_keys.txt" "https://www.dropbox.com/s/j46rq05i92ip4rq/name_keys.txt?dl=1" || \
-    echo "name_keys.txt could not be accessed"
-    echo "name_keys.txt created in $key_loc"
+  if [ ! -d "$key_loc/test_name_keys.txt" ] ; then
+    curl -Lo "test_name_keys.txt" "https://www.dropbox.com/s/yxebmo4gm0qq7nj/test_name_keys.txt?dl=1" || \
+    echo "test_name_keys.txt could not be accessed"
+    echo "test_name_keys.txt created in $key_loc"
   else
-    echo "name_keys.txt already exists in $key_loc"
+    echo "test_name_keys.txt already exists in $key_loc"
   fi
 
-  if [ ! -d "$key_loc/embedding_keys.txt" ] ; then
-    wget -O "embedding_keys.txt" "https://www.dropbox.com/s/wlxykht47j3zfpg/embedding_keys.txt?dl=1" || \
-    echo "embedding_keys.txt could not be accessed"
-    echo "embedding_keys.txt created in $key_loc"
+  if [ ! -d "$key_loc/test_embedding_keys.txt" ] ; then
+    curl -Lo "test_embedding_keys.txt" "https://www.dropbox.com/s/kl5s77evy8m9mpm/test_embedding_keys.txt?dl=1" || \
+    echo "test_embedding_keys.txt could not be accessed"
+    echo "test_embedding_keys.txt created in $key_loc"
   else
-    echo "embedding_keys.txt already exists in $key_loc"
+    echo "test_embedding_keys.txt already exists in $key_loc"
   fi
 
 }
@@ -67,7 +67,7 @@ function update_json {
     touch "$json_path"
   fi
 
-  printf '{\n    "names": "%sname_keys.txt",\n    "embeddings": "%sembedding_keys.txt"\n}\n' "$key_dir" "$key_dir" \
+  printf '{\n    "names": "%s/test_name_keys.txt",\n    "embeddings": "%s/test_embedding_keys.txt"\n}\n' "$key_dir" "$key_dir" \
   > "$json_path"
 }
 
