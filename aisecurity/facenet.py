@@ -94,13 +94,13 @@ class FaceNet:
         elif self.MODE == "tf-trt":
             self._trt_init(filepath, input_name, output_name, sess)
 
-        self.__static_db = None  # must be filled in by user
-        self.__dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
+        self._static_db = None  # must be filled in by user
+        self._dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
 
         self.static_knn = None
         self.dynamic_knn = None
 
-        self.set_data(retrieve_embeds(DATABASE), config=DATABASE_INFO)
+        self.set_data(retrieve_embeds(), config=DATABASE_INFO)
         self.set_dist_metric("auto")
 
         self.HYPERPARAMS.update(hyperparams)
@@ -196,7 +196,7 @@ class FaceNet:
                 assert is_vector, "each data[key] must be a vectorized embedding"
             return data
 
-        self.__static_db = check_validity(data)
+        self._static_db = check_validity(data)
 
         self._train_knn(knn_types=["static"])
 
@@ -254,10 +254,10 @@ class FaceNet:
             return knn
 
         try:
-            if self.__static_db and "static" in knn_types:
-                self.static_knn = knn_factory(self.__static_db)
-            if self.__dynamic_db and "dynamic" in knn_types:
-                self.dynamic_knn = knn_factory(self.__dynamic_db)
+            if self._static_db and "static" in knn_types:
+                self.static_knn = knn_factory(self._static_db)
+            if self._dynamic_db and "dynamic" in knn_types:
+                self.dynamic_knn = knn_factory(self._dynamic_db)
         except ValueError:
             raise ValueError("Current model incompatible with database")
 
@@ -267,11 +267,11 @@ class FaceNet:
     def data(self):
         """Property for static database
 
-        :returns: self.__static_db
+        :returns: self._static_db
 
         """
 
-        return self.__static_db
+        return self._static_db
 
     @staticmethod
     def get_frozen_graph(path):
@@ -349,8 +349,8 @@ class FaceNet:
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Recognition time")
-    def _recognize(self, img, db_types=None, **kwargs):
-        """Facial recognition under the hood
+    def recognize(self, img, db_types=None, **kwargs):
+        """Facial recognition
 
         :param img: image array
         :param db_types: database types: "static" and/or "dynamic" (default: None)
@@ -359,47 +359,29 @@ class FaceNet:
 
         """
 
-        assert self.__static_db or self.__dynamic_db, "data must be provided"
+        assert self._static_db or self._dynamic_db, "data must be provided"
 
         knns, data = [], {}
         if db_types is None or "static" in db_types:
             knns.append(self.static_knn)
-            data.update(self.__static_db)
-        if db_types and "dynamic" in db_types and self.dynamic_knn and self.__dynamic_db:
+            data.update(self._static_db)
+        if db_types and "dynamic" in db_types and self.dynamic_knn and self._dynamic_db:
             knns.append(self.dynamic_knn)
-            data.update(self.__dynamic_db)
+            data.update(self._dynamic_db)
 
         embedding = self.get_embeds(data, img, **kwargs)
+
         best_matches = []
         for knn in knns:
             pred = knn.predict(embedding)[0]
-            best_matches.append((pred, self.dist_metric(embedding, data[pred], mode="calc+norm", ignore=self.ignore)))
+            dist = self.dist_metric(embedding, data[pred], mode="calc+norm", ignore=self.ignore)
+
+            best_matches.append((pred, dist))
+
         best_match, dist = max(best_matches, key=lambda n: n[1])
         is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
         return embedding, is_recognized, best_match, dist
-
-    # FACIAL RECOGNITION
-    def recognize(self, img, verbose=True):
-        """Facial recognition for a single image
-
-        :param img: image array
-        :param verbose: verbose or not (default: True)
-        :returns: is recognized (bool), best match from static database, distance
-
-        """
-
-        _, is_recognized, best_match, dist = self._recognize(img)
-        # img can be a path, image, database name key, or embedding
-
-        if verbose:
-            if is_recognized:
-                print("Your image is a picture of \"{}\". {} of {}".format(best_match, self.dist_metric, dist))
-            else:
-                print("Your image is not in the database. The best match is \"{}\". {} = {}".format(
-                    best_match, self.dist_metric, dist))
-
-        return is_recognized, best_match, dist
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
@@ -481,7 +463,7 @@ class FaceNet:
 
                 # facial recognition
                 try:
-                    embedding, is_recognized, best_match, dist = self._recognize(frame, db_types, faces=face)
+                    embedding, is_recognized, best_match, dist = self.recognize(frame, db_types, faces=face)
                     print("{}: {} ({}){}".format(
                         self.dist_metric, round(dist, 4), best_match, " !" if not is_recognized else "")
                     )
@@ -504,10 +486,11 @@ class FaceNet:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
                 if use_keypad:
-                    if is_recognized:
-                        run_async_method(keypad.monitor)
-                    elif last_best_match != best_match:
-                         keypad.CONFIG["continue"] = False
+                    pass
+                    # if is_recognized:
+                    #     run_async_method(keypad.monitor)
+                    # elif last_best_match != best_match:
+                    #     keypad.CONFIG["continue"] = False
                     # FIXME:
                     #  1. above lines should be changed and use log.current_log instead of making another local var
                     #  2. use of 3 is ambiguous-- add to keypad.CONFIG)
@@ -533,7 +516,6 @@ class FaceNet:
                 break
 
             frames += 1
-
             await asyncio.sleep(1e-6)
 
         cap.release()
@@ -646,7 +628,7 @@ class FaceNet:
             label = best_match.replace("_", " ").title()
             font = cv2.FONT_HERSHEY_DUPLEX
 
-            (width, height), _ = cv2.getTextSize(label, font, font_size, thickness)
+            (width, height), __ = cv2.getTextSize(label, font, font_size, thickness)
 
             box_x = max(corner[0], origin[0] + width + 6)
             cv2.rectangle(frame, (origin[0], corner[1] - 35), (box_x, corner[1]), color, cv2.FILLED)
@@ -752,17 +734,13 @@ class FaceNet:
                 recognized_person = mode(log.CURRENT_LOG)
                 log.log_person(recognized_person, times=log.CURRENT_LOG[recognized_person])
 
-                cprint("Regular activity logged ({})".format(best_match), color="green", attrs=["bold"])
-
                 lcd.add_lcd_display(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
         elif log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.UNK_LAST_LOGGED):
             log.log_unknown("<DEPRECATED>")
 
-            cprint("Unknown activity logged", color="red", attrs=["bold"])
-
             if use_dynamic:
-                self.__dynamic_db["visitor_{}".format(len(self.__dynamic_db) + 1)] = embedding.flatten()
+                self._dynamic_db["visitor_{}".format(len(self._dynamic_db) + 1)] = embedding.flatten()
                 self._train_knn(knn_types=["dynamic"])
 
                 cprint("Visitor activity logged", color="magenta", attrs=["bold"])
@@ -781,13 +759,17 @@ class FaceNet:
         """
 
         next_check = log.THRESHOLDS["missed_frames"]
+
         if frames == 0 or time.time() - last_gpu_checkup > next_check:
             with HidePrints():
-                self._recognize(frame, checkup=True)
+                self.recognize(frame, checkup=True)
             print("Regular computation check")
+
             last_gpu_checkup = time.time()
+
             if use_lcd:
                 lcd.LCD_DEVICE.clear()
+
         elif not (time.time() - log.LAST_LOGGED > next_check or time.time() - log.UNK_LAST_LOGGED > next_check):
             last_gpu_checkup = time.time()
 

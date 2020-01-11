@@ -14,6 +14,7 @@ import mysql.connector
 import pyrebase
 from pyrebase import *
 import requests
+from termcolor import cprint
 
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
 
@@ -188,6 +189,8 @@ def log_person(student_name, times):
 
     flush_current(mode="known")
 
+    cprint("Regular activity logged ({})".format(student_name), color="green", attrs=["bold"])
+
 
 def log_unknown(path_to_img):
     now = get_now(time.time())
@@ -211,6 +214,8 @@ def log_unknown(path_to_img):
         pass
 
     flush_current(mode="unknown")
+
+    cprint("Unknown activity logged", color="red", attrs=["bold"])
 
 
 def flush_current(mode="known", flush_times=True):
