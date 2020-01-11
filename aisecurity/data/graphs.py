@@ -13,88 +13,8 @@ import time
 
 import tensorflow as tf
 from tensorflow.python.framework import graph_io
-import tensorrt as trt
 
 from aisecurity.utils.events import timer
-
-
-# CUDA ENGINE MANAGER
-class CudaEngineManager:
-
-    # CONSTANTS
-    CONSTANTS = {
-        "trt_logger": trt.Logger(trt.Logger.WARNING),
-        "dtype": trt.float32,
-        "max_batch_size": 1,
-        "max_workspace_size": 1 << 20,
-    }
-
-
-    # INIT
-    def __init__(self, **kwargs):
-        self.CONSTANTS = {**self.CONSTANTS, **kwargs}
-
-        self.builder = trt.Builder(CudaEngineManager.CONSTANTS["trt_logger"])
-        self.builder.max_batch_size = CudaEngineManager.CONSTANTS["max_batch_size"]
-        self.builder.max_workspace_size = CudaEngineManager.CONSTANTS["max_workspace_size"]
-
-        if self.CONSTANTS["dtype"] == trt.float16:
-            self.builder.fp16_mode = True
-
-        self.network = self.builder.create_network()
-
-
-    # ENGINE TASK HELPERS
-    @timer("Uff model parsing time")
-    def _parse_uff(uff_file, network, input_name, input_shape, output_name):
-        parser = trt.UffParser()
-
-        parser.register_input(input_name, input_shape)
-        parser.register_output(output_name)
-
-        parser.parse(uff_file, network, CudaEngineManager.CONSTANTS["dtype"])
-
-        self.parser = parser
-
-    @timer("Caffe model parsing time")
-    def _parse_caffe(self, caffe_model_file, caffe_deploy_file, network, output_name="prob1"):
-        parser = trt.CaffeParser()
-
-        model_tensors = parser.parse(deploy=caffe_deploy_file, model=caffe_model_file, network=network,
-                                     dtype=CudaEngineManager.CONSTANTS["dtype"])
-
-        network.mark_output(model_tensors.find(output_name))
-
-        self.parser = parser
-
-    @timer("Engine building time")
-    def _build_engine(self, builder, network):
-        self.builder = builder.build_cuda_engine(network)
-
-    @timer("Engine serializing time")
-    def _serialize_engine(self, engine):
-        self.engine = engine.serialize()
-
-
-    # CUDA ENGINE WRITE AND READ
-    def read_cuda_engine(self, engine_file):
-        with open(engine_file, "rb") as file, trt.Runtime(self.CONSTANTS["trt_logger"]) as runtime:
-            self.engine = runtime.deserialize_cuda_engine(file.read())
-
-    def uff_write_cuda_engine(self, uff_file, target_file, input_name, input_shape, output_name):
-        self._parse_uff(uff_file, self.network, input_name, input_shape, output_name)
-        self._build_engine(self.builder, self.network)
-        self._serialize_engine()
-
-        with open(target_file, "wb") as file:
-            file.write(self.engine)
-
-    def caffe_write_cuda_engine(self, caffe_model_file, caffe_deploy_file, target_file):
-        self.parser = self._parse_caffe(caffe_model_file, caffe_deploy_file, self.network)
-        self.engine = self._serialize_engine(self._build_engine(self.builder, self.network))
-
-        with open(target_file, "wb") as file:
-            file.write(self.engine)
 
 
 # MODEL CONVERSIONS
