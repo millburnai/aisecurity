@@ -26,6 +26,14 @@ COLORS = None
 LCD_DEVICE, PROGRESS_BAR, GPIO = None, None, None
 
 try:
+    from adafruit_character_lcd.character_lcd_i2c import Character_LCD_I2C as character_lcd
+    import board
+    import busio
+except (NotImplementedError, ModuleNotFoundError, ValueError):
+    # ValueError- a different mode has already been set
+    warnings.warn("LCD not found")
+
+try:
     i2c = busio.I2C(board.SCL, board.SDA)
     i2c.scan()
 except (RuntimeError, NameError) as error:
@@ -33,13 +41,6 @@ except (RuntimeError, NameError) as error:
         raise RuntimeError("Wire configuration incorrect")
     elif isinstance(error, NameError):
         warnings.warn("i2c not found")
-
-try:
-    from adafruit_character_lcd.character_lcd_i2c import Character_LCD_I2C as character_lcd
-    import board
-    import busio
-except (NotImplementedError, ModuleNotFoundError, ValueError): #ValueError- a different mode has already been set
-    warnings.warn("LCD not found")
 
 try:
     import Jetson.GPIO as GPIO
