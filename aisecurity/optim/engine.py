@@ -65,7 +65,7 @@ class CudaEngineManager:
 
 
     # INITS
-    def __init__(self, filepath, input_name, output_name, input_shape, **kwargs):
+    def __init__(self):
         # constants (have to be set here in case trt isn't imported)
         self.CONSTANTS["trt_logger"] = trt.Logger(trt.Logger.WARNING)
         self.CONSTANTS["dtype"] = trt.float32
@@ -81,35 +81,6 @@ class CudaEngineManager:
             self.builder.fp16_mode = True
 
         self.network = self.builder.create_network()
-
-        # engine
-        self.read_cuda_engine(filepath)
-
-        # input and output shapes and names
-        self._io_init(filepath, input_name, output_name, input_shape)
-
-        # memory allocation
-        self.allocate_buffers()
-
-    def _io_init(self, filepath, input_name, output_name, input_shape):
-        self.input_name, self.output_name, self.model_name = None, None, None
-
-        for model in self.MODELS:
-            if model in filepath:
-                self.model_name = model
-                self.input_name = self.MODELS[model]["input"]
-                self.output_name = self.MODELS[model]["output"]
-
-        self.input_name, self.output_name = input_name, output_name
-
-        if input_shape:
-            assert input_shape[0] == 3, "input shape to engine should be in channels-first mode"
-            self.input_shape = input_shape
-        elif self.model_name is not None:
-            self.input_shape = self.MODELS[self.model_name]["input_shape"]
-
-        assert self.input_name and self.output_name, "I/O for {} not detected or provided".format(filepath)
-        assert self.input_shape, "input shape for {} not detected or provided".format(filepath)
 
 
     # MEMORY ALLOCATION
@@ -226,3 +197,49 @@ class CudaEngineManager:
                 print("\tOutput Name:  {}".format(layer_output.name))
                 print("\tOutput Shape: {}".format(layer_output.shape))
             print("===========================================")
+
+
+# CUDA ENGINE
+class CudaEngine:
+
+    # INITS
+    def __init__(self, filepath, input_name, output_name, input_shape, **kwargs):
+        # engine
+        self.engine_manager = CudaEngineManager()
+        self.engine_manager.read_cuda_engine(filepath)
+
+        # input and output shapes and names
+        self.io_check(filepath, input_name, output_name, input_shape)
+
+        # memory allocation
+        self.engine_manager.allocate_buffers()
+
+    def io_check(self, filepath, input_name, output_name, input_shape):
+        self.input_name, self.output_name, self.model_name = None, None, None
+
+        for model in self.MODELS:
+            if model in filepath:
+                self.model_name = model
+                self.input_name = self.MODELS[model]["input"]
+                self.output_name = self.MODELS[model]["output"]
+
+        self.input_name, self.output_name = input_name, output_name
+
+        if input_shape:
+            assert input_shape[0] == 3, "input shape to engine should be in channels-first mode"
+            self.input_shape = input_shape
+        elif self.model_name is not None:
+            self.input_shape = self.MODELS[self.model_name]["input_shape"]
+
+        assert self.input_name and self.output_name, "I/O for {} not detected or provided".format(filepath)
+        assert self.input_shape, "input shape for {} not detected or provided".format(filepath)
+
+
+    # INFERENCE
+    def inference(self, *args, **kwargs):
+        return self.engine_manager.inference(*args, **kwargs)
+
+
+    # SUMMARY
+    def summary(self, *args, **kwargs):
+        self.engine_manager.summary(*args, **kwargs)

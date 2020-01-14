@@ -186,7 +186,7 @@ class FaceNet:
     def _trt_init(self, filepath, input_name, output_name, input_shape):
         assert engine.INIT_SUCCESS, "tensorrt or pycuda import failed: trt mode not available"
 
-        self.facenet = engine.CudaEngineManager(filepath, input_name, output_name, input_shape)
+        self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
         IMG_CONSTANTS["img_size"] = tuple(reversed(self.facenet.input_shape))
 
 
