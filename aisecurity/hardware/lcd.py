@@ -26,17 +26,13 @@ COLORS = None
 LCD_DEVICE, PROGRESS_BAR, GPIO = None, None, None
 
 try:
-    import Jetson.GPIO as GPIO
-    GPIO.cleanup()
-    GPIO.setmode(GPIO.BCM)
-    try:
-        COLORS = [18, 23]
-        for color in COLORS:
-            GPIO.setup(color, GPIO.OUT)
-    except RuntimeError:
-        warnings.warn("Improper wire configuration")
-except ImportError:
-    warnings.warn("Jetson.GPIO not found")
+    i2c = busio.I2C(board.SCL, board.SDA)
+    i2c.scan()
+except (RuntimeError, NameError) as error:
+    if isinstance(error, RuntimeError):
+        raise RuntimeError("Wire configuration incorrect")
+    elif isinstance(error, NameError):
+        warnings.warn("i2c not found")
 
 try:
     from adafruit_character_lcd.character_lcd_i2c import Character_LCD_I2C as character_lcd
@@ -46,13 +42,20 @@ except (NotImplementedError, ModuleNotFoundError, ValueError): #ValueError- a di
     warnings.warn("LCD not found")
 
 try:
-    i2c = busio.I2C(board.SCL, board.SDA)
-    i2c.scan()
-except (RuntimeError, NameError) as error:
-    if isinstance(error, RuntimeError):
-        raise RuntimeError("Wire configuration incorrect")
-    elif isinstance(error, NameError):
-        warnings.warn("i2c not found")
+    import Jetson.GPIO as GPIO
+    GPIO.cleanup()
+    GPIO.setmode(GPIO.BCM)
+    try:
+        COLORS = [18, 23]
+        for color in COLORS:
+            GPIO.setup(color, GPIO.OUT)
+    except RuntimeError:
+        warnings.warn("Improper wire configuration")
+except (ImportError, RuntimeError) as e:
+    if isinstance(e, ImportError):
+        warnings.warn("Jetson.GPIO not found")
+    elif isinstance(e, RuntimeError):
+        warnings.warn("/dev/ cannot be accessed: use sudo")
 
 
 # LCD INIT
