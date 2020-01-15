@@ -102,7 +102,7 @@ class CudaEngineManager:
             cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
             self.stream.synchronize()
 
-        output = self.h_output
+        output = np.copy(self.h_output)
         if output_shape is not None:
             output = output.reshape(output_shape)
 
