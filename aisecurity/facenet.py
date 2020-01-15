@@ -31,7 +31,7 @@ from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.events import timer, HidePrints, run_async_method
 from aisecurity.utils.paths import DATABASE_INFO, DEFAULT_MODEL
-from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces
+from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces, mtcnn_init
 
 
 ################################ FaceNet ###############################
@@ -441,7 +441,7 @@ class FaceNet:
         cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip, device=device)
         assert cap.isOpened(), "video capture failed to initialize"
 
-        mtcnn = MTCNN(min_face_size=0.5 * (mtcnn_width + mtcnn_height) / 3)
+        mtcnn_init(min_face_size=0.5 * (mtcnn_width + mtcnn_height) / 3)
         # face needs to fill at least 1/3 of the frame
 
         missed_frames = 0
@@ -463,7 +463,7 @@ class FaceNet:
                 last_gpu_checkup = self.keep_gpu_warm(frame, frames, last_gpu_checkup, use_lcd)
 
             # using MTCNN to detect faces
-            result = mtcnn.detect_faces(frame)
+            result = IMG_CONSTANTS["mtcnn"].detect_faces(frame)
 
             if result:
                 overlay = original_frame.copy()
