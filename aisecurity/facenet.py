@@ -187,7 +187,7 @@ class FaceNet:
         assert engine.INIT_SUCCESS, "tensorrt or pycuda import failed: trt mode not available"
 
         self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
-        IMG_CONSTANTS["img_size"] = tuple(reversed(self.facenet.input_shape))
+        IMG_CONSTANTS["img_size"] = tuple(reversed(self.facenet.input_shape))[:-1]
 
 
     # MUTATORS
@@ -329,7 +329,7 @@ class FaceNet:
             output_tensor = self.facenet.get_tensor_by_name(self.output_name)
             predict = lambda imgs: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(imgs))
         elif self.MODE == "trt":
-            predict = lambda imgs: self.facenet.inference(imgs, output_shape=(-1, 1))
+            predict = lambda imgs: self.facenet.inference(imgs, output_shape=(1, -1))
 
         cropped_imgs = normalize(crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup))
         raw_embeddings = predict(cropped_imgs)
