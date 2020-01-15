@@ -44,28 +44,9 @@ class CudaEngineManager:
         "max_workspace_size": 1 << 20,
     }
 
-    # PREBUILT MODELS
-    MODELS = {
-        "ms_celeb_1m": {
-            "input": "input_1",
-            "output": "Bottleneck_BatchNorm/batchnorm/add_1",
-            "input_shape": (3, 160, 160)
-        },
-        "vgg_face_2": {
-            "input": "base_input",
-            "output": "classifier_low_dim/Softmax",
-            "input_shape": (3, 224, 224)
-        },
-        "20180402-114759": {
-            "input": "batch_join",
-            "output": "embeddings",
-            "input_shape": (3, 160, 160)
-        }
-    }
-
 
     # INITS
-    def __init__(self):
+    def __init__(self, **kwargs):
         # constants (have to be set here in case trt isn't imported)
         self.CONSTANTS["trt_logger"] = trt.Logger(trt.Logger.WARNING)
         self.CONSTANTS["dtype"] = trt.float32
@@ -202,10 +183,29 @@ class CudaEngineManager:
 # CUDA ENGINE
 class CudaEngine:
 
+    # PREBUILT MODELS
+    MODELS = {
+        "ms_celeb_1m": {
+            "input": "input_1",
+            "output": "Bottleneck_BatchNorm/batchnorm/add_1",
+            "input_shape": (3, 160, 160)
+        },
+        "vgg_face_2": {
+            "input": "base_input",
+            "output": "classifier_low_dim/Softmax",
+            "input_shape": (3, 224, 224)
+        },
+        "20180402-114759": {
+            "input": "batch_join",
+            "output": "embeddings",
+            "input_shape": (3, 160, 160)
+        }
+    }
+
     # INITS
     def __init__(self, filepath, input_name, output_name, input_shape, **kwargs):
         # engine
-        self.engine_manager = CudaEngineManager()
+        self.engine_manager = CudaEngineManager(**kwargs)
         self.engine_manager.read_cuda_engine(filepath)
 
         # input and output shapes and names
@@ -223,7 +223,10 @@ class CudaEngine:
                 self.input_name = self.MODELS[model]["input"]
                 self.output_name = self.MODELS[model]["output"]
 
-        self.input_name, self.output_name = input_name, output_name
+        if input_name:
+            self.input_name = input_name
+        if output_name:
+            self.output_name = output_name
 
         if input_shape:
             assert input_shape[0] == 3, "input shape to engine should be in channels-first mode"
@@ -231,7 +234,7 @@ class CudaEngine:
         elif self.model_name is not None:
             self.input_shape = self.MODELS[self.model_name]["input_shape"]
 
-        assert self.input_name and self.output_name, "I/O for {} not detected or provided".format(filepath)
+        assert self.input_name and self.output_name, "I/O names for {} not detected or provided".format(filepath)
         assert self.input_shape, "input shape for {} not detected or provided".format(filepath)
 
 
@@ -241,5 +244,5 @@ class CudaEngine:
 
 
     # SUMMARY
-    def summary(self, *args, **kwargs):
-        self.engine_manager.summary(*args, **kwargs)
+    def summary(self):
+        self.engine_manager.summary()
