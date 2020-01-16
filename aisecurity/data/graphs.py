@@ -85,6 +85,7 @@ def frozen_to_uff(path_to_model):
 
 
 # frozen .pb -> trt-optimizer .pb
+@timer("Inference graph creation time")
 def optimize_graph(frozen_graph, output_names, save_dir=".", save_name="trt_graph.pb"):
     trt_graph = trt.create_inference_graph(
         input_graph_def=frozen_graph,
