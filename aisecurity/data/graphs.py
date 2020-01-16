@@ -86,17 +86,21 @@ def frozen_to_uff(path_to_model):
 
 # frozen .pb -> trt-optimizer .pb
 @timer("Inference graph creation time")
-def optimize_graph(frozen_graph, output_names, save_dir=".", save_name="trt_graph.pb"):
-    trt_graph = trt.create_inference_graph(
-        input_graph_def=frozen_graph,
-        outputs=output_names,
-        max_batch_size=1,
-        max_workspace_size_bytes=1 << 25,
-        precision_mode="FP16",
-        minimum_segment_size=50
-    )
+def optimize_graph(path_to_graph_def, output_names, save_dir=".", save_name="trt_graph.pb"):
+    with tf.gfile.FastGFile(path_to_graph_def, "rb") as graph_file:
+        graph_def = tf.GraphDef()
+        graph_def.ParseFromString(graph_file.read())
 
-    if save_dir:
-        graph_io.write_graph(trt_graph, save_dir, save_name)
+        trt_graph = trt.create_inference_graph(
+            input_graph_def=graph_def,
+            outputs=output_names,
+            max_batch_size=1,
+            max_workspace_size_bytes=1 << 25,
+            precision_mode="FP16",
+            minimum_segment_size=50
+        )
 
-    return trt_graph
+        if save_dir:
+            graph_io.write_graph(trt_graph, save_dir, save_name)
+
+        return trt_graph
