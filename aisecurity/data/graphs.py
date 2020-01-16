@@ -7,15 +7,14 @@ Data and CUDA utils.
 """
 
 
-import functools
 import subprocess
-import time
 
+from keras import backend as K
 import tensorflow as tf
+import tensorflow.contrib.tensorrt as trt
 from tensorflow.python.framework import graph_io
 
 from aisecurity.utils.events import timer
-
 
 # MODEL CONVERSIONS
 
@@ -37,13 +36,11 @@ def _freeze_graph(graph, sess, output_names, save_dir=None, save_name=None):
 
 # .pb -> frozen .pb
 @timer("Freeze TF model time")
-def freeze_graph(path_to_model, output_names, save_dir=None, save_name="frozen_graph.pb"):
+def freeze_graph(path_to_model, output_names, save_dir=".", save_name="frozen_graph.pb"):
     assert path_to_model.endswith(".pb"), "{} must be a .pb file".format(path_to_model)
 
     K.clear_session()
     K.set_learning_phase(0)
-
-    sess = K.get_session()
 
     with tf.Session(graph=tf.Graph()) as sess:
 
@@ -85,3 +82,20 @@ def frozen_to_uff(path_to_model):
     process = subprocess.Popen(bash_cmd.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
     return output, error
+
+
+# frozen .pb -> trt-optimizer .pb
+def optimize_graph(frozen_graph, output_names, save_dir=".", save_name="trt_graph.pb"):
+    trt_graph = trt.create_inference_graph(
+        input_graph_def=frozen_graph,
+        outputs=output_names,
+        max_batch_size=1,
+        max_workspace_size_bytes=1 << 25,
+        precision_mode="FP16",
+        minimum_segment_size=50
+    )
+
+    if save_dir:
+        graph_io.write_graph(trt_graph, save_dir, save_name)
+
+    return trt_graph
