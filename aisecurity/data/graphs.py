@@ -2,7 +2,7 @@
 
 "aisecurity.data.graphs"
 
-Data and CUDA utils.
+Graph control and flow.
 
 """
 

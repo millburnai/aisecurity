@@ -12,7 +12,7 @@ import subprocess
 
 import aisecurity
 
-CONFIG_HOME = os.getenv("HOME") + "/.aisecurity"
+CONFIG_HOME = os.path.expanduser("~") + "/.aisecurity"
 HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
 if not os.path.exists(CONFIG_HOME):
     subprocess.call(["make_config.sh"])
