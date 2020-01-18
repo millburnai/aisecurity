@@ -17,7 +17,6 @@ import cv2
 import keras
 from keras import backend as K
 import matplotlib.pyplot as plt
-from mtcnn.mtcnn import MTCNN
 import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
@@ -25,16 +24,16 @@ from termcolor import cprint
 
 from aisecurity.data.dataflow import retrieve_embeds
 from aisecurity.database import log
+from aisecurity.optim import engine
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.events import timer, HidePrints, run_async_method
-from aisecurity.utils.paths import DATABASE_INFO, DATABASE, DEFAULT_MODEL
-from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces
+from aisecurity.utils.paths import DATABASE_INFO, DEFAULT_MODEL
+from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces, mtcnn_init
 
 
-# ---------------- FACENET ----------------
-
+################################ FaceNet ###############################
 class FaceNet:
     """Class implementation of FaceNet"""
 
@@ -69,13 +68,15 @@ class FaceNet:
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=DEFAULT_MODEL, sess=None, input_name=None, output_name=None, **hyperparams):
+    def __init__(self, filepath=DEFAULT_MODEL, sess=None, input_name=None, output_name=None, input_shape=None,
+                 **hyperparams):
         """Initializes FaceNet object
 
         :param filepath: path to model (default: aisecurity.utils.paths.DEFAULT_MODEL)
         :param sess: tf.Session to use (default: None)
-        :param input_name: name of input tensor-- only required if using TF-TRT non-default model (default: None)
-        :param output_name: name of output tensor-- only required if using TF-TRT non-default model (default: None)
+        :param input_name: name of input tensor-- only required if using (TF)TRT non-default model (default: None)
+        :param output_name: name of output tensor-- only required if using (TF)TRT non-default model (default: None)
+        :param input_shape: input shape-- only required if using (TF)TRT non-default model (default: None)
         :param hyperparams: hyperparameters to override FaceNet.HYPERPARAMS
 
         """
@@ -84,15 +85,15 @@ class FaceNet:
 
         if ".pb" in filepath:
             self.MODE = "tf-trt"
+            self._tf_trt_init(filepath, input_name, output_name, sess, input_shape)
         elif ".h5" in filepath:
             self.MODE = "keras"
+            self._keras_init(filepath)
+        elif ".engine" in filepath:
+            self.MODE = "trt"
+            self._trt_init(filepath, input_name, output_name, input_shape)
         else:
             raise TypeError("model must be a .h5 or a frozen .pb file")
-
-        if self.MODE == "keras":
-            self._keras_init(filepath)
-        elif self.MODE == "tf-trt":
-            self._trt_init(filepath, input_name, output_name, sess)
 
         self._static_db = None  # must be filled in by user
         self._dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
@@ -105,6 +106,7 @@ class FaceNet:
 
         self.HYPERPARAMS.update(hyperparams)
 
+    # KERAS INIT
     def _keras_init(self, filepath):
         """Initializes a Keras model
 
@@ -115,17 +117,17 @@ class FaceNet:
         self.facenet = keras.models.load_model(filepath)
         IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
 
-    def _trt_init(self, filepath, input_name, output_name, sess):
-        """Initializes a TF_TRT model
+    # TF-TRT INIT
+    def _tf_trt_init(self, filepath, input_name, output_name, sess, input_shape):
+        """Initializes a TF-TRT model
 
         :param filepath: path to model (.pb)
         :param input_name: name of input tensor
         :param output_name: name of output tensor
         :param sess: tf.Session to enter
+        :param input_shape: input shape for facenet
 
         """
-
-        assert tf.test.is_gpu_available(), "TF-TRT mode requires a CUDA-enabled GPU"
 
         graph_def = self.get_frozen_graph(filepath)
 
@@ -142,15 +144,17 @@ class FaceNet:
 
         self.facenet = self.sess.graph
         try:
-            IMG_CONSTANTS["img_size"] = tuple(
-                self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3]
-            )
+            if input_shape is not None:
+                IMG_CONSTANTS["img_size"] = input_shape
+            else:
+                IMG_CONSTANTS["img_size"] = tuple(
+                    self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3]
+                )
         except ValueError:
             warnings.warn("Input tensor size not detected")
 
-
     def _tensor_init(self, model_name, input_name, output_name):
-        """Initializes tensors (TF-TRT only)
+        """Initializes tensors (TF-TRT or TRT modes only)
 
         :param model_name: name of model
         :param input_name: input tensor name
@@ -176,6 +180,13 @@ class FaceNet:
             self.output_name = output_name
 
         assert self.input_name and self.output_name, "I/O tensors for {} not detected or provided".format(model_name)
+
+    # TRT INIT
+    def _trt_init(self, filepath, input_name, output_name, input_shape):
+        assert engine.INIT_SUCCESS, "tensorrt or pycuda import failed: trt mode not available"
+
+        self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
+        IMG_CONSTANTS["img_size"] = tuple(reversed(self.facenet.input_shape))[:-1]
 
 
     # MUTATORS
@@ -316,6 +327,8 @@ class FaceNet:
         elif self.MODE == "tf-trt":
             output_tensor = self.facenet.get_tensor_by_name(self.output_name)
             predict = lambda imgs: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(imgs))
+        elif self.MODE == "trt":
+            predict = lambda imgs: self.facenet.inference(imgs, output_shape=(1, -1))
 
         cropped_imgs = normalize(crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup))
         raw_embeddings = predict(cropped_imgs)
@@ -427,7 +440,7 @@ class FaceNet:
         cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip, device=device)
         assert cap.isOpened(), "video capture failed to initialize"
 
-        mtcnn = MTCNN(min_face_size=0.5 * (mtcnn_width + mtcnn_height) / 3)
+        mtcnn_init(min_face_size=0.5 * (mtcnn_width + mtcnn_height) / 3)
         # face needs to fill at least 1/3 of the frame
 
         missed_frames = 0
@@ -449,7 +462,7 @@ class FaceNet:
                 last_gpu_checkup = self.keep_gpu_warm(frame, frames, last_gpu_checkup, use_lcd)
 
             # using MTCNN to detect faces
-            result = mtcnn.detect_faces(frame)
+            result = IMG_CONSTANTS["mtcnn"].detect_faces(frame)
 
             if result:
                 overlay = original_frame.copy()

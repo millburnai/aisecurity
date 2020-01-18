@@ -19,7 +19,7 @@ from aisecurity.database.log import THRESHOLDS
 from aisecurity.utils.paths import CONFIG
 
 
-# ---------------- INITS ----------------
+################################ INITS ################################
 
 # AUTOINIT
 COLORS = None
@@ -195,7 +195,7 @@ class LCDProgressBar:
             self.lcd.set_message("[{}]".format(" " * self.bar_length))
 
 
-# ---------------- FUNCTIONS AND DECORATORS ----------------
+################################ FUNCTIONS AND DECORATORS ################################
 
 # ADD DISPLAY
 def add_lcd_display(best_match, use_server):
