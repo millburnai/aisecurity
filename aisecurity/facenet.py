@@ -17,7 +17,6 @@ import cv2
 import keras
 from keras import backend as K
 import matplotlib.pyplot as plt
-from mtcnn.mtcnn import MTCNN
 import numpy as np
 from sklearn import neighbors
 import tensorflow as tf

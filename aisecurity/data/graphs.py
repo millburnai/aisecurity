@@ -16,8 +16,8 @@ from tensorflow.python.framework import graph_io
 
 from aisecurity.utils.events import timer
 
-# MODEL CONVERSIONS
 
+# MODEL CONVERSIONS
 def _freeze_graph(graph, sess, output_names, save_dir=None, save_name=None):
     def freeze(graph, sess, output):
         with graph.as_default():

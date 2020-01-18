@@ -1,9 +1,6 @@
 """
-
 "aisecurity.hardware.lcd"
-
 LCD utils.
-
 """
 
 import concurrent.futures
@@ -26,23 +23,11 @@ COLORS = None
 LCD_DEVICE, PROGRESS_BAR, GPIO = None, None, None
 
 try:
-    import Jetson.GPIO as GPIO
-    GPIO.cleanup()
-    GPIO.setmode(GPIO.BCM)
-    try:
-        COLORS = [18, 23]
-        for color in COLORS:
-            GPIO.setup(color, GPIO.OUT)
-    except RuntimeError:
-        warnings.warn("Improper wire configuration")
-except ImportError:
-    warnings.warn("Jetson.GPIO not found")
-
-try:
     from adafruit_character_lcd.character_lcd_i2c import Character_LCD_I2C as character_lcd
     import board
     import busio
-except (NotImplementedError, ModuleNotFoundError, ValueError): #ValueError- a different mode has already been set
+except (NotImplementedError, ModuleNotFoundError, ValueError):
+    # ValueError- a different mode has already been set
     warnings.warn("LCD not found")
 
 try:
@@ -53,6 +38,22 @@ except (RuntimeError, NameError) as error:
         raise RuntimeError("Wire configuration incorrect")
     elif isinstance(error, NameError):
         warnings.warn("i2c not found")
+
+try:
+    import Jetson.GPIO as GPIO
+    GPIO.cleanup()
+    GPIO.setmode(GPIO.BCM)
+    try:
+        COLORS = [18, 23]
+        for color in COLORS:
+            GPIO.setup(color, GPIO.OUT)
+    except RuntimeError:
+        warnings.warn("Improper wire configuration")
+except (ImportError, RuntimeError) as e:
+    if isinstance(e, ImportError):
+        warnings.warn("Jetson.GPIO not found")
+    elif isinstance(e, RuntimeError):
+        warnings.warn("/dev/ cannot be accessed: use sudo")
 
 
 # LCD INIT
@@ -65,7 +66,7 @@ def init():
     PROGRESS_BAR = LCDProgressBar(total=THRESHOLDS["num_recognized"], lcd=LCD_DEVICE)
 
 
-################################ CLASSES ################################
+# ---------------- CLASSES ----------------
 
 # LCD WRAPPER CLASS (WITH DEV SUPPORT)
 class LCD:
