@@ -18,7 +18,6 @@ from aisecurity.utils.events import timer
 
 # MODEL CONVERSIONS
 
-# HELPERS
 def _freeze_graph(graph, sess, output_names, save_dir=None, save_name=None):
     def freeze(graph, sess, output):
         with graph.as_default():
@@ -101,6 +100,6 @@ def optimize_graph(path_to_graph_def, output_names, save_dir=".", save_name="trt
         )
 
         if save_dir:
-            graph_io.write_graph(trt_graph, save_dir, save_name)
+            graph_io.write_graph(trt_graph, save_dir, save_name, as_text=False)
 
         return trt_graph
