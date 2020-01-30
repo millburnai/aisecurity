@@ -10,7 +10,7 @@ setup(
     author_email="22parkr@millburn.org, 22pilarskil@millburn.org",
     license=None,
     python_requires=">=3.5.0",
-    install_requires=["adafruit-circuitpython-charlcd", "tensorflow==1.15.0", "keras", "matplotlib", "mysql-connector-python",
+    install_requires=["adafruit-circuitpython-charlcd", "tensorflow==1.15.2", "keras", "matplotlib", "mysql-connector-python",
                       "Pyrebase", "pycryptodome", "requests", "scikit-learn", "mtcnn"],
     scripts=["bin/drop.sql", "bin/make_config.sh", "bin/make_keys.sh"],
     packages=find_packages(),
