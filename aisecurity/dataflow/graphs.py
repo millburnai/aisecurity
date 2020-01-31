@@ -1,6 +1,6 @@
 """
 
-"aisecurity.data.graphs"
+"aisecurity.dataflow.graphs"
 
 Graph control and flow.
 

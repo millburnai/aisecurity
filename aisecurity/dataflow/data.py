@@ -1,6 +1,6 @@
 """
 
-"aisecurity.data.dataflow"
+"aisecurity.dataflow.data"
 
 Data utils.
 
