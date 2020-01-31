@@ -5,28 +5,24 @@
 
 if [ ! -d "$HOME/.aisecurity" ] ; then
   mkdir "$HOME/.aisecurity"
-else
-  read -rp "$HOME/.aisecurity already exists. Overwrite? (y/n): " confirm
-  if ! [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] ; then
-    echo "Exiting..." ; exit 1
-  fi
 fi
 
 cd "$HOME/.aisecurity" || echo "Error: unable to access ~/.aisecurity"
 config_path=$(pwd )
 
-echo "Adding aisecurity.json to .aisecurity"
-touch "$HOME/.aisecurity/aisecurity.json"
-
-printf '{\n    "default_model": "%s/models/ms_celeb_1m.h5",\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_file.json",\n    "database_location": "%s/database/test.json",\n    "database_info": "%s/database/test_info.json",\n    "mysql_user": "root",\n    "mysql_password": "root"\n}\n' \
-"$config_path" "$config_path" "$config_path" "$config_path" "$config_path" > "$config_path/aisecurity.json"
+if [ ! -f "$HOME/.aisecurity/aisecurity.json" ] ; then
+  echo "Adding aisecurity.json to .aisecurity"
+  touch "$HOME/.aisecurity/aisecurity.json"
+  printf '{\n    "default_model": "%s/models/ms_celeb_1m.h5",\n    "key_directory": "%s/keys/",\n    "key_location": "%s/keys/keys_file.json",\n    "database_location": "%s/database/test.json",\n    "database_info": "%s/database/test_info.json",\n    "mysql_user": "root",\n    "mysql_password": "root"\n}\n' \
+  "$config_path" "$config_path" "$config_path" "$config_path" "$config_path" > "$config_path/aisecurity.json"
+fi
 
 if [ ! -d "$config_path/database" ] ; then
   echo "Making database and unknown directories"
   mkdir database
   cd "$config_path/database" || echo "Error: unable to access $config_path/database"
-  curl -Lo "test.json" https://www.dropbox.com/s/umjku76xppc0396/test.json?dl=1 || echo "Error: unable to download test.json"
-  curl -Lo "test_info.json" https://www.dropbox.com/s/ihfmemt6sqdfj74/test_info.json?dl=1 || echo "Error: unable to download test_info.json"
+  curl -Lo "test.json" "https://www.dropbox.com/s/umjku76xppc0396/test.json?dl=1" || echo "Error: unable to download test.json"
+  curl -Lo "test_info.json" "https://www.dropbox.com/s/ihfmemt6sqdfj74/test_info.json?dl=1" || echo "Error: unable to download test_info.json"
 fi
 
 if [ ! -d "$config_path/models" ] ; then
@@ -61,4 +57,13 @@ if [ ! -d "$HOME/.aisecurity/logging" ] ; then
   touch "$config_path/logging/firebase.json"
   echo "Fill in '$config_path/logging/firebase.json' and a key file in the same directory to use firebase logging"
   mkdir unknown
+fi
+
+if [ ! -d "$HOME/.aisecurity/config" ] ; then
+  echo "Creating config directory"
+  cd "$config_path" || echo "Error: unable to access $config_path"
+  mkdir config
+  cd "$config_path/config" || echo "Error: unable to access $config_path/config"
+  curl -Lo "models.json" "https://www.dropbox.com/s/9my8ofbzohi0dsm/models.json?dl=1"
+  curl -Lo "cuda_models.json" "https://www.dropbox.com/s/ieke59ny0r7qxo3/cuda_models.json?dl=1"
 fi
