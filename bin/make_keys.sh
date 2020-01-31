@@ -22,18 +22,12 @@ function mk_key_files {
 
   if [ ! -f "$key_loc/test_name_keys.txt" ] ; then
     curl -Lo "test_name_keys.txt" "https://www.dropbox.com/s/yxebmo4gm0qq7nj/test_name_keys.txt?dl=1" || \
-    echo "test_name_keys.txt could not be accessed"
-    echo "test_name_keys.txt created in $key_loc"
-  else
-    echo "test_name_keys.txt already exists in $key_loc"
+    echo "\e[31mError: could not download test_name_keys.txt\e[0m"
   fi
 
   if [ ! -f "$key_loc/test_embedding_keys.txt" ] ; then
     curl -Lo "test_embedding_keys.txt" "https://www.dropbox.com/s/kl5s77evy8m9mpm/test_embedding_keys.txt?dl=1" || \
-    echo "test_embedding_keys.txt could not be accessed"
-    echo "test_embedding_keys.txt created in $key_loc"
-  else
-    echo "test_embedding_keys.txt already exists in $key_loc"
+    echo "\e[31mError: could not download test_embedding_keys.txt\e[0m"
   fi
 
 }
@@ -45,13 +39,11 @@ function mk_keys {
   dir=$key_dir
 
   if [ ! -d "$dir" ] ; then
-    echo "Creating keys directory at $dir"
+    echo "\e[95mCreating keys directory at $dir\e[0m"
     mkdir "$dir"
-  else
-    echo "Keys directory already exists at $dir"
   fi
 
-  cd "$dir" || echo "Something went wrong: $dir cannot be accessed"
+  cd "$dir" || echo "\e[31mError: cannot access $dir\e[0m"
 
   mk_key_files "$dir"
 }
@@ -63,7 +55,7 @@ function update_json {
   json_path=$path_to_json
 
   if [ ! -f "$json_path" ] ; then
-    echo "Creating json key file at $json_path"
+    echo "\e[95mCreating json key file at $json_path\e[0m"
     touch "$json_path"
     printf '{\n    "names": "%s/test_name_keys.txt",\n    "embeddings": "%s/test_embedding_keys.txt"\n}\n' "$key_dir" "$key_dir" \
     > "$json_path"
