@@ -69,7 +69,7 @@ def init():
     PROGRESS_BAR = LCDProgressBar(total=THRESHOLDS["num_recognized"], lcd=LCD_DEVICE)
 
 
-# ---------------- CLASSES ----------------
+################################ CLASSES ################################
 
 # LCD WRAPPER CLASS (WITH DEV SUPPORT)
 class LCD:

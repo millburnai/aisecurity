@@ -34,7 +34,7 @@ if not INIT_SUCCESS:
     warnings.warn("tensorrt mode cannot be used: library import failed")
 
 
-# ---------------- CUDA ENGINE MANAGER ----------------
+################################ CUDA ENGINE MANAGER ################################
 class CudaEngineManager:
     """Class-oriented cuda engine management"""
 

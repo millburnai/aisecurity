@@ -1,6 +1,6 @@
 """
 
-"aisecurity.database.log"
+"aisecurity.db.log"
 
 MySQL and Firebase database handling.
 

@@ -98,6 +98,7 @@ class FaceNet:
         """
 
         self.facenet = keras.models.load_model(filepath)
+        self.img_norm = self.MODELS["_default"]["params"]["img_norm"]
         IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
 
     # TF-TRT INIT
@@ -153,6 +154,7 @@ class FaceNet:
         self.input_name = self.model_config["input"]
         self.output_name = self.model_config["output"]
         self.params = self.model_config["params"]
+        self.img_norm = self.params["img_norm"]
 
         if not self.input_name:
             self.input_name = input_name
@@ -166,6 +168,7 @@ class FaceNet:
         assert engine.INIT_SUCCESS, "tensorrt or pycuda import failed: trt mode not available"
 
         self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
+        self.img_norm = self.MODELS["_default"]["params"]["img_norm"]
         IMG_CONSTANTS["img_size"] = tuple(reversed(self.facenet.input_shape))[:-1]
 
 
@@ -311,7 +314,7 @@ class FaceNet:
             predict = lambda imgs: self.facenet.inference(imgs, output_shape=(1, -1))
 
         cropped_faces = crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup)
-        normalized_faces = normalize(cropped_faces, mode=self.params["img_norm"])
+        normalized_faces = normalize(cropped_faces, mode=self.img_norm)
 
         raw_embeddings = predict(normalized_faces)
         normalized_embeddings = self.dist_metric(raw_embeddings)
