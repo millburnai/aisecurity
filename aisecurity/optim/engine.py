@@ -5,10 +5,11 @@
 CUDA engine management.
 
 """
-
+import json
 import warnings
 
 import numpy as np
+from aisecurity.utils.paths import CONFIG_HOME
 
 from aisecurity.utils.events import timer
 
@@ -240,23 +241,8 @@ class CudaEngine:
     """Class-oriented cuda engine manager wrapper"""
 
     # PREBUILT MODELS
-    MODELS = {
-        "ms_celeb_1m": {
-            "input": "input_1",
-            "output": "Bottleneck_BatchNorm/batchnorm/add_1",
-            "input_shape": (3, 160, 160)
-        },
-        "vgg_face_2": {
-            "input": "base_input",
-            "output": "classifier_low_dim/Softmax",
-            "input_shape": (3, 224, 224)
-        },
-        "20180402-114759": {
-            "input": "batch_join",
-            "output": "embeddings",
-            "input_shape": (3, 160, 160)
-        }
-    }
+    MODELS = json.load(open(CONFIG_HOME + "/config/cuda_models.json"))
+
 
     # INITS
     def __init__(self, filepath, input_name, output_name, input_shape, **kwargs):

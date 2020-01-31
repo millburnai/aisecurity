@@ -9,6 +9,7 @@ Reference paper: https://arxiv.org/pdf/1503.03832.pdf
 """
 
 import asyncio
+import json
 import os
 import time
 import warnings
@@ -22,15 +23,15 @@ from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
 
-from aisecurity.data.dataflow import retrieve_embeds
-from aisecurity.database import log
+from aisecurity.dataflow.data import retrieve_embeds
+from aisecurity.db import log
 from aisecurity.optim import engine
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.events import timer, HidePrints, run_async_method
-from aisecurity.utils.paths import DATABASE_INFO, DEFAULT_MODEL
-from aisecurity.data.preprocessing import IMG_CONSTANTS, normalize, crop_faces, mtcnn_init
+from aisecurity.utils.paths import DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
+from aisecurity.utils.preprocessing import IMG_CONSTANTS, normalize, crop_faces, mtcnn_init
 
 
 ################################ FaceNet ###############################
@@ -44,26 +45,8 @@ class FaceNet:
         "mtcnn_alpha": 0.9
     }
 
-    # TENSOR CONSTANTS (FOR TF-TRT)
-    TENSORS = {
-        "ms_celeb_1m": {
-            "input": "input_1:0",
-            "output": "Bottleneck_BatchNorm/batchnorm/add_1:0",
-            "extras": {}
-        },
-        "vgg_face_2": {
-            "input": "base_input:0",
-            "output": "classifier_low_dim/Softmax:0",
-            "extras": {}
-        },
-        "20180402-114759": {
-            "input": "batch_join:0",
-            "output": "embeddings:0",
-            "extras": {
-                "phase_train:0": False
-            }
-        }
-    }
+    # PRE-BUILT MODEL CONFIGS
+    MODELS = json.load(open(CONFIG_HOME + "/config/models.json"))
 
 
     # INITS
@@ -139,7 +122,6 @@ class FaceNet:
 
         tf.import_graph_def(graph_def, name="")
 
-        self.extra_tensors = []  # extra tensors for feed dict to sess.run
         self._tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
 
         self.facenet = self.sess.graph
@@ -161,18 +143,16 @@ class FaceNet:
         :param output_name: output tensor name
 
         """
+        
+        self.model_config = self.MODELS["_default"]
 
-        self.input_name, self.output_name = None, None
-
-        for model in self.TENSORS:
+        for model in self.MODELS:
             if model in model_name:
-                tensors = self.TENSORS[model]
+                self.model_config = self.MODELS[model]
 
-                self.input_name = tensors["input"]
-                self.output_name = tensors["output"]
-
-                for tensor, value in tensors["extras"].items():
-                    self.extra_tensors.append({tensor: value})
+        self.input_name = self.model_config["input"]
+        self.output_name = self.model_config["output"]
+        self.params = self.model_config["params"]
 
         if not self.input_name:
             self.input_name = input_name
@@ -307,7 +287,7 @@ class FaceNet:
         """
 
         feed_dict = {self.input_name: imgs}
-        for tensor_dict in self.extra_tensors:
+        for tensor_dict in self.params["feed_dict"]:
             feed_dict.update(tensor_dict)
         return feed_dict
 
@@ -330,8 +310,10 @@ class FaceNet:
         elif self.MODE == "trt":
             predict = lambda imgs: self.facenet.inference(imgs, output_shape=(1, -1))
 
-        cropped_imgs = normalize(crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup))
-        raw_embeddings = predict(cropped_imgs)
+        cropped_faces = crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup)
+        normalized_faces = normalize(cropped_faces, mode=self.params["img_norm"])
+
+        raw_embeddings = predict(normalized_faces)
         normalized_embeddings = self.dist_metric(raw_embeddings)
 
         return normalized_embeddings
