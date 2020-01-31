@@ -1,0 +1,17 @@
+{
+    "ms_celeb_1m": {
+        "input": "input_1",
+        "output": "Bottleneck_BatchNorm/batchnorm/add_1",
+        "input_shape": [3, 160, 160]
+    },
+    "vgg_face_2": {
+        "input": "base_input",
+        "output": "classifier_low_dim/Softmax",
+        "input_shape": [3, 224, 224]
+    },
+    "20180402-114759": {
+        "input": "batch_join",
+        "output": "embeddings",
+        "input_shape": [3, 160, 160]
+    }
+}

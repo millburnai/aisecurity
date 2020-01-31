@@ -1,0 +1,36 @@
+{
+    "_default": {
+        "input": "",
+        "output": "",
+        "params": {
+            "feed_dict": {},
+            "img_norm": "per_image"
+        }
+    },
+    "ms_celeb_1m": {
+        "input": "input_1:0",
+        "output": "Bottleneck_BatchNorm/batchnorm/add_1:0",
+        "params": {
+            "feed_dict": {},
+            "img_norm": "per_image"
+        }
+    },
+    "vgg_face_2": {
+        "input": "base_input:0",
+        "output": "classifier_low_dim/Softmax:0",
+        "params": {
+            "feed_dict": {},
+            "img_norm": "per_image"
+        }
+    },
+    "20180402-114759": {
+        "input": "batch_join:0",
+        "output": "embeddings:0",
+        "params": {
+            "feed_dict": {
+                "phase_train:0": false
+            },
+            "img_norm": "fixed"
+        }
+    }
+}
