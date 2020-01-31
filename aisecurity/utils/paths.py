@@ -12,11 +12,14 @@ import subprocess
 
 import aisecurity
 
+# download stuff and set up stuff
+subprocess.call(["make_config.sh"])
+subprocess.call(["make_keys.sh"])
+
+# paths
 CONFIG_HOME = os.path.expanduser("~") + "/.aisecurity"
 HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
-if not os.path.exists(CONFIG_HOME):
-    subprocess.call(["make_config.sh"])
-    subprocess.call(["make_keys.sh"])
+
 CONFIG = json.load(open(CONFIG_HOME + "/aisecurity.json"))
 
 DATABASE = CONFIG["database_location"]
