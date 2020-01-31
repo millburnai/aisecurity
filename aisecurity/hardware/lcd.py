@@ -15,7 +15,7 @@ from keras import backend as K
 from termcolor import cprint
 import requests
 
-from aisecurity.database.log import THRESHOLDS
+from aisecurity.db.log import THRESHOLDS
 from aisecurity.utils.paths import CONFIG
 
 

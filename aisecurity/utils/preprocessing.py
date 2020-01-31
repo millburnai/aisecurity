@@ -1,6 +1,6 @@
 """
 
-"aisecurity.data.preprocessing"
+"aisecurity.utils.preprocessing"
 
 Preprocessing for FaceNet.
 
@@ -38,10 +38,14 @@ def cascade_init(**kwargs):
 # IMAGE PROCESSING
 def normalize(x, mode="per_image"):
     if mode == "per_image":
+        # linearly scales x to have mean of 0, variance of 1
         std_adj = np.maximum(np.std(x, axis=(0, 1, 2), keepdims=True), 1. / np.sqrt(x.size))
         normalized = (x - np.mean(x, axis=(0, 1, 2), keepdims=True)) / std_adj
+    elif mode == "fixed":
+        # scales x to [-1, 1]
+        normalized = (x - 127.5) / 128.0
     else:
-        raise ValueError("only 'per_image' standardization is currently supported")
+        raise ValueError("only 'per_image' and 'fixed' standardization supported")
 
     return normalized
 
