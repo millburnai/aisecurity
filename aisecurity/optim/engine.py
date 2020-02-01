@@ -5,6 +5,7 @@
 CUDA engine management.
 
 """
+
 import json
 import warnings
 
@@ -13,6 +14,8 @@ from aisecurity.utils.paths import CONFIG_HOME
 
 from aisecurity.utils.events import timer
 
+
+################################ Setup ################################
 
 # AUTOINIT
 INIT_SUCCESS = True
@@ -34,7 +37,7 @@ if not INIT_SUCCESS:
     warnings.warn("tensorrt mode cannot be used: library import failed")
 
 
-################################ CUDA ENGINE MANAGER ################################
+################################ CUDA Engine Manager ################################
 class CudaEngineManager:
     """Class-oriented cuda engine management"""
 
@@ -45,6 +48,7 @@ class CudaEngineManager:
         "max_batch_size": 1,
         "max_workspace_size": 1 << 20,
     }
+
 
     # INITS
     def __init__(self, **kwargs):
@@ -70,6 +74,7 @@ class CudaEngineManager:
 
         self.network = self.builder.create_network()
 
+
     # MEMORY ALLOCATION
     def allocate_buffers(self):
         """Allocates GPU memory for future use and creates an asynchronous stream"""
@@ -89,6 +94,7 @@ class CudaEngineManager:
         self.d_output = cuda.mem_alloc(self.h_output.nbytes)
 
         self.stream = cuda.Stream()
+
 
     # INFERENCE
     def inference(self, img, output_shape=None):
@@ -123,7 +129,8 @@ class CudaEngineManager:
 
         return output
 
-    # CUDA ENGINE READ
+
+    # CUDA ENGINE READ/WRITE
     def read_cuda_engine(self, engine_file):
         """Read and deserialize engine from file
 
@@ -134,7 +141,6 @@ class CudaEngineManager:
         with open(engine_file, "rb") as file, trt.Runtime(self.CONSTANTS["logger"]) as runtime:
             self.engine = runtime.deserialize_cuda_engine(file.read())
 
-    # CUDA ENGINE WRITE
     @timer("Engine building and serializing time")
     def build_and_serialize_engine(self):
         """Builds and serializes a cuda engine"""
@@ -215,6 +221,7 @@ class CudaEngineManager:
         with open(target_file, "wb") as file:
             file.write(self.engine)
 
+
     # DISPLAY
     def summary(self):
         """Printed summary of all the layers of the network"""
@@ -236,7 +243,7 @@ class CudaEngineManager:
             print("===========================================")
 
 
-# CUDA ENGINE
+################################ CUDA Engine ################################
 class CudaEngine:
     """Class-oriented cuda engine manager wrapper"""
 
