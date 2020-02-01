@@ -1,16 +1,15 @@
 """
 
-"aisecurity.utils.preprocessing"
+"aisecurity.face.preprocessing"
 
 Preprocessing for FaceNet.
 
 """
 
-from aisecurity.utils.paths import CONFIG_HOME
-
 import cv2
-from mtcnn.mtcnn import MTCNN
 import numpy as np
+
+from aisecurity.face.detection import FACE_DETECTORS, detect_faces, detector_init
 
 
 # CONSTANTS
@@ -45,19 +44,13 @@ def crop_faces(paths_or_imgs, margin, faces=None, checkup=False):
 
         if not checkup:
             if not faces:
-                if IMG_CONSTANTS["mtcnn"] is None:
-                    mtcnn_init()
-                if IMG_CONSTANTS["cascade"] is None:
-                    cascade_init()
+                if not FACE_DETECTORS["mtcnn"] and not FACE_DETECTORS["haarcascade"]:
+                    detector_init()
 
-                found = IMG_CONSTANTS["mtcnn"].detect_faces(img)
+                result = detect_faces(img)
+                assert len(result) != 0, "face was not found in {}".format(path_or_img)
 
-                if len(found) != 0:
-                    faces = found[0]["box"]
-                else:
-                    found = IMG_CONSTANTS["cascade"].detectMultiScale(img, scaleFactor=1.1)
-                    assert len(found) != 0, "face was not found in {}".format(path_or_img)
-                    faces = found[0]
+                faces = max(result, key=lambda person: person["confidence"])
 
             x, y, width, height = faces
             img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]

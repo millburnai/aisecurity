@@ -14,7 +14,8 @@ from aisecurity.utils.paths import DEFAULT_MODEL
 
 
 def demo(path=None, dist_metric="auto", logging=None, use_dynamic=True, use_picam=False,
-         use_graphics=True, use_lcd=False, use_keypad=False, resize=None, flip=0, device=0, allow_gpu_growth=False):
+         use_graphics=True, use_lcd=False, use_keypad=False, resize=None, flip=0, device=0,
+         face_detector="mtcnn", allow_gpu_growth=False):
 
     if allow_gpu_growth:
         tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
@@ -29,7 +30,8 @@ def demo(path=None, dist_metric="auto", logging=None, use_dynamic=True, use_pica
 
     facenet.real_time_recognize(
         dist_metric=dist_metric, logging=logging, use_dynamic=use_dynamic, use_picam=use_picam,
-        use_graphics=use_graphics, resize=resize, use_lcd=use_lcd, use_keypad=use_keypad, flip=flip, device=device
+        use_graphics=use_graphics, resize=resize, use_lcd=use_lcd, use_keypad=use_keypad, flip=flip, device=device,
+        face_detector=face_detector
     )
 
 
@@ -73,6 +75,7 @@ if __name__ == "__main__":
     parser.add_argument("--resize", help="resize frame for faster recognition (default: None)", type=bounded_float,
                         default=None)
     parser.add_argument("--device", help="camera device (default: 0)", type=to_int, default=0)
+    parser.add_argument("--face_detector", help="type of face detector (default: mtcnn)", type=str, default="mtcnn")
     parser.add_argument("--allow_gpu_growth", help="use this flag to use GPU growth", action="store_true")
     args = parser.parse_args()
 
@@ -82,5 +85,5 @@ if __name__ == "__main__":
         path=args.path_to_model, dist_metric=args.dist_metric, logging=args.logging,
         use_dynamic=args.use_dynamic, use_picam=args.use_picam, use_graphics=not args.no_graphics,
         use_lcd=args.use_lcd, use_keypad=args.use_keypad, flip=args.flip, resize=args.resize, device=args.device,
-        allow_gpu_growth=args.allow_gpu_growth
+        face_detector=args.face_detector, allow_gpu_growth=args.allow_gpu_growth
     )

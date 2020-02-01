@@ -31,7 +31,9 @@ from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.events import timer, HidePrints, run_async_method
 from aisecurity.utils.paths import DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
-from aisecurity.utils.preprocessing import IMG_CONSTANTS, normalize, crop_faces, mtcnn_init
+from aisecurity.utils.visuals import get_video_cap, add_graphics
+from aisecurity.face.detection import detector_init, detect_faces
+from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_faces
 
 
 ################################ FaceNet ###############################
@@ -225,7 +227,7 @@ class FaceNet:
         # check against data config
         self.ignore = {0: self.dist_metric.get_config()}
         if self.cfg_dist_metric != self.dist_metric.get_config():
-            self.ignore.update({1: self.cfg_dist_metric})
+            self.ignore[1] = self.cfg_dist_metric
             warnings.warn(
                 "provided DistMetric ({}) is not the same as the data config metric ({}) ".format(
                     self.dist_metric.get_config(), self.cfg_dist_metric
@@ -384,7 +386,7 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
-                                   use_lcd, use_keypad, framerate, resize, flip, device):
+                                   use_lcd, use_keypad, framerate, resize, flip, device, face_detector):
         """Real-time facial recognition under the hood (dev use only)
 
         :param width: width of frame (only matters if use_graphics is True)
@@ -400,6 +402,7 @@ class FaceNet:
         :param resize: resize scale (float between 0. and 1.)
         :param flip: flip method: +1 = +90º rotation
         :param device: camera device (/dev/video{device})
+        :param face_detector: face detector type ("mtcnn" or "haarcascade")
         :returns: number of frames elapsed
 
         """
@@ -418,14 +421,14 @@ class FaceNet:
         if dist_metric:
             self.set_dist_metric(dist_metric)
         if resize:
-            mtcnn_width, mtcnn_height = width * resize, height * resize
+            face_width, face_height = width * resize, height * resize
         else:
-            mtcnn_width, mtcnn_height = width, height
+            face_width, face_height = width, height
 
-        cap = self.get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip, device=device)
+        cap = get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip, device=device)
         assert cap.isOpened(), "video capture failed to initialize"
 
-        mtcnn_init(min_face_size=0.5 * (mtcnn_width + mtcnn_height) / 3)
+        detector_init(min_face_size=int(0.5 * (face_width + face_height) / 3))
         # face needs to fill at least 1/3 of the frame
 
         missed_frames = 0
@@ -446,8 +449,8 @@ class FaceNet:
                 # otherwise, recognition times can be slow when spaced out by several minutes
                 last_gpu_checkup = self.keep_gpu_warm(frame, frames, last_gpu_checkup, use_lcd)
 
-            # using MTCNN to detect faces
-            result = IMG_CONSTANTS["mtcnn"].detect_faces(frame)
+            # face detection
+            result = detect_faces(frame, mode=face_detector)
 
             if result:
                 overlay = original_frame.copy()
@@ -478,7 +481,7 @@ class FaceNet:
 
                 # add graphics, lcd, and do logging
                 if use_graphics:
-                    self.add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match, resize)
+                    add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match, resize)
 
                 if use_lcd and is_recognized:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
@@ -525,7 +528,7 @@ class FaceNet:
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
                             use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
-                            framerate=20, resize=None, flip=0, device=0):
+                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn"):
         """Real-time facial recognition
 
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
@@ -541,135 +544,22 @@ class FaceNet:
         :param resize: resize scale (float between 0. and 1.) (default: None)
         :param flip: flip method: +1 = +90º rotation (default: 0)
         :param device: camera device (/dev/video{device}) (default: 0)
+        :param face_detector: face detector type ("mtcnn" or "haarcascade") (default: "mtcnn")
 
         """
 
         assert width > 0 and height > 0, "width and height must be positive integers"
-        assert not logging or logging == "mysql" or logging == "firebase", "only mysql and firebase database supported"
+        assert not logging or logging == "mysql" or logging == "firebase", "only mysql and firebase logging supported"
         assert 0 < framerate <= 120, "framerate must be between 0 and 120"
         assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
+        assert face_detector == "mtcnn" or face_detector == "haarcascade", "only mtcnn and haarcascade supported"
 
         run_async_method(
-            self._real_time_recognize, width=width, height=height, dist_metric=dist_metric, logging=logging,
-            use_dynamic=use_dynamic, use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd,
-            use_keypad=use_keypad, framerate=framerate, resize=resize, flip=flip, device=device
+            self._real_time_recognize,
+            width=width, height=height, dist_metric=dist_metric, logging=logging, use_dynamic=use_dynamic,
+            use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd, use_keypad=use_keypad, framerate=framerate,
+            resize=resize, flip=flip, device=device, face_detector=face_detector
         )
-
-
-    # GRAPHICS
-    @staticmethod
-    def get_video_cap(width, height, picamera, framerate, flip, device=0):
-        """Initializes cv2.VideoCapture object
-
-        :param width: width of frame
-        :param height: height of frame
-        :param picamera: use picamera or not
-        :param framerate: framerate, recommended <120
-        :param flip: flip method: +1 = +90º rotation (default: 0)
-        :param device: VideoCapture will use /dev/video{'device'} (default: 0)
-        :returns: cv2.VideoCapture object
-
-        """
-
-        def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=640, display_height=360,
-                                framerate=20, flip=0):
-            return (
-                "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
-                " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
-                " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
-                % (capture_width, capture_height, framerate, flip, display_width, display_height)
-            )
-
-        if picamera:
-            return cv2.VideoCapture(
-                _gstreamer_pipeline(display_width=width, display_height=height, framerate=framerate, flip=flip),
-                cv2.CAP_GSTREAMER)
-        else:
-            cap = cv2.VideoCapture(device)
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-            return cap
-
-    @staticmethod
-    def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize):
-        """Adds graphics to a frame
-
-        :param frame: frame as array
-        :param overlay: overlay as array
-        :param person: MTCNN detection dict
-        :param width: width of frame
-        :param height: height of frame
-        :param is_recognized: whether face was recognized or not
-        :param best_match: best match from database
-        :param resize: resize scale factor, from 0. to 1.
-
-        """
-
-        line_thickness = round(1e-6 * width * height + 1.5)
-        radius = round((1e-6 * width * height + 1.5) / 2.)
-        font_size = 4.5e-7 * width * height + 0.5
-        # works for 6.25e4 pixel video cature to 1e6 pixel video capture
-
-        def get_color(is_recognized, best_match):
-            if not is_recognized:
-                return 0, 0, 255  # red
-            elif "visitor" in best_match:
-                return 218, 112, 214  # purple (actually more of an "orchid")
-            else:
-                return 0, 255, 0  # green
-
-        def add_box_and_label(frame, origin, corner, color, line_thickness, best_match, font_size, thickness):
-            # bounding box
-            cv2.rectangle(frame, origin, corner, color, line_thickness)
-
-            # label box
-            label = best_match.replace("_", " ").title()
-            font = cv2.FONT_HERSHEY_DUPLEX
-
-            (width, height), __ = cv2.getTextSize(label, font, font_size, thickness)
-
-            box_x = max(corner[0], origin[0] + width + 6)
-            cv2.rectangle(frame, (origin[0], corner[1] - 35), (box_x, corner[1]), color, cv2.FILLED)
-
-            # label
-            cv2.putText(frame, label, (origin[0] + 6, corner[1] - 6), font, font_size, (255, 255, 255), thickness)
-
-
-        def add_features(overlay, features, radius, color, line_thickness):
-            cv2.circle(overlay, (features["left_eye"]), radius, color, line_thickness)
-            cv2.circle(overlay, (features["right_eye"]), radius, color, line_thickness)
-            cv2.circle(overlay, (features["nose"]), radius, color, line_thickness)
-            cv2.circle(overlay, (features["mouth_left"]), radius, color, line_thickness)
-            cv2.circle(overlay, (features["mouth_right"]), radius, color, line_thickness)
-
-            cv2.line(overlay, features["left_eye"], features["nose"], color, radius)
-            cv2.line(overlay, features["right_eye"], features["nose"], color, radius)
-            cv2.line(overlay, features["mouth_left"], features["nose"], color, radius)
-            cv2.line(overlay, features["mouth_right"], features["nose"], color, radius)
-
-        features = person["keypoints"]
-        x, y, height, width = person["box"]
-
-        if resize:
-            scale_factor = 1. / resize
-
-            scale = lambda x: tuple(round(element * scale_factor) for element in x)
-            features = {feature: scale(features[feature]) for feature in features}
-
-            scale = lambda *xs: tuple(round(x * scale_factor) for x in xs)
-            x, y, height, width = scale(x, y, height, width)
-
-        color = get_color(is_recognized, best_match)
-
-        margin = IMG_CONSTANTS["margin"]
-        origin = (x - margin // 2, y - margin // 2)
-        corner = (x + height + margin // 2, y + width + margin // 2)
-
-        add_features(overlay, features, radius, color, line_thickness)
-        cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
-
-        text = best_match if is_recognized else ""
-        add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
 
     # DISPLAY
