@@ -301,7 +301,7 @@ class FaceNet:
         """Embeds and normalizes an image from path or array
 
         :param path_or_img: path or image to predict on
-        :param face_detector: face detector (either mtcnn or haarcascade) (default: "mtcnn")
+        :param face_detector: face detector (either mtcnn, haarcascade, or None) (default: "mtcnn")
         :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
         :returns: normalized embeddings, facial coordinates
 
@@ -328,7 +328,7 @@ class FaceNet:
 
 
     # FACIAL RECOGNITION HELPER
-    @timer(message="Recognition time")
+    @timer(message="Detection and recognition time")
     def recognize(self, img, db_types=None, **kwargs):
         """Facial recognition
 

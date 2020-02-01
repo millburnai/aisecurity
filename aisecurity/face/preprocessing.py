@@ -45,17 +45,21 @@ def crop_face(path_or_img, margin, face_detector="mtcnn", alpha=0.9):
     if not FACE_DETECTORS["mtcnn"] and not FACE_DETECTORS["haarcascade"]:
         detector_init()
 
-    result = detect_faces(img, mode=face_detector)
-    if len(result) == 0:
-        return itertools.repeat(-1, 2)
+    if face_detector:
+        result = detect_faces(img, mode=face_detector)
+        if len(result) == 0:
+            return itertools.repeat(-1, 2)
 
-    face = max(result, key=lambda person: person["confidence"])
-    if face["confidence"] < alpha:
-        print("{}% face detection confidence is too low".format(round(face["confidence"] * 100, 2)))
-        return itertools.repeat(-1, 2)
+        face = max(result, key=lambda person: person["confidence"])
+        if face["confidence"] < alpha:
+            print("{}% face detection confidence is too low".format(round(face["confidence"] * 100, 2)))
+            return itertools.repeat(-1, 2)
 
-    x, y, width, height = face["box"]
-    img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
+        x, y, width, height = face["box"]
+        img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
+
+    else:
+        face = {"box": list(itertools.repeat(-1, 4)), "keypoints": {}, "confidence": 1.0}
 
     resized = cv2.resize(img, IMG_CONSTANTS["img_size"])
     return resized, face

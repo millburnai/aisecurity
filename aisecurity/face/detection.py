@@ -6,7 +6,6 @@ Haarcascade or MTCNN face detection.
 
 """
 
-from aisecurity.utils.events import timer
 from aisecurity.utils.paths import CONFIG_HOME
 
 import cv2
@@ -36,7 +35,6 @@ class FaceDetector:
         elif self.mode == "haarcascade":
             self.detector = cv2.CascadeClassifier(filepath)
 
-    @timer(message="Detection time")
     def detect_faces(self, img):
         if self.mode == "mtcnn":
             result = self.detector.detect_faces(img)
@@ -48,7 +46,7 @@ class FaceDetector:
             img = cv2.equalizeHist(img)
 
             faces = self.detector.detectMultiScale(
-                img, scaleFactor=1.2, minSize=(self.min_face_size, self.min_face_size)
+                img, scaleFactor=1.1, minSize=(self.min_face_size, self.min_face_size)
             )
 
             for (x, y, width, height) in faces:
