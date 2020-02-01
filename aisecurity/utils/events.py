@@ -11,9 +11,10 @@ import functools
 import os
 import sys
 import time
+import warnings
 
 
-# PRINT HANDLING
+# CONTEXT MANAGERS
 class HidePrints:
 
     def __enter__(self):
@@ -25,7 +26,7 @@ class HidePrints:
         sys.stdout = self.to_show
 
 
-# TIMER
+# DECORATORS
 def timer(message="Time elapsed"):
     def _timer(func):
         @functools.wraps(func)
@@ -38,6 +39,19 @@ def timer(message="Time elapsed"):
         return _func
 
     return _timer
+
+
+def in_dev(message="currently in development; do not use in production"):
+    def _in_dev(func):
+        @functools.wraps(func)
+        def _func(*args, **kwargs):
+            result = func(*args, **kwargs)
+            warnings.warn(message)
+            return result
+
+        return _func
+
+    return _in_dev
 
 
 # ASYNC

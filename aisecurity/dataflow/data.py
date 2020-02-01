@@ -14,7 +14,7 @@ import warnings
 import numpy as np
 
 from aisecurity.privacy.encryptions import DataEncryption, _KEY_FILES
-from aisecurity.utils.events import timer
+from aisecurity.utils.events import timer, in_dev
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.paths import DATABASE_INFO, DATABASE
 
@@ -27,10 +27,11 @@ def online_load(facenet, img_dir, people=None):
 
     data = {}
     no_faces = []
+
     with tqdm.trange(len(people)) as pbar:
         for person in people:
             try:
-                data[person.strip(".jpg").strip(".png")] = facenet.predict([os.path.join(img_dir, person)])
+                data[person.strip(".jpg").strip(".png")] = facenet.predict(os.path.join(img_dir, person))
                 pbar.update()
             except AssertionError:
                 warnings.warn("face not found in {}".format(person))
@@ -85,14 +86,16 @@ def retrieve_embeds(path=DATABASE, encrypted=DATABASE_INFO["encrypted"], name_ke
     return DataEncryption.decrypt_data(data, ignore=ignore, name_keys=name_keys, embedding_keys=embedding_keys)
 
 
-# EMBEDDING PROCESSING
+# EMBEDDING PROCESSING (DEV!)
 
 # EMBED PROCESSING FUNCS
+@in_dev()
 def subtract_mean(data, **kwargs):
     mean = np.mean(list(data.values()), **kwargs)
     return {person: (embedding - mean).tolist() for person, embedding in data.items()}
 
 # ... maybe add more?
+@in_dev()
 def faux_concatenate_flip(data, **kwargs):
     # NOTE: this function doesn't actually concat flipped and non-flipped, just concats the same embeddings twice
     # in order to maintain dimensionality
@@ -100,6 +103,7 @@ def faux_concatenate_flip(data, **kwargs):
 
 
 # IMPLEMENTS ABOVE FOR DUMP SUPPORT
+@in_dev()
 def process_embeds(data, func, data_dump_path, config, config_dump_path, data_dump_mode="w+", config_dump_mode="w+",
                    **kwargs):
     if data_dump_path:
