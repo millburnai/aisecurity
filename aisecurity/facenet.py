@@ -9,6 +9,7 @@ Reference paper: https://arxiv.org/pdf/1503.03832.pdf
 """
 
 import asyncio
+import itertools
 import json
 import os
 import time
@@ -33,7 +34,7 @@ from aisecurity.utils.events import timer, HidePrints, run_async_method
 from aisecurity.utils.paths import DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
 from aisecurity.utils.visuals import get_video_cap, add_graphics
 from aisecurity.face.detection import detector_init, detect_faces
-from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_faces
+from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_face
 
 
 ################################ FaceNet ###############################
@@ -283,68 +284,47 @@ class FaceNet:
             graph_def.ParseFromString(graph_file.read())
         return graph_def
 
-    def _make_feed_dict(self, imgs):
+    def _make_feed_dict(self, img):
         """Makes feed dict for sess.run (TF-TRT only)
 
-        :param imgs: image input
+        :param img: image input
         :returns: feed dict
 
         """
 
-        feed_dict = {self.input_name: imgs}
+        feed_dict = {self.input_name: np.expand_dims(img, axis=0)}
         for tensor_dict in self.params["feed_dict"]:
             feed_dict.update(tensor_dict)
         return feed_dict
 
-    def predict(self, paths_or_imgs, margin=IMG_CONSTANTS["margin"], faces=None, checkup=False):
-        """Low-level predict function (don't use unless developing)
+    def predict(self, path_or_img, face_detector="mtcnn", margin=IMG_CONSTANTS["margin"]):
+        """Embeds and normalizes an image from path or array
 
-        :param paths_or_imgs: paths or images to predict on
+        :param path_or_img: path or image to predict on
+        :param face_detector: face detector (either mtcnn or haarcascade) (default: "mtcnn")
         :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
-        :param faces: pre-detected MTCNN faces (makes 'margin' param irrelevant) (default: None)
-        :param checkup: whether this is just a call to keep the GPU warm (default: False)
-        :returns: normalized embeddings
+        :returns: normalized embeddings, facial coordinates
 
         """
 
         if self.MODE == "keras":
-            predict = lambda imgs: self.facenet.predict(imgs)
+            predict = lambda img: self.facenet.predict(np.expand_dims(img, axis=0))
         elif self.MODE == "tf-trt":
             output_tensor = self.facenet.get_tensor_by_name(self.output_name)
-            predict = lambda imgs: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(imgs))
+            predict = lambda img: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(img))
         elif self.MODE == "trt":
-            predict = lambda imgs: self.facenet.inference(imgs, output_shape=(1, -1))
+            predict = lambda img: self.facenet.inference(np.expand_dims(img, axis=0), output_shape=(1, -1))
 
-        cropped_faces = crop_faces(paths_or_imgs, margin, faces=faces, checkup=checkup)
-        normalized_faces = normalize(cropped_faces, mode=self.img_norm)
+        cropped_face, face_coords = crop_face(path_or_img, margin, face_detector, alpha=self.HYPERPARAMS["mtcnn_alpha"])
+        if face_coords == -1:
+            return itertools.repeat(-1, 2)  # exit code: failure to detect face
 
-        raw_embeddings = predict(normalized_faces)
-        normalized_embeddings = self.dist_metric(raw_embeddings)
+        normalized_face = normalize(cropped_face, mode=self.img_norm)
 
-        return normalized_embeddings
+        raw_embedding = predict(normalized_face)
+        normalized_embedding = self.dist_metric(raw_embedding)
 
-    def get_embeds(self, data, *args, **kwargs):
-        """Gets embedding from various datatypes
-
-        :param data: data dictionary in form {name: embedding vector, ...}
-        :param args: data to embed. Can be a key in 'data' param, a filepath, or an image array
-        :param kwargs: named arguments to self.predict
-        :returns: list of embeddings
-
-        """
-        embeds = []
-        for n in args:
-            if isinstance(n, str):
-                try:
-                    embeds.append(data[n])
-                except KeyError:
-                    embeds.append(self.predict([n], **kwargs))
-            elif not (n.ndim <= 2 and (1 in n.shape or n.ndim == 1)):  # if n is not an embedding vector
-                embeds.append(self.predict([n], **kwargs))
-            else:
-                warnings.warn("{} is not in data or suitable for input into facenet".format(n))
-
-        return embeds if len(embeds) > 1 else embeds[0]
+        return normalized_embedding, face_coords
 
 
     # FACIAL RECOGNITION HELPER
@@ -359,29 +339,42 @@ class FaceNet:
 
         """
 
-        assert self._static_db or self._dynamic_db, "data must be provided"
+        try:
+            assert self._static_db or self._dynamic_db, "data must be provided"
 
-        knns, data = [], {}
-        if db_types is None or "static" in db_types:
-            knns.append(self.static_knn)
-            data.update(self._static_db)
-        if db_types and "dynamic" in db_types and self.dynamic_knn and self._dynamic_db:
-            knns.append(self.dynamic_knn)
-            data.update(self._dynamic_db)
+            knns, data = [], {}
+            if db_types is None or "static" in db_types:
+                knns.append(self.static_knn)
+                data.update(self._static_db)
+            if db_types and "dynamic" in db_types and self.dynamic_knn and self._dynamic_db:
+                knns.append(self.dynamic_knn)
+                data.update(self._dynamic_db)
 
-        embedding = self.get_embeds(data, img, **kwargs)
+            embedding, face = self.predict(img, **kwargs)
+            if face == -1:  # no face detected
+                return itertools.repeat(-1, 5)
 
-        best_matches = []
-        for knn in knns:
-            pred = knn.predict(embedding)[0]
-            dist = self.dist_metric(embedding, data[pred], mode="calc+norm", ignore=self.ignore)
+            best_matches = []
+            for knn in knns:
+                pred = knn.predict(embedding)[0]
+                dist = self.dist_metric(embedding, data[pred], mode="calc+norm", ignore=self.ignore)
 
-            best_matches.append((pred, dist))
+                best_matches.append((pred, dist))
 
-        best_match, dist = max(best_matches, key=lambda n: n[1])
-        is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
+            best_match, dist = max(best_matches, key=lambda n: n[1])
+            is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
-        return embedding, is_recognized, best_match, dist
+            return embedding, is_recognized, best_match, dist, face
+
+        except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+            if "query data dimension" in str(error):
+                raise ValueError("Current model incompatible with database")
+            elif "empty" in str(error):
+                print("Image refresh rate too high")
+            elif "opencv" in str(error):
+                print("Failed to capture frame")
+            else:
+                raise error
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
@@ -445,43 +438,23 @@ class FaceNet:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
             if use_picam:
-                # make sure computation is performed periodically to keep GPU "warm" (i.e., constantly active);
-                # otherwise, recognition times can be slow when spaced out by several minutes
                 last_gpu_checkup = self.keep_gpu_warm(frame, frames, last_gpu_checkup, use_lcd)
 
-            # face detection
-            result = detect_faces(frame, mode=face_detector)
+            # facial detection and recognition
+            embedding, is_recognized, best_match, dist, face = self.recognize(
+                frame, db_types, face_detector=face_detector
+            )
 
-            if result:
+            if face != -1:
                 overlay = original_frame.copy()
 
-                person = max(result, key=lambda person: person["confidence"])
-                face = person["box"]
-
-                if person["confidence"] < self.HYPERPARAMS["mtcnn_alpha"]:
-                    print("{}% face detection confidence is too low".format(round(person["confidence"] * 100, 2)))
-                    continue
-
-                # facial recognition
-                try:
-                    embedding, is_recognized, best_match, dist = self.recognize(frame, db_types, faces=face)
-                    print("{}: {} ({}){}".format(
-                        self.dist_metric, round(dist, 4), best_match, " !" if not is_recognized else "")
-                    )
-                except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
-                    if "query data dimension" in str(error):
-                        raise ValueError("Current model incompatible with database")
-                    elif "empty" in str(error):
-                        print("Image refresh rate too high")
-                    elif "opencv" in str(error):
-                        print("Failed to capture frame")
-                    else:
-                        raise error
-                    continue
+                print("{}: {} ({}){}".format(
+                    self.dist_metric, round(dist, 4), best_match, " !" if not is_recognized else "")
+                )
 
                 # add graphics, lcd, and do logging
                 if use_graphics:
-                    add_graphics(original_frame, overlay, person, width, height, is_recognized, best_match, resize)
+                    add_graphics(original_frame, overlay, face, width, height, is_recognized, best_match, resize)
 
                 if use_lcd and is_recognized:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")

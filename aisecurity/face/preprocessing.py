@@ -6,6 +6,8 @@ Preprocessing for FaceNet.
 
 """
 
+import itertools
+
 import cv2
 import numpy as np
 
@@ -34,28 +36,26 @@ def normalize(x, mode="per_image"):
     return normalized
 
 
-def crop_faces(paths_or_imgs, margin, faces=None, checkup=False):
+def crop_face(path_or_img, margin, face_detector="mtcnn", alpha=0.9):
+    try:
+        img = cv2.imread(path_or_img).astype(np.uint8)
+    except (SystemError, TypeError):  # if img is actually image
+        img = path_or_img.astype(np.uint8)
 
-    def crop_face(path_or_img, faces, checkup):
-        try:
-            img = cv2.imread(path_or_img).astype(np.uint8)
-        except (SystemError, TypeError):  # if img is actually image
-            img = path_or_img.astype(np.uint8)
+    if not FACE_DETECTORS["mtcnn"] and not FACE_DETECTORS["haarcascade"]:
+        detector_init()
 
-        if not checkup:
-            if not faces:
-                if not FACE_DETECTORS["mtcnn"] and not FACE_DETECTORS["haarcascade"]:
-                    detector_init()
+    result = detect_faces(img, mode=face_detector)
+    if len(result) == 0:
+        return itertools.repeat(-1, 2)
 
-                result = detect_faces(img)
-                assert len(result) != 0, "face was not found in {}".format(path_or_img)
+    face = max(result, key=lambda person: person["confidence"])
+    if face["confidence"] < alpha:
+        print("{}% face detection confidence is too low".format(round(face["confidence"] * 100, 2)))
+        return itertools.repeat(-1, 2)
 
-                faces = max(result, key=lambda person: person["confidence"])
+    x, y, width, height = face["box"]
+    img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
 
-            x, y, width, height = faces
-            img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
-
-        resized = cv2.resize(img, IMG_CONSTANTS["img_size"])
-        return resized
-
-    return np.array([crop_face(path_or_img, faces, checkup) for path_or_img in paths_or_imgs])
+    resized = cv2.resize(img, IMG_CONSTANTS["img_size"])
+    return resized, face
