@@ -40,7 +40,7 @@ class CudaEngineManager:
 
     # CONSTANTS
     CONSTANTS = {
-        "trt_logger": None,
+        "logger": None,
         "dtype": None,
         "max_batch_size": 1,
         "max_workspace_size": 1 << 20,
@@ -55,13 +55,13 @@ class CudaEngineManager:
         """
 
         # constants (have to be set here in case trt isn't imported)
-        self.CONSTANTS["trt_logger"] = trt.Logger(trt.Logger.WARNING)
+        self.CONSTANTS["logger"] = trt.Logger(trt.Logger.ERROR)
         self.CONSTANTS["dtype"] = trt.float32
 
         self.CONSTANTS = {**self.CONSTANTS, **kwargs}
 
         # builder and netork
-        self.builder = trt.Builder(CudaEngineManager.CONSTANTS["trt_logger"])
+        self.builder = trt.Builder(CudaEngineManager.CONSTANTS["logger"])
         self.builder.max_batch_size = CudaEngineManager.CONSTANTS["max_batch_size"]
         self.builder.max_workspace_size = CudaEngineManager.CONSTANTS["max_workspace_size"]
 
@@ -131,7 +131,7 @@ class CudaEngineManager:
 
         """
 
-        with open(engine_file, "rb") as file, trt.Runtime(self.CONSTANTS["trt_logger"]) as runtime:
+        with open(engine_file, "rb") as file, trt.Runtime(self.CONSTANTS["logger"]) as runtime:
             self.engine = runtime.deserialize_cuda_engine(file.read())
 
     # CUDA ENGINE WRITE
@@ -299,6 +299,7 @@ class CudaEngine:
         assert self.input_name and self.output_name, "I/O names for {} not detected or provided".format(filepath)
         assert self.input_shape, "input shape for {} not detected or provided".format(filepath)
 
+
     # INFERENCE
     def inference(self, *args, **kwargs):
         """Inference on given image
@@ -309,6 +310,7 @@ class CudaEngine:
         """
 
         return self.engine_manager.inference(*args, **kwargs)
+
 
     # SUMMARY
     def summary(self):

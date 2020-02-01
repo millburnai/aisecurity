@@ -170,6 +170,9 @@ class FaceNet:
     def _trt_init(self, filepath, input_name, output_name, input_shape):
         assert engine.INIT_SUCCESS, "tensorrt or pycuda import failed: trt mode not available"
 
+        tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
+        # needed to fix https://stackoverflow.com/questions/58756919/python-tensorrt-cudnn-status-mapping-error-error
+
         self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
         self.img_norm = self.MODELS["_default"]["params"]["img_norm"]
         IMG_CONSTANTS["img_size"] = tuple(reversed(self.facenet.input_shape))[:-1]
