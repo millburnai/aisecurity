@@ -76,14 +76,14 @@ class LCD:
 
     def __init__(self, mode="physical"):
         assert mode == "physical" or mode == "dev", "supported modes are physical (physical LCD) and dev (testing)"
-        self.__lcd = None
+        self._lcd = None
 
         try:
-            self.__lcd = character_lcd(i2c, 16, 2, backlight_inverted=False)
+            self._lcd = character_lcd(i2c, 16, 2, backlight_inverted=False)
             self.mode = "physical"
             assert self.mode == mode  # making sure that physical doesn't override user choice
         except (NameError, AssertionError):
-            self.__lcd = LCDSimulation()
+            self._lcd = LCDSimulation()
             self.mode = "dev"
 
             if self.mode != mode:
@@ -120,7 +120,7 @@ class LCD:
 
         assert backlight in display_dict.keys(), "backlight must be green, red, violet, or white"
 
-        self.__lcd.message = message
+        self._lcd.message = message
 
         if self.mode == "physical":
             # set backlight if supported
@@ -130,11 +130,11 @@ class LCD:
     # RETRIEVERS
     @property
     def lcd(self):
-        return self.__lcd
+        return self._lcd
 
     @property
     def message(self):
-        return self.__lcd.message
+        return self._lcd.message
 
 
 # SIMULATION SUPPORT FOR DEV
@@ -201,27 +201,28 @@ class LCDProgressBar:
 def add_lcd_display(best_match, use_server):
     global LCD_DEVICE, PROGRESS_BAR
 
-    LCD_DEVICE.clear()
-    PROGRESS_BAR.display_off()
+    if LCD_DEVICE and PROGRESS_BAR:
+        LCD_DEVICE.clear()
+        PROGRESS_BAR.display_off()
 
-    best_match = best_match.replace("_", " ").title()
+        best_match = best_match.replace("_", " ").title()
 
-    if use_server:
-        request = requests.get(CONFIG["server_address"])
-        data = request.json()
+        if use_server:
+            request = requests.get(CONFIG["server_address"])
+            data = request.json()
 
-        if data["accept"]:
-            LCD_DEVICE.set_message("ID Accepted\n{}".format(best_match), color="green")
-        elif "visitor" in best_match.lower():
-            LCD_DEVICE.set_message("Welcome to MHS,\n{}".format(best_match), color="violet")
+            if data["accept"]:
+                LCD_DEVICE.set_message("ID Accepted\n{}".format(best_match), color="green")
+            elif "visitor" in best_match.lower():
+                LCD_DEVICE.set_message("Welcome to MHS,\n{}".format(best_match), color="violet")
+            else:
+                LCD_DEVICE.set_message("No Senior Priv\n{}".format(best_match), color="red")
+
         else:
-            LCD_DEVICE.set_message("No Senior Priv\n{}".format(best_match), color="red")
-
-    else:
-        if "visitor" in best_match.lower():
-            LCD_DEVICE.set_message("Welcome to MHS,\n{}".format(best_match), color="violet")
-        else:
-            LCD_DEVICE.set_message("[Server Error]\n{}".format(best_match), color="green")
+            if "visitor" in best_match.lower():
+                LCD_DEVICE.set_message("Welcome to MHS,\n{}".format(best_match), color="violet")
+            else:
+                LCD_DEVICE.set_message("[Server Error]\n{}".format(best_match), color="green")
 
 
 # PROGRESS BAR DECORATOR

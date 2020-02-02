@@ -53,7 +53,6 @@ def init(logging, flush=False, thresholds=None):
     CURRENT_LOG, DISTS = {}, []
 
     if logging == "mysql":
-
         try:
             DATABASE = mysql.connector.connect(
                 host="localhost",
@@ -63,23 +62,24 @@ def init(logging, flush=False, thresholds=None):
             )
             CURSOR = DATABASE.cursor()
 
+            CURSOR.execute("USE LOG;")
+            DATABASE.commit()
+
+            if flush:
+                instructions = open(CONFIG_HOME + "/bin/drop.sql")
+                for cmd in instructions:
+                    if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"):
+                        CURSOR.execute(cmd)
+                        DATABASE.commit()
+
         except (mysql.connector.errors.DatabaseError, mysql.connector.errors.InterfaceError):
             warnings.warn("MySQL database credentials missing or incorrect")
-
-        CURSOR.execute("USE LOG;")
-        DATABASE.commit()
-
-        if flush:
-            instructions = open(CONFIG_HOME + "/bin/drop.sql")
-            for cmd in instructions:
-                if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"):
-                    CURSOR.execute(cmd)
-                    DATABASE.commit()
 
     elif logging == "firebase":
         try:
             FIREBASE = pyrebase.initialize_app(json.load(open(CONFIG_HOME + "/logging/firebase.json")))
             DATABASE = FIREBASE.database()
+
         except (FileNotFoundError, json.JSONDecodeError):
             raise ValueError(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
 
@@ -94,7 +94,7 @@ def init(logging, flush=False, thresholds=None):
             raise Exception("django logging not able to be initialized")
 
     else:
-        MODE = None
+        MODE = "<no database>"
         warnings.warn("{} not a supported logging option. No logging will occur".format(logging))
 
     if thresholds:
@@ -163,16 +163,16 @@ def update_current_logs(is_recognized, best_match):
 
 
 # LOGGING FUNCTIONS
-def log_person(student_name, times):
+def log_person(logging, student_name, times):
     now = get_now(sum(times) / len(times))
 
-    if MODE == "mysql":
+    if logging == "mysql" and MODE == "mysql":
         add = "INSERT INTO Activity (id, name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
             get_id(student_name), student_name.replace("_", " ").title(), *now)
         CURSOR.execute(add)
         DATABASE.commit()
 
-    elif MODE == "firebase":
+    elif logging == "firebase" and MODE == "firebase":
         data = {
             "id": get_id(student_name),
             "name": student_name.replace("_", " ").title(),
@@ -181,7 +181,7 @@ def log_person(student_name, times):
         }
         DATABASE.child("known").child(*get_now(time.time())).set(data)
 
-    elif MODE == "django":
+    elif logging == "django" and MODE == "django":
         student_id = get_id(student_name)
         student_name = student_name.replace("_", " ").title()
         # TODO: log {*now: student_id, student_name} in django db
@@ -193,19 +193,19 @@ def log_person(student_name, times):
 
     flush_current(mode="known")
 
-    cprint("Regular activity logged ({})".format(student_name), color="green", attrs=["bold"])
+    cprint("Regular activity ({}) logged with {}".format(student_name, MODE), color="green", attrs=["bold"])
 
 
-def log_unknown(path_to_img):
+def log_unknown(logging, path_to_img):
     now = get_now(time.time())
 
-    if MODE == "mysql":
+    if logging == "mysql" and MODE == "mysql":
         add = "INSERT INTO Unknown (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
             path_to_img, *now)
         CURSOR.execute(add)
         DATABASE.commit()
 
-    elif MODE == "firebase":
+    elif logging == "firebase" and MODE == "firebase":
         data = {
             "path_to_img": path_to_img,
             "date": now[0],
@@ -213,7 +213,7 @@ def log_unknown(path_to_img):
         }
         DATABASE.child("unknown").child(*get_now(time.time())).set(data)
 
-    elif MODE == "django":
+    elif logging == "django" and MODE == "django":
         # TODO: log {*get_now(time.time()): path_to_img} in django db
             # DJANGO: u = UnknownLog(time=datetime.datetime.now(), path_to_img=path_to_img)
             #         u.save()
@@ -222,7 +222,7 @@ def log_unknown(path_to_img):
 
     flush_current(mode="unknown")
 
-    cprint("Unknown activity logged", color="red", attrs=["bold"])
+    cprint("Unknown activity logged with {}".format(MODE), color="red", attrs=["bold"])
 
 
 def flush_current(mode="known", flush_times=True):
