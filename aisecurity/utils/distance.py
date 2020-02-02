@@ -79,11 +79,10 @@ class DistMetric:
         # "use_stat": use statistics like mean and std (requires data to be supplied
         # "func": norm func
         "subtract_mean": construct_norm(
-            apply_to= _CHECKS["is_vector"],
+            apply_to=_CHECKS["is_vector"],
             use_stat=True,
             func=lambda x, stats: x - stats["mean"]
         ),
-
         "l2_normalize": construct_norm(
             apply_to=_CHECKS["is_vector"],
             use_stat=False,
@@ -128,9 +127,7 @@ class DistMetric:
         if normalized is None:
             normalized = arg
 
-        functional_dict = self.NORMALIZATIONS[norm_id]
-
-        actions = functional_dict.copy()
+        actions = self.NORMALIZATIONS[norm_id].copy()
         apply_to = actions.pop("apply_to")
         use_stat = actions.pop("use_stat")
 
@@ -154,10 +151,10 @@ class DistMetric:
         for norm_id in self.normalizations:
             normalized = self._apply_norm(norm_id, arg, normalized)
 
-        if hasattr(normalized, "__len__"):
-            check_passes =  _CHECKS["is_shape_equal"](normalized, arg)
-        else:
+        if _CHECKS["is_float_like"](arg):
             check_passes = _CHECKS["is_float_like"](normalized)
+        else:
+            check_passes = _CHECKS["is_shape_equal"](normalized, arg)
 
         assert check_passes, "mismatch between normalized and original arg"
 

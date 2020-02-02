@@ -46,11 +46,10 @@ def get_video_cap(width, height, picamera, framerate, flip, device=0):
 
 
 ################################ Graphics ###############################
-def add_graphics(frame, overlay, person, width, height, is_recognized, best_match, resize):
+def add_graphics(frame, person, width, height, is_recognized, best_match, resize):
     """Adds graphics to a frame
 
     :param frame: frame as array
-    :param overlay: overlay as array
     :param person: MTCNN detection dict
     :param width: width of frame
     :param height: height of frame
@@ -121,6 +120,7 @@ def add_graphics(frame, overlay, person, width, height, is_recognized, best_matc
     corner = (x + height + margin // 2, y + width + margin // 2)
 
     if features:
+        overlay = frame.copy()
         add_features(overlay, features, radius, color, line_thickness)
         cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
 
