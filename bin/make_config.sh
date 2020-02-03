@@ -55,13 +55,6 @@ if [ ! -d "$HOME/.aisecurity/keys" ] ; then
   mkdir keys
 fi
 
-if [ ! -d "$HOME/.aisecurity/bin" ] ; then
-  echo -e "\033[0;95mCreating bin directory\033[0m"
-  cd "$config_path" || echo -e "\033[0;31mError: unable to access $config_path\033[0m"
-  mkdir bin
-  cd "$config_path/bin" || echo -e "\033[0;31mError: unable to access $config_path/bin\033[0m"
-fi
-
 if [ ! -d "$HOME/.aisecurity/logging" ] ; then
   echo -e "\033[0;95mCreating logging directory\033[0m"
   cd "$config_path" || echo -e "\033[0;31mError: unable to access $config_path\033[0m"
