@@ -73,6 +73,7 @@ def init(logging, flush=False, thresholds=None):
                         DATABASE.commit()
 
         except (mysql.connector.errors.DatabaseError, mysql.connector.errors.InterfaceError):
+            MODE = "<no database>"
             warnings.warn("MySQL database credentials missing or incorrect")
 
     elif logging == "firebase":
@@ -81,17 +82,13 @@ def init(logging, flush=False, thresholds=None):
             DATABASE = FIREBASE.database()
 
         except (FileNotFoundError, json.JSONDecodeError):
-            raise ValueError(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
+            MODE = "<no database>"
+            warnings.warn(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
 
     elif logging == "django":
         # TODO: fill in init for django logging
-        try:
-            # initialize django database
-            # for now, hardcode any links/ip addresses that you might need to use to connect to a db
-            pass
-        except Exception:
-            # replace Exception with correct django error that might occur
-            raise Exception("django logging not able to be initialized")
+        MODE = "<no database>"
+        warnings.warn("django logging supported yet")
 
     else:
         MODE = "<no database>"
@@ -160,6 +157,12 @@ def update_current_logs(is_recognized, best_match):
         NUM_UNKNOWN += 1
         if NUM_UNKNOWN >= THRESHOLDS["num_unknown"]:
             NUM_RECOGNIZED = 0
+
+def cooldown_ok(t):
+    return time.time() - t > THRESHOLDS["cooldown"]
+
+def get_mode(d):
+    return max(d.keys(), key=lambda key: len(d[key]))
 
 
 # LOGGING FUNCTIONS
@@ -231,10 +234,13 @@ def flush_current(mode="known", flush_times=True):
     if "known" in mode:
         CURRENT_LOG = {}
         NUM_RECOGNIZED = 0
+
         if flush_times:
             LAST_LOGGED = time.time()
+
     if "unknown" in mode:
         DISTS = []
         NUM_UNKNOWN = 0
+
         if flush_times:
             UNK_LAST_LOGGED = time.time()
