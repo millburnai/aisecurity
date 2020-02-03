@@ -462,7 +462,7 @@ class FaceNet:
             )
 
             if face != -1:
-                print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if  is_recognized else " !"))
+                print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
 
                 # add graphics, lcd, and log
                 if use_graphics:
@@ -491,7 +491,7 @@ class FaceNet:
                 missed_frames += 1
                 if missed_frames > log.THRESHOLDS["missed_frames"]:
                     missed_frames = 0
-                    log.flush_current(mode=["known", "unknown"], flush_times=False)
+                    log.flush_current(mode="known+unknown"], flush_times=False)
                 print("No face detected")
 
             if use_graphics:
