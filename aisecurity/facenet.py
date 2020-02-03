@@ -81,6 +81,7 @@ class FaceNet:
         else:
             raise TypeError("model must be a .h5 or a frozen .pb file")
 
+        # TODO: make databases values a list of embeddings (multiple photos per person)
         self._static_db = None  # must be filled in by user
         self._dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
 
@@ -137,7 +138,7 @@ class FaceNet:
                     self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3]
                 )
         except ValueError:
-            warnings.warn("Input tensor size not detected")
+            warnings.warn("Input tensor size not detected. Default size is {}".format(IMG_CONSTANTS["img_size"]))
 
     def _tensor_init(self, model_name, input_name, output_name):
         """Initializes tensors (TF-TRT or TRT modes only)
@@ -168,6 +169,15 @@ class FaceNet:
 
     # TRT INIT
     def _trt_init(self, filepath, input_name, output_name, input_shape):
+        """TensorRT initialization
+
+        :param filepath: path to serialized engine (not portable across GPUs or platforms)
+        :param input_name: name of input to network
+        :param output_name: name of output to network
+        :param input_shape: input shape (channels first)
+
+        """
+
         assert engine.INIT_SUCCESS, "tensorrt or pycuda import failed: trt mode not available"
 
         tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
@@ -186,6 +196,7 @@ class FaceNet:
         :param config: data config dict with the entry "metric": <DistMetric str constructor> (default: None)
 
         """
+
         assert data, "data must be provided"
 
         def check_validity(data):
@@ -296,8 +307,8 @@ class FaceNet:
         """
 
         feed_dict = {self.input_name: np.expand_dims(img, axis=0)}
-        for tensor_dict in self.params["feed_dict"]:
-            feed_dict.update(tensor_dict)
+        for tensor, value in self.params["feed_dict"].items():
+            feed_dict[tensor] = value
         return feed_dict
 
     def predict(self, path_or_img, face_detector="mtcnn", margin=IMG_CONSTANTS["margin"]):
@@ -311,10 +322,11 @@ class FaceNet:
         """
 
         if self.MODE == "keras":
-            predict = lambda img: self.facenet.predict(np.expand_dims(img, axis=0))
+            predict = lambda img: self.facenet.predict(np.expand_dims(img, axis=0)).reshape(1, -1)
         elif self.MODE == "tf-trt":
             output_tensor = self.facenet.get_tensor_by_name(self.output_name)
-            predict = lambda img: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(img))
+            print(self._make_feed_dict(path_or_img))
+            predict = lambda img: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(img)).reshape(1, -1)
         elif self.MODE == "trt":
             predict = lambda img: self.facenet.inference(np.expand_dims(img, axis=0), output_shape=(1, -1))
 
@@ -382,7 +394,7 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
-                                   use_lcd, use_keypad, framerate, resize, flip, device, face_detector):
+                                   use_lcd, use_keypad, framerate, resize, flip, device, face_detector, update_static):
         """Real-time facial recognition under the hood (dev use only)
 
         :param width: width of frame (only matters if use_graphics is True)
@@ -399,6 +411,7 @@ class FaceNet:
         :param flip: flip method: +1 = +90º rotation
         :param device: camera device (/dev/video{device})
         :param face_detector: face detector type ("mtcnn" or "haarcascade")
+        :param update_static: update static database on prompt or not (-dev-)
         :returns: number of frames elapsed
 
         """
@@ -407,8 +420,8 @@ class FaceNet:
         db_types = ["static"]
         if use_dynamic:
             db_types.append("dynamic")
+        log.init(logging, flush=True)
         if logging:
-            log.init(logging, flush=True)
             log.server_init()
         if use_lcd:
             lcd.init()
@@ -449,15 +462,11 @@ class FaceNet:
             )
 
             if face != -1:
-                overlay = original_frame.copy()
+                print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if  is_recognized else " !"))
 
-                print("{}: {} ({}){}".format(
-                    self.dist_metric, round(dist, 4), best_match, " !" if not is_recognized else "")
-                )
-
-                # add graphics, lcd, and do logging
+                # add graphics, lcd, and log
                 if use_graphics:
-                    add_graphics(original_frame, overlay, face, width, height, is_recognized, best_match, resize)
+                    add_graphics(original_frame, face, width, height, is_recognized, best_match, resize)
 
                 if use_lcd and is_recognized:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
@@ -473,8 +482,8 @@ class FaceNet:
                     #  2. use of 3 is ambiguous-- add to keypad.CONFIG)
                     #  3. keypad.monitor(0) should be replaced with a reset or flush function if that's what it does
 
-                if logging and frames > 5:  # five frames before logging starts
-                    self.log_activity(is_recognized, best_match, use_dynamic, embedding)
+                if frames > 5:  # five frames before logging starts
+                    self.log_activity(logging, is_recognized, best_match, embedding, use_dynamic, update_static)
 
                     log.DISTS.append(dist)
 
@@ -504,7 +513,7 @@ class FaceNet:
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
                             use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
-                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn"):
+                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", update_static=False):
         """Real-time facial recognition
 
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
@@ -521,6 +530,7 @@ class FaceNet:
         :param flip: flip method: +1 = +90º rotation (default: 0)
         :param device: camera device (/dev/video{device}) (default: 0)
         :param face_detector: face detector type ("mtcnn" or "haarcascade") (default: "mtcnn")
+        :param update_static: update static database or not (default: False)
 
         """
 
@@ -534,7 +544,7 @@ class FaceNet:
             self._real_time_recognize,
             width=width, height=height, dist_metric=dist_metric, logging=logging, use_dynamic=use_dynamic,
             use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd, use_keypad=use_keypad, framerate=framerate,
-            resize=resize, flip=flip, device=device, face_detector=face_detector
+            resize=resize, flip=flip, device=device, face_detector=face_detector, update_static=update_static
         )
 
 
@@ -577,37 +587,54 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, is_recognized, best_match, use_dynamic, embedding):
+    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, update_static):
         """Logs facial recognition activity
 
+        :param logging: logging type-- None, "firebase", or "mysql"
         :param is_recognized: whether face was recognized or not
         :param best_match: best match from database
         :param mode: logging type: "firebase" or "mysql"
-        :param use_dynamic: use dynamic database or not
         :param embedding: embedding vector
+        :param use_dynamic: use dynamic database or not
+        :param update_static: update static database or not
 
         """
 
-        cooldown_ok = lambda t: time.time() - t > log.THRESHOLDS["cooldown"]
-        mode = lambda d: max(d.keys(), key=lambda key: len(d[key]))
-
         log.update_current_logs(is_recognized, best_match)
 
-        if log.NUM_RECOGNIZED >= log.THRESHOLDS["num_recognized"] and cooldown_ok(log.LAST_LOGGED):
+        if log.NUM_RECOGNIZED >= log.THRESHOLDS["num_recognized"] and log.cooldown_ok(log.LAST_LOGGED):
             if log.get_percent_diff(best_match, log.CURRENT_LOG) <= log.THRESHOLDS["percent_diff"]:
-                recognized_person = mode(log.CURRENT_LOG)
-                log.log_person(recognized_person, times=log.CURRENT_LOG[recognized_person])
+                recognized_person = log.get_mode(log.CURRENT_LOG)
+                log.log_person(logging, recognized_person, times=log.CURRENT_LOG[recognized_person])
 
                 lcd.add_lcd_display(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
-        elif log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and cooldown_ok(log.UNK_LAST_LOGGED):
-            log.log_unknown("<DEPRECATED>")
+                if update_static:
+                    is_correct = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
+
+                    if len(is_correct) == 0 or is_correct[0] == "y":
+                        self._static_db[best_match] = embedding.flatten()
+                        self._train_knn(knn_types=["static"])
+                    else:
+                        name = input("Who are you? ").lower().replace(" ", "_")
+
+                        if name in self._static_db:
+                            self._static_db[name] = embedding.flatten()
+                            self._train_knn(knn_types=["static"])
+                        else:
+                            cprint("'{}' is not in static database".format(name), attrs=["bold"])
+
+                        cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
+
+        elif log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and log.cooldown_ok(log.UNK_LAST_LOGGED):
+            log.log_unknown(logging, "<DEPRECATED>")
 
             if use_dynamic:
-                self._dynamic_db["visitor_{}".format(len(self._dynamic_db) + 1)] = embedding.flatten()
+                visitor_num = len(self._dynamic_db) + 1
+                self._dynamic_db["visitor_{}".format(visitor_num)] = embedding.flatten()
                 self._train_knn(knn_types=["dynamic"])
 
-                cprint("Visitor activity logged", color="magenta", attrs=["bold"])
+                cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
 
     # COMPUTATION CHECK
