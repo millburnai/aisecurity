@@ -148,7 +148,7 @@ class FaceNet:
         :param output_name: output tensor name
 
         """
-        
+
         self.model_config = self.MODELS["_default"]
 
         for model in self.MODELS:
@@ -353,6 +353,8 @@ class FaceNet:
 
         """
 
+        exit_failure = itertools.repeat(-1, 5)
+
         try:
             assert self._static_db or self._dynamic_db, "data must be provided"
 
@@ -366,7 +368,7 @@ class FaceNet:
 
             embedding, face = self.predict(img, **kwargs)
             if face == -1:  # no face detected
-                return itertools.repeat(-1, 5)
+                return exit_failure
 
             best_matches = []
             for knn in knns:
@@ -385,8 +387,10 @@ class FaceNet:
                 raise ValueError("Current model incompatible with database")
             elif "empty" in str(error):
                 print("Image refresh rate too high")
+                return exit_failure
             elif "opencv" in str(error):
                 print("Failed to capture frame")
+                return exit_failure
             else:
                 raise error
 
