@@ -325,7 +325,6 @@ class FaceNet:
             predict = lambda img: self.facenet.predict(np.expand_dims(img, axis=0)).reshape(1, -1)
         elif self.MODE == "tf-trt":
             output_tensor = self.facenet.get_tensor_by_name(self.output_name)
-            print(self._make_feed_dict(path_or_img))
             predict = lambda img: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(img)).reshape(1, -1)
         elif self.MODE == "trt":
             predict = lambda img: self.facenet.inference(np.expand_dims(img, axis=0), output_shape=(1, -1))
