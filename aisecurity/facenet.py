@@ -656,7 +656,7 @@ class FaceNet:
 
         if frames == 0 or time.time() - last_gpu_checkup > next_check:
             with HidePrints():
-                self.recognize(frame, checkup=True)
+                self.recognize(frame)
             print("Regular computation check")
 
             last_gpu_checkup = time.time()
