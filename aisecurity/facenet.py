@@ -82,11 +82,8 @@ class FaceNet:
             raise TypeError("model must be a .h5 or a frozen .pb file")
 
         # TODO: make databases values a list of embeddings (multiple photos per person)
-        self._static_db = None  # must be filled in by user
-        self._dynamic_db = {}  # used for real-time database updating (i.e., for visitors)
-
-        self.static_knn = None
-        self.dynamic_knn = None
+        self._db = {}
+        self._knn = None
 
         self.set_data(retrieve_embeds(), config=DATABASE_INFO)
         self.set_dist_metric("auto")
@@ -189,6 +186,36 @@ class FaceNet:
 
 
     # MUTATORS
+    def _screen_data(self, key, value):
+        """Checks if key-value pair is valid for data dict
+
+        :param key: new key
+        :param value: new value
+
+        """
+
+        assert isinstance(key, str), "data keys must be person names"
+        value = np.asarray(value)
+        is_vector = value.ndim <= 2 and (1 in value.shape or value.ndim == 1)
+        assert is_vector, "each value must be a vectorized embedding"
+
+        return key, value
+
+    def update_data(self, person, embedding, train_knn=True):
+        """Updates data property
+
+        :param person: new entry
+        :param embedding: new entry's embedding
+        :param train_knn: whether or not to train K-NN (default: True)
+
+        """
+
+        person, embedding = self._screen_data(person, embedding)
+
+        self._db[person] = embedding
+        if train_knn:
+            self._train_knn()
+
     def set_data(self, data, config=None):
         """Sets data property
 
@@ -199,17 +226,9 @@ class FaceNet:
 
         assert data, "data must be provided"
 
-        def check_validity(data):
-            for key in data.keys():
-                assert isinstance(key, str), "data keys must be person names"
-                data[key] = np.asarray(data[key])
-                is_vector = data[key].ndim <= 2 and (1 in data[key].shape or data[key].ndim == 1)
-                assert is_vector, "each data[key] must be a vectorized embedding"
-            return data
-
-        self._static_db = check_validity(data)
-
-        self._train_knn(knn_types=["static"])
+        for person, embed in data.items():
+            self.update_data(person, embed, train_knn=False)
+        self._train_knn()
 
         if config is None:
             warnings.warn("data config missing. Distance metric not detected")
@@ -249,12 +268,8 @@ class FaceNet:
                 )
             )
 
-    def _train_knn(self, knn_types):
-        """Trains K-Nearest-Neighbors
-
-        :param knn_types: types of K-NN to train
-
-        """
+    def _train_knn(self):
+        """Trains K-Nearest-Neighbors"""
 
         def knn_factory(data):
             names, embeddings = zip(*data.items())
@@ -265,10 +280,8 @@ class FaceNet:
             return knn
 
         try:
-            if self._static_db and "static" in knn_types:
-                self.static_knn = knn_factory(self._static_db)
-            if self._dynamic_db and "dynamic" in knn_types:
-                self.dynamic_knn = knn_factory(self._dynamic_db)
+            if self._db:
+                self._knn = knn_factory(self._db)
         except ValueError:
             raise ValueError("Current model incompatible with database")
 
@@ -278,11 +291,11 @@ class FaceNet:
     def data(self):
         """Property for static database
 
-        :returns: self._static_db
+        :returns: self._db
 
         """
 
-        return self._static_db
+        return self._db
 
     @staticmethod
     def get_frozen_graph(path):
@@ -343,11 +356,10 @@ class FaceNet:
 
     # FACIAL RECOGNITION HELPER
     @timer(message="Detection and recognition time")
-    def recognize(self, img, db_types=None, **kwargs):
+    def recognize(self, img, **kwargs):
         """Facial recognition
 
         :param img: image array
-        :param db_types: database types: "static" and/or "dynamic" (default: None)
         :param kwargs: named arguments to self.get_embeds (will be passed to self.predict)
         :returns: embedding, is recognized (bool), best match from database(s), distance
 
@@ -356,28 +368,14 @@ class FaceNet:
         exit_failure = itertools.repeat(-1, 5)
 
         try:
-            assert self._static_db or self._dynamic_db, "data must be provided"
-
-            knns, data = [], {}
-            if db_types is None or "static" in db_types:
-                knns.append(self.static_knn)
-                data.update(self._static_db)
-            if db_types and "dynamic" in db_types and self.dynamic_knn and self._dynamic_db:
-                knns.append(self.dynamic_knn)
-                data.update(self._dynamic_db)
+            assert self._db, "data must be provided"
 
             embedding, face = self.predict(img, **kwargs)
             if face == -1:  # no face detected
                 return exit_failure
 
-            best_matches = []
-            for knn in knns:
-                pred = knn.predict(embedding)[0]
-                dist = self.dist_metric(embedding, data[pred], mode="calc+norm", ignore=self.ignore)
-
-                best_matches.append((pred, dist))
-
-            best_match, dist = max(best_matches, key=lambda n: n[1])
+            best_match = self._knn.predict(embedding)[0]
+            dist = self.dist_metric(embedding, self._db[best_match], mode="calc+norm", ignore=self.ignore)
             is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
             return embedding, is_recognized, best_match, dist, face
@@ -420,9 +418,6 @@ class FaceNet:
         """
 
         # INITS
-        db_types = ["static"]
-        if use_dynamic:
-            db_types.append("dynamic")
         log.init(logging, flush=True)
         if logging:
             log.server_init()
@@ -460,9 +455,7 @@ class FaceNet:
                 last_gpu_checkup = self.keep_gpu_warm(frame, frames, last_gpu_checkup, use_lcd)
 
             # facial detection and recognition
-            embedding, is_recognized, best_match, dist, face = self.recognize(
-                frame, db_types, face_detector=face_detector
-            )
+            embedding, is_recognized, best_match, dist, face = self.recognize(frame, face_detector=face_detector)
 
             if face != -1:
                 print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
@@ -605,39 +598,41 @@ class FaceNet:
 
         log.update_current_logs(is_recognized, best_match)
 
-        if log.NUM_RECOGNIZED >= log.THRESHOLDS["num_recognized"] and log.cooldown_ok(log.LAST_LOGGED):
+        update_recognized = log.NUM_RECOGNIZED >= log.THRESHOLDS["num_recognized"] and log.cooldown_ok(log.LAST_LOGGED)
+        update_unrecognized = log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and log.cooldown_ok(log.UNK_LAST_LOGGED)
+
+        if update_recognized:
             if log.get_percent_diff(best_match, log.CURRENT_LOG) <= log.THRESHOLDS["percent_diff"]:
                 recognized_person = log.get_mode(log.CURRENT_LOG)
                 log.log_person(logging, recognized_person, times=log.CURRENT_LOG[recognized_person])
 
                 lcd.add_lcd_display(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
-                if update_static:
-                    is_correct = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
-
-                    if len(is_correct) == 0 or is_correct[0] == "y":
-                        self._static_db[best_match] = embedding.flatten()
-                        self._train_knn(knn_types=["static"])
-                    else:
-                        name = input("Who are you? ").lower().replace(" ", "_")
-
-                        if name in self._static_db:
-                            self._static_db[name] = embedding.flatten()
-                            self._train_knn(knn_types=["static"])
-                        else:
-                            cprint("'{}' is not in static database".format(name), attrs=["bold"])
-
-                        cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
-
-        elif log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and log.cooldown_ok(log.UNK_LAST_LOGGED):
+        elif update_unrecognized:
             log.log_unknown(logging, "<DEPRECATED>")
 
             if use_dynamic:
-                visitor_num = len(self._dynamic_db) + 1
-                self._dynamic_db["visitor_{}".format(visitor_num)] = embedding.flatten()
-                self._train_knn(knn_types=["dynamic"])
+                visitor_num = len([person for person in self._db if "visitor" in person]) + 1
+                self.update_data("visitor_{}".format(visitor_num), embedding.flatten())
 
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
+
+        if update_static and (update_recognized or update_unrecognized):
+            print(update_static, update_recognized, update_unrecognized)
+            is_correct = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
+
+            if len(is_correct) == 0 or is_correct[0] == "y":
+                self.update_data(best_match, embedding.flatten())
+
+            else:
+                name = input("Who are you? ").lower().replace(" ", "_")
+
+                if name in self.data:
+                    self.update_data(name, embedding.flatten())
+                else:
+                    cprint("'{}' is not in database".format(name), attrs=["bold"])
+
+                cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
 
 
     # COMPUTATION CHECK
