@@ -14,7 +14,6 @@ import aisecurity
 
 # download stuff and set up stuff
 subprocess.call(["make_config.sh"])
-subprocess.call(["make_keys.sh"])
 
 # paths
 CONFIG_HOME = os.path.expanduser("~") + "/.aisecurity"
@@ -25,10 +24,7 @@ CONFIG = json.load(open(CONFIG_HOME + "/aisecurity.json"))
 DATABASE = CONFIG["database_location"]
 DATABASE_INFO = json.load(open(CONFIG["database_info"]))
 
-KEY_DIR = CONFIG["key_directory"]
-KEY_FILE = CONFIG["key_location"]
-
-NAME_KEYS = json.load(open(KEY_FILE))["names"]
-EMBEDDING_KEYS = json.load(open(KEY_FILE))["embeddings"]
+NAME_KEYS = CONFIG["name_keys"]
+EMBEDDING_KEYS = CONFIG["embedding_keys"]
 
 DEFAULT_MODEL = CONFIG["default_model"]
