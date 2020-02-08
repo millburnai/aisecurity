@@ -25,7 +25,7 @@ setup(
     license=None,
     python_requires=">=3.5.0",
     install_requires=install_requires,
-    scripts=["bin/drop.sql", "bin/make_config.sh", "bin/make_keys.sh"],
+    scripts=["bin/drop.sql", "bin/make_config.sh"],
     packages=find_packages(),
     zip_safe=False
 )
