@@ -13,10 +13,10 @@ import warnings
 
 import numpy as np
 
-from aisecurity.privacy.encryptions import DataEncryption, _KEY_FILES
+from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.utils.events import timer, in_dev
 from aisecurity.utils.distance import DistMetric
-from aisecurity.utils.paths import DATABASE_INFO, DATABASE
+from aisecurity.utils.paths import DATABASE_INFO, DATABASE, NAME_KEYS, EMBEDDING_KEYS
 
 
 # LOAD ON THE FLY
@@ -72,8 +72,8 @@ def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=
 
 
 @timer(message="Data retrieval time")
-def retrieve_embeds(path=DATABASE, encrypted=DATABASE_INFO["encrypted"], name_keys=_KEY_FILES["names"],
-                    embedding_keys=_KEY_FILES["embeddings"]):
+def retrieve_embeds(path=DATABASE, encrypted=DATABASE_INFO["encrypted"], name_keys=NAME_KEYS,
+                    embedding_keys=EMBEDDING_KEYS):
     with open(path, "r") as json_file:
         data = json.load(json_file)
 

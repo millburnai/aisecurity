@@ -7,26 +7,16 @@ AES encryption for the image database.
 """
 
 import functools
-import json
-import os
 import struct
-import subprocess
 
 import numpy as np
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-from aisecurity.utils.paths import KEY_DIR, KEY_FILE
+from aisecurity.utils.paths import NAME_KEYS, EMBEDDING_KEYS
 
 
 # CONSTANTS
-try:
-    _KEY_FILES = json.load(open(KEY_FILE))
-    assert os.path.exists(_KEY_FILES["names"]) and os.path.exists(_KEY_FILES["embeddings"])
-except (FileNotFoundError, AssertionError):
-    subprocess.call(["make_keys.sh", KEY_DIR, KEY_FILE])
-    _KEY_FILES = json.load(open(KEY_FILE))
-
 _BIT_ENCRYPTION = 16
 
 
@@ -92,8 +82,7 @@ def decrypt(cipher_text, position, key_file):
 class DataEncryption:
 
     @staticmethod
-    def encrypt_data(data, ignore=None, decryptable=True, name_key_file=_KEY_FILES["names"],
-                     embeddings_key_file=_KEY_FILES["embeddings"]):
+    def encrypt_data(data, ignore=None, decryptable=True, name_key_file=NAME_KEYS, embeddings_key_file=EMBEDDING_KEYS):
         if ignore is None:
             ignore = []
         if decryptable:
@@ -123,7 +112,7 @@ class DataEncryption:
         return encrypted
 
     @staticmethod
-    def decrypt_data(data, ignore=None, name_keys=_KEY_FILES["names"], embedding_keys=_KEY_FILES["embeddings"]):
+    def decrypt_data(data, ignore=None, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS):
         if ignore is None:
             ignore = []
 
