@@ -33,7 +33,7 @@ from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.events import timer, HidePrints, run_async_method
 from aisecurity.utils.paths import DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
 from aisecurity.utils.visuals import get_video_cap, add_graphics
-from aisecurity.face.detection import detector_init, detect_faces
+from aisecurity.face.detection import detector_init
 from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_face
 
 

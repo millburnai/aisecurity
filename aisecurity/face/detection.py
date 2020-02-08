@@ -9,7 +9,7 @@ Haarcascade or MTCNN face detection.
 from aisecurity.utils.paths import CONFIG_HOME
 
 import cv2
-from mtcnn.mtcnn import MTCNN
+from mtcnn import MTCNN
 
 
 # GLOBALS ALLOC
