@@ -30,7 +30,7 @@ from aisecurity.optim import engine
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.distance import DistMetric
-from aisecurity.utils.events import timer, HidePrints, run_async_method
+from aisecurity.utils.events import timer, run_async_method
 from aisecurity.utils.paths import DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
 from aisecurity.utils.visuals import get_video_cap, add_graphics
 from aisecurity.face.detection import detector_init
@@ -70,16 +70,13 @@ class FaceNet:
         assert os.path.exists(filepath), "{} not found".format(filepath)
 
         if ".pb" in filepath:
-            self.MODE = "tf-trt"
             self._tf_trt_init(filepath, input_name, output_name, sess, input_shape)
         elif ".h5" in filepath:
-            self.MODE = "keras"
             self._keras_init(filepath)
         elif ".engine" in filepath:
-            self.MODE = "trt"
             self._trt_init(filepath, input_name, output_name, input_shape)
         else:
-            raise TypeError("model must be a .h5 or a frozen .pb file")
+            raise TypeError("model must be an .h5, .pb, or .engine file")
 
         # TODO: make databases values a list of embeddings (multiple photos per person)
         self._db = {}
@@ -98,9 +95,14 @@ class FaceNet:
 
         """
 
+        self.MODE = "keras"
+
         self.facenet = keras.models.load_model(filepath)
+        self.predict_fn = lambda img: self.facenet.predict(np.expand_dims(img, axis=0)).reshape(1, -1)
+
         self.img_norm = self.MODELS["_default"]["params"]["img_norm"]
         IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
+
 
     # TF-TRT INIT
     def _tf_trt_init(self, filepath, input_name, output_name, sess, input_shape):
@@ -113,6 +115,8 @@ class FaceNet:
         :param input_shape: input shape for facenet
 
         """
+
+        self.MODE = "tf-trt"
 
         graph_def = self.get_frozen_graph(filepath)
 
@@ -127,6 +131,9 @@ class FaceNet:
         self._tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
 
         self.facenet = self.sess.graph
+        output_tensor = self.facenet.get_tensor_by_name(self.output_name)
+        self.predict_fn = lambda img: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(img)).reshape(1, -1)
+
         try:
             if input_shape is not None:
                 IMG_CONSTANTS["img_size"] = input_shape
@@ -177,10 +184,14 @@ class FaceNet:
 
         assert engine.INIT_SUCCESS, "tensorrt or pycuda import failed: trt mode not available"
 
+        self.MODE = "trt"
+
         tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
         # needed to fix https://stackoverflow.com/questions/58756919/python-tensorrt-cudnn-status-mapping-error-error
 
         self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
+        self.predict_fn = lambda img: self.facenet.inference(np.expand_dims(img, axis=0), output_shape=(1, -1))
+
         self.img_norm = self.MODELS["_default"]["params"]["img_norm"]
         IMG_CONSTANTS["img_size"] = tuple(reversed(self.facenet.input_shape))[:-1]
 
@@ -334,21 +345,13 @@ class FaceNet:
 
         """
 
-        if self.MODE == "keras":
-            predict = lambda img: self.facenet.predict(np.expand_dims(img, axis=0)).reshape(1, -1)
-        elif self.MODE == "tf-trt":
-            output_tensor = self.facenet.get_tensor_by_name(self.output_name)
-            predict = lambda img: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(img)).reshape(1, -1)
-        elif self.MODE == "trt":
-            predict = lambda img: self.facenet.inference(np.expand_dims(img, axis=0), output_shape=(1, -1))
-
         cropped_face, face_coords = crop_face(path_or_img, margin, face_detector, alpha=self.HYPERPARAMS["mtcnn_alpha"])
         if face_coords == -1:
             return itertools.repeat(-1, 2)  # exit code: failure to detect face
 
         normalized_face = normalize(cropped_face, mode=self.img_norm)
 
-        raw_embedding = predict(normalized_face)
+        raw_embedding = self.predict_fn(normalized_face)
         normalized_embedding = self.dist_metric(raw_embedding)
 
         return normalized_embedding, face_coords
@@ -650,8 +653,7 @@ class FaceNet:
         next_check = log.THRESHOLDS["missed_frames"]
 
         if frames == 0 or time.time() - last_gpu_checkup > next_check:
-            with HidePrints():
-                self.recognize(frame)
+            self.predict_fn(frame)
             print("Regular computation check")
 
             last_gpu_checkup = time.time()

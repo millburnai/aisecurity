@@ -8,22 +8,8 @@ Miscellaneous tools for time and event handling.
 
 import asyncio
 import functools
-import os
-import sys
 import time
 import warnings
-
-
-# CONTEXT MANAGERS
-class HidePrints:
-
-    def __enter__(self):
-        self.to_show = sys.stdout
-        sys.stdout = open(os.devnull, "w")
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        sys.stdout.close()
-        sys.stdout = self.to_show
 
 
 # DECORATORS
