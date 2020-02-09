@@ -67,8 +67,8 @@ class DistMetric:
         ),
         "cosine": construct_dist(
             # definitely not right... has to be a transformation s.t. x^T x = 1 for all x in a, b
-            norm=lambda x: x / np.linalg.norm(x),
-            calc=lambda a, b: cosine_similarity(a.reshape(-1, 1), b.reshape(-1, 1))
+            norm=lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6)),
+            calc=lambda a, b: cosine_similarity(a.reshape(1, -1), b.reshape(1, -1))
         )
     }
 
@@ -224,8 +224,6 @@ class DistMetric:
 if __name__ == "__main__":
     from time import time
 
-    from sklearn.metrics.pairwise import cosine_similarity
-
     for trial_num, test in enumerate(np.random.random((10, 128, 1))):
         start = time()
 
@@ -234,9 +232,22 @@ if __name__ == "__main__":
 
         differences = {}
 
-        dist_metric = DistMetric("cosine", data=data)
-        result = dist_metric(test, second_test, mode="calc")
-        true_value = cosine_similarity(test, second_test)
+        dist_metric = DistMetric("cosine")
+        norm_test, norm_second_test = dist_metric(test.reshape(-1, 1), second_test.reshape(1, -1), mode="norm")
+        print(DistMetric.NORMALIZATIONS["l2_normalize"]["func"](second_test) - norm_second_test)
+        result = DistMetric("euclidean")(norm_test, norm_second_test, mode="calc")
+        true_value = cosine_similarity(
+            test.reshape(1, -1),
+            second_test.reshape(1, -1)
+        )
+        differences[dist_metric.get_config() + "+calc_with_euclidean"] = np.sum(true_value - result)
+
+        dist_metric = DistMetric("cosine+subtract_mean", data=data)
+        result = dist_metric(test.reshape(-1, 1), second_test.reshape(1, -1), mode="calc+norm")
+        true_value = cosine_similarity(
+            (test - np.mean(data)).reshape(1, -1),
+            (second_test - np.mean(data)).reshape(1, -1)
+        )
         differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+subtract_mean", data=data)
@@ -245,8 +256,8 @@ if __name__ == "__main__":
         differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+subtract_mean", data=data)
-        result = dist_metric(test)
-        true_value = test - np.mean(data)
+        result = dist_metric(test, second_test, mode="calc+norm")
+        true_value = np.linalg.norm(test - np.mean(data) - (second_test - np.mean(data)))
         differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+l2_normalize", data=data)

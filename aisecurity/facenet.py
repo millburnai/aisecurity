@@ -44,7 +44,7 @@ class FaceNet:
 
     # HYPERPARAMETERS
     HYPERPARAMS = {
-        "alpha": 0.75,  # 0.9 for cosine+l2_normalize
+        "alpha": 0.75,
         "mtcnn_alpha": 0.9
     }
 
@@ -392,7 +392,7 @@ class FaceNet:
                 return exit_failure
 
             best_match = self._knn.predict(embedding)[0]
-            best_embed = self.expanded_embeds[self.expanded_names.index(best_match)].reshape(1, -1)
+            best_embed = self.expanded_embeds[self.expanded_names.index(best_match)]
 
             dist = self.dist_metric(embedding, best_embed, mode="calc+norm", ignore=self.ignore)
             is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
