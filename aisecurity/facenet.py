@@ -31,7 +31,7 @@ from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.events import timer, run_async_method
-from aisecurity.utils.paths import DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
+from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
 from aisecurity.utils.visuals import get_video_cap, add_graphics
 from aisecurity.face.detection import detector_init
 from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_face
@@ -54,11 +54,12 @@ class FaceNet:
 
     # INITS
     @timer(message="Model load time")
-    def __init__(self, filepath=DEFAULT_MODEL, sess=None, input_name=None, output_name=None, input_shape=None,
-                 **hyperparams):
+    def __init__(self, model_path=DEFAULT_MODEL, data_path=DATABASE, sess=None, input_name=None, output_name=None,
+                 input_shape=None, **hyperparams):
         """Initializes FaceNet object
 
-        :param filepath: path to model (default: aisecurity.utils.paths.DEFAULT_MODEL)
+        :param model_path: path to model (default: aisecurity.utils.paths.DEFAULT_MODEL)
+        :param data_path: path to data(default: aisecurity.utils.paths.DATABASE)
         :param sess: tf.Session to use (default: None)
         :param input_name: name of input tensor-- only required if using (TF)TRT non-default model (default: None)
         :param output_name: name of output tensor-- only required if using (TF)TRT non-default model (default: None)
@@ -67,22 +68,25 @@ class FaceNet:
 
         """
 
-        assert os.path.exists(filepath), "{} not found".format(filepath)
+        assert os.path.exists(model_path), "{} not found".format(model_path)
+        assert not data_path or os.path.exists(data_path), "{} not found".format(data_path)
 
-        if ".pb" in filepath:
-            self._tf_trt_init(filepath, input_name, output_name, sess, input_shape)
-        elif ".h5" in filepath:
-            self._keras_init(filepath)
-        elif ".engine" in filepath:
-            self._trt_init(filepath, input_name, output_name, input_shape)
+        if ".pb" in model_path:
+            self._tf_trt_init(model_path, input_name, output_name, sess, input_shape)
+        elif ".h5" in model_path:
+            self._keras_init(model_path)
+        elif ".engine" in model_path:
+            self._trt_init(model_path, input_name, output_name, input_shape)
         else:
             raise TypeError("model must be an .h5, .pb, or .engine file")
 
-        # TODO: make databases values a list of embeddings (multiple photos per person)
         self._db = {}
         self._knn = None
 
-        self.set_data(retrieve_embeds(), config=DATABASE_INFO)
+        if data_path:
+            self.set_data(retrieve_embeds(data_path), config=DATABASE_INFO)
+        else:
+            warnings.warn("data not set. Set it manually with set_data to use FaceNet")
         self.set_dist_metric("auto")
 
         self.HYPERPARAMS.update(hyperparams)
@@ -206,24 +210,30 @@ class FaceNet:
         """
 
         assert isinstance(key, str), "data keys must be person names"
-        value = np.asarray(value)
-        is_vector = value.ndim <= 2 and (1 in value.shape or value.ndim == 1)
-        assert is_vector, "each value must be a vectorized embedding"
+
+        for embed in value:
+            embed = np.asarray(embed)
+            is_vector = embed.ndim <= 2 and (1 in embed.shape or embed.ndim == 1)
+            assert is_vector, "each value must be a vectorized embedding, got shape {}".format(embed.shape)
 
         return key, value
 
-    def update_data(self, person, embedding, train_knn=True):
+    def update_data(self, person, embeddings, train_knn=True):
         """Updates data property
 
         :param person: new entry
-        :param embedding: new entry's embedding
+        :param embeddings: new entry's list of embeddings
         :param train_knn: whether or not to train K-NN (default: True)
 
         """
 
-        person, embedding = self._screen_data(person, embedding)
+        person, embeddings = self._screen_data(person, embeddings)
 
-        self._db[person] = embedding
+        if person in self.data:
+            self._db[person].append(np.array(embeddings).flatten())
+        else:
+            self._db[person] = [np.array(embeddings).flatten()]
+
         if train_knn:
             self._train_knn()
 
@@ -257,43 +267,47 @@ class FaceNet:
         # set distance metric
         if isinstance(dist_metric, DistMetric):
             self.dist_metric = dist_metric
+
         elif isinstance(dist_metric, str):
             if "auto" in dist_metric:
+                constructor = self.cfg_dist_metric
                 if "+" in dist_metric:
-                    constructor = self.cfg_dist_metric + dist_metric[dist_metric.find("+"):]
-                else:
-                    constructor = self.cfg_dist_metric
+                    constructor += dist_metric[dist_metric.find("+"):]
             else:
                 constructor = dist_metric
+
             self.dist_metric = DistMetric(constructor, data=list(self.data.values()), axis=0)
+
         else:
             raise ValueError("{} not a supported dist metric".format(dist_metric))
 
         # check against data config
         self.ignore = {0: self.dist_metric.get_config()}
+
         if self.cfg_dist_metric != self.dist_metric.get_config():
             self.ignore[1] = self.cfg_dist_metric
-            warnings.warn(
-                "provided DistMetric ({}) is not the same as the data config metric ({}) ".format(
-                    self.dist_metric.get_config(), self.cfg_dist_metric
-                )
-            )
+
+            warnings.warn("provided DistMetric ({}) is not the same as the data config metric ({}) ".format(
+                self.dist_metric.get_config(), self.cfg_dist_metric))
 
     def _train_knn(self):
         """Trains K-Nearest-Neighbors"""
+        try:
+            self.expanded_names = []
+            self.expanded_embeds = []
 
-        def knn_factory(data):
-            names, embeddings = zip(*data.items())
-            knn = neighbors.KNeighborsClassifier(n_neighbors=len(names) // len(set(names)))
+            for name, embeddings in self.data.items():
+                for idx, embedding in enumerate(embeddings):
+                    self.expanded_names.append(name)
+                    self.expanded_embeds.append(embedding)
+
             # always use minkowski distance, other metrics are just normalizing before minkowski to act
             # as the desired metric (ex: cosine)
-            knn.fit(embeddings, names)
-            return knn
+            n_neighbors = len(self.expanded_names) // len(set(self.expanded_names))
+            self._knn = neighbors.KNeighborsClassifier(n_neighbors=n_neighbors)
+            self._knn.fit(self.expanded_embeds, self.expanded_names)
 
-        try:
-            if self._db:
-                self._knn = knn_factory(self._db)
-        except ValueError:
+        except (AttributeError, ValueError):
             raise ValueError("Current model incompatible with database")
 
 
@@ -378,7 +392,9 @@ class FaceNet:
                 return exit_failure
 
             best_match = self._knn.predict(embedding)[0]
-            dist = self.dist_metric(embedding, self._db[best_match], mode="calc+norm", ignore=self.ignore)
+            best_embed = self.expanded_embeds[self.expanded_names.index(best_match)].reshape(1, -1)
+
+            dist = self.dist_metric(embedding, best_embed, mode="calc+norm", ignore=self.ignore)
             is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
             return embedding, is_recognized, best_match, dist, face
@@ -470,20 +486,8 @@ class FaceNet:
                 if use_lcd and is_recognized:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
-                if use_keypad:
-                    pass
-                    # if is_recognized:
-                    #     run_async_method(keypad.monitor)
-                    # elif last_best_match != best_match:
-                    #     keypad.CONFIG["continue"] = False
-                    # FIXME:
-                    #  1. above lines should be changed and use log.current_log instead of making another local var
-                    #  2. use of 3 is ambiguous-- add to keypad.CONFIG)
-                    #  3. keypad.monitor(0) should be replaced with a reset or flush function if that's what it does
-
                 if frames > 5:  # five frames before logging starts
                     self.log_activity(logging, is_recognized, best_match, embedding, use_dynamic, update_static)
-
                     log.DISTS.append(dist)
 
             else:
@@ -616,22 +620,21 @@ class FaceNet:
 
             if use_dynamic:
                 visitor_num = len([person for person in self._db if "visitor" in person]) + 1
-                self.update_data("visitor_{}".format(visitor_num), embedding.flatten())
+                self.update_data("visitor_{}".format(visitor_num), embedding)
 
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
         if update_static and (update_recognized or update_unrecognized):
-            print(update_static, update_recognized, update_unrecognized)
             is_correct = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
 
             if len(is_correct) == 0 or is_correct[0] == "y":
-                self.update_data(best_match, embedding.flatten())
+                self.update_data(best_match, embedding)
 
             else:
                 name = input("Who are you? ").lower().replace(" ", "_")
 
                 if name in self.data:
-                    self.update_data(name, embedding.flatten())
+                    self.update_data(name, embedding)
                 else:
                     cprint("'{}' is not in database".format(name), attrs=["bold"])
 
@@ -665,3 +668,5 @@ class FaceNet:
             last_gpu_checkup = time.time()
 
         return last_gpu_checkup
+
+# FaceNet("/home/ryan/.aisecurity/models/ms_celeb_1m.pb").real_time_recognize()
