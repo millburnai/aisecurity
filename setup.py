@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-# TENSORFLOW/MTCNN INSTALL
+# TENSORFLOW INSTALL
 SUPPORTED_TF_VERSIONS = ["1.12", "1.14", "1.15"]
 
 install_requires = ["adafruit-circuitpython-charlcd", "keras", "matplotlib",
@@ -12,12 +12,6 @@ try:
 except (ModuleNotFoundError, AssertionError):
     install_requires.append("tensorflow==1.15.2")
     
-try:
-    import mtcnn
-    assert "0.1" in mtcnn.__version__
-except (ModuleNotFoundError, AssertionError):
-    install_requires.append("mtcnn")
-
 
 # SETUP
 setup(
