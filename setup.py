@@ -1,16 +1,22 @@
 from setuptools import setup, find_packages
 
-# TENSORFLOW INSTALL
+# TENSORFLOW/MTCNN INSTALL
 SUPPORTED_TF_VERSIONS = ["1.12", "1.14", "1.15"]
 
 install_requires = ["adafruit-circuitpython-charlcd", "keras", "matplotlib",
-                    "mysql-connector-python", "Pyrebase", "pycryptodome", "requests", "scikit-learn", "mtcnn"]
+                    "mysql-connector-python", "Pyrebase", "pycryptodome", "requests", "scikit-learn"]
 
 try:
     import tensorflow as tf
     assert any(version in tf.__version__ for version in SUPPORTED_TF_VERSIONS)
 except (ModuleNotFoundError, AssertionError):
     install_requires.append("tensorflow==1.15.2")
+    
+try:
+    import mtcnn
+    assert "0.1" in mtcnn.__version__
+except (ModuleNotFoundError, AssertionError):
+    install_requires.append("mtcnn")
 
 
 # SETUP
