@@ -1,4 +1,3 @@
-import websocket
 import json
 import time
 import aisecurity
@@ -10,7 +9,7 @@ except ImportError:
     import _thread as thread
 
 
-def on_message():
+def on_message(ws):
 	message = json.loads(message)
 	return message
 
@@ -21,5 +20,6 @@ def on_error(ws, error):
 def on_close(ws):
     pass
 
-def on_open()
+def on_open(ws):
+	print("open")
 	thread.start_new_thread(facenet.real_time_recognize())
