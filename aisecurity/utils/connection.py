@@ -1,25 +1,12 @@
-import json
-import time
-import aisecurity
-facenet = aisecurity.FaceNet()
-
-try:
-    import thread
-except ImportError:
-    import _thread as thread
+import aisecurity.utils.connection as connection
+import websocket
 
 
-def on_message(ws):
-	message = json.loads(message)
-	return message
-
-def on_error(ws, error):
-    print(error)
-
-
-def on_close(ws):
-    pass
-
-def on_open(ws):
-	print("open")
-	thread.start_new_thread(facenet.real_time_recognize())
+if __name__ == "__main__":
+    websocket.enableTrace(True)
+    ws = websocket.WebSocketApp("ws://172.31.217.136:8000/v1/guard/live",
+                              on_message = lambda ws,msg: connection.on_message(ws, msg),
+                              on_error = connection.on_error,
+                              on_close = connection.on_close)
+    ws.on_open = connection.on_open
+    ws.run_forever()
