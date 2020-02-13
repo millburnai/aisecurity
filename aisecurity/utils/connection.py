@@ -1,12 +1,12 @@
-import aisecurity.utils.connection as connection
+import aisecurity.utils.socket as socket
 import websocket
 
 
-if __name__ == "__main__":
+def real_time_recognize_socket(socket_url)
     websocket.enableTrace(True)
-    ws = websocket.WebSocketApp("ws://172.31.217.136:8000/v1/guard/live",
-                              on_message = lambda ws,msg: connection.on_message(ws, msg),
-                              on_error = connection.on_error,
-                              on_close = connection.on_close)
-    ws.on_open = connection.on_open
+    ws = websocket.WebSocketApp(socket_url,
+                              on_message = lambda ws,msg: socket.on_message(ws, msg),
+                              on_error = socket.on_error,
+                              on_close = socket.on_close)
+    ws.on_open = socket.on_open
     ws.run_forever()
