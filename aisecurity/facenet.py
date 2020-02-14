@@ -463,9 +463,16 @@ class FaceNet:
         last_gpu_checkup = time.time()
 
         # CAM LOOP
+        test_frames = 0
+
         while True:
             _, frame = cap.read()
+            test_frames += 1
             original_frame = frame.copy()
+
+            if socket is not None and test_frames % 100 == 0:
+                print(test_frames)
+                socket.send(test_frames)
 
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
@@ -486,10 +493,8 @@ class FaceNet:
                 if use_lcd and is_recognized:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
-                if frames > 5:  # five frames before logging starts
-                    if socket is not None:
-                        socket.send(best_match)
 
+                if frames > 5:  # five frames before logging starts
                     self.log_activity(logging, is_recognized, best_match, embedding, use_dynamic, update_static)
                     log.DISTS.append(dist)
 
