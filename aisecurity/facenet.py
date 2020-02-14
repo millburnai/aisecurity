@@ -472,7 +472,7 @@ class FaceNet:
 
             if socket is not None and test_frames % 100 == 0:
                 print(test_frames)
-                socket.send(test_frames)
+                socket.send(str(test_frames))
 
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
