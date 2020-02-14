@@ -414,7 +414,7 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
-                                   use_lcd, use_keypad, framerate, resize, flip, device, face_detector, update_static):
+                                   use_lcd, use_keypad, framerate, resize, flip, device, face_detector, update_static, socket):
         """Real-time facial recognition under the hood (dev use only)
 
         :param width: width of frame (only matters if use_graphics is True)
@@ -487,6 +487,9 @@ class FaceNet:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
                 if frames > 5:  # five frames before logging starts
+                    if socket is not None:
+                        socket.send(best_match)
+
                     self.log_activity(logging, is_recognized, best_match, embedding, use_dynamic, update_static)
                     log.DISTS.append(dist)
 
@@ -516,7 +519,7 @@ class FaceNet:
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
                             use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
-                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", update_static=False):
+                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", update_static=False, socket=None):
         """Real-time facial recognition
 
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
@@ -547,7 +550,7 @@ class FaceNet:
             self._real_time_recognize,
             width=width, height=height, dist_metric=dist_metric, logging=logging, use_dynamic=use_dynamic,
             use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd, use_keypad=use_keypad, framerate=framerate,
-            resize=resize, flip=flip, device=device, face_detector=face_detector, update_static=update_static
+            resize=resize, flip=flip, device=device, face_detector=face_detector, update_static=update_static, socket=socket,
         )
 
 
