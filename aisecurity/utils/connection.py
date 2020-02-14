@@ -1,4 +1,4 @@
-import aisecurity.utils.socket as socket
+import aisecurity.utils.socket_ as socket_
 import websocket
 
 from aisecurity.utils.events import in_dev
@@ -7,8 +7,8 @@ from aisecurity.utils.events import in_dev
 def real_time_recognize_socket(socket_url)
     websocket.enableTrace(True)
     ws = websocket.WebSocketApp(socket_url,
-                              on_message = lambda ws,msg: socket.on_message(ws, msg),
-                              on_error = socket.on_error,
-                              on_close = socket.on_close)
-    ws.on_open = socket.on_open
+                              on_message = lambda ws,msg: socket_.on_message(ws, msg),
+                              on_error = socket_.on_error,
+                              on_close = socket_.on_close)
+    ws.on_open = socket_.on_open(ws)
     ws.run_forever()
