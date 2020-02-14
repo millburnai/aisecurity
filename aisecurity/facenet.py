@@ -668,5 +668,3 @@ class FaceNet:
             last_gpu_checkup = time.time()
 
         return last_gpu_checkup
-
-# FaceNet("/home/ryan/.aisecurity/models/ms_celeb_1m.pb").real_time_recognize()

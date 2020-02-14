@@ -1,7 +1,9 @@
 import aisecurity.utils.socket as socket
 import websocket
 
+from aisecurity.utils.events import in_dev
 
+@in_dev("real_time_recognize_socket is in production")
 def real_time_recognize_socket(socket_url)
     websocket.enableTrace(True)
     ws = websocket.WebSocketApp(socket_url,
