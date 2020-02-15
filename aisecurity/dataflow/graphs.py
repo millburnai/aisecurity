@@ -14,7 +14,7 @@ import tensorflow as tf
 import tensorflow.contrib.tensorrt as trt
 from tensorflow.python.framework import graph_io
 
-from aisecurity.utils.events import timer
+from aisecurity.utils.events import print_time
 
 
 # MODEL CONVERSIONS
@@ -34,7 +34,7 @@ def _freeze_graph(graph, sess, output_names, save_dir=None, save_name=None):
 
 
 # .pb -> frozen .pb
-@timer("Freeze TF model time")
+@print_time("Freeze TF model time")
 def freeze_graph(path_to_model, output_names, save_dir=".", save_name="frozen_graph.pb"):
     assert path_to_model.endswith(".pb"), "{} must be a .pb file".format(path_to_model)
 
@@ -55,7 +55,7 @@ def freeze_graph(path_to_model, output_names, save_dir=".", save_name="frozen_gr
 
 
 # .h5 -> frozen .pb
-@timer("Freeze Keras model time")
+@print_time("Freeze Keras model time")
 def freeze_keras_model(path_to_model, save_dir=None, save_name="frozen_graph.pb"):
     assert path_to_model.endswith(".h5"), "{} must be a .h5 file".format(path_to_model)
 
@@ -75,7 +75,7 @@ def freeze_keras_model(path_to_model, save_dir=None, save_name="frozen_graph.pb"
 
 
 # .pb -> .uff
-@timer("Conversion to .uff time")
+@print_time("Conversion to .uff time")
 def frozen_to_uff(path_to_model):
     bash_cmd = "convert-to-uff \"{}\"".format(path_to_model)
     process = subprocess.Popen(bash_cmd.split(), stdout=subprocess.PIPE)
@@ -84,7 +84,7 @@ def frozen_to_uff(path_to_model):
 
 
 # frozen .pb -> trt-optimizer .pb
-@timer("Inference graph creation time")
+@print_time("Inference graph creation time")
 def optimize_graph(path_to_graph_def, output_names, save_dir=".", save_name="trt_graph.pb"):
     with tf.gfile.FastGFile(path_to_graph_def, "rb") as graph_file:
         graph_def = tf.GraphDef()

@@ -12,7 +12,7 @@ import warnings
 import numpy as np
 from aisecurity.utils.paths import CONFIG_HOME
 
-from aisecurity.utils.events import timer
+from aisecurity.utils.events import print_time
 
 
 ################################ Setup ################################
@@ -141,12 +141,12 @@ class CudaEngineManager:
         with open(engine_file, "rb") as file, trt.Runtime(self.CONSTANTS["logger"]) as runtime:
             self.engine = runtime.deserialize_cuda_engine(file.read())
 
-    @timer("Engine building and serializing time")
+    @print_time("Engine building and serializing time")
     def build_and_serialize_engine(self):
         """Builds and serializes a cuda engine"""
         self.engine = self.builder.build_cuda_engine(self.network).serialize()
 
-    @timer("uff model parsing time")
+    @print_time("uff model parsing time")
     def parse_uff(self, uff_file, input_name, input_shape, output_name):
         """Parses .uff file and prepares for serialization
 
@@ -167,7 +167,7 @@ class CudaEngineManager:
 
         self.parser = parser
 
-    @timer("caffe model parsing time")
+    @print_time("caffe model parsing time")
     def parse_caffe(self, caffe_model_file, caffe_deploy_file, output_name="prob1"):
         """Parses caffe model file and prepares for serialization
 

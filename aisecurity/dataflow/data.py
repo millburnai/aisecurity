@@ -14,13 +14,13 @@ import warnings
 import numpy as np
 
 from aisecurity.privacy.encryptions import DataEncryption
-from aisecurity.utils.events import timer, in_dev
+from aisecurity.utils.events import print_time, in_dev
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.paths import DATABASE_INFO, DATABASE, NAME_KEYS, EMBEDDING_KEYS
 
 
 # LOAD ON THE FLY
-@timer(message="Data preprocessing time")
+@print_time("Data preprocessing time")
 def online_load(facenet, img_dir, people=None):
     if people is None:
         people = [f for f in os.listdir(img_dir) if not f.endswith(".DS_Store") and not f.endswith(".json")]
@@ -42,7 +42,7 @@ def online_load(facenet, img_dir, people=None):
 
 
 # LONG TERM STORAGE
-@timer(message="Data dumping time")
+@print_time("Data dumping time")
 def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, to_encrypt="all", mode="w+"):
     ignore = ["names", "embeddings"]
     if to_encrypt == "all":
@@ -71,7 +71,7 @@ def dump_embeds(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=
     return encrypted_data, no_faces
 
 
-@timer(message="Data retrieval time")
+@print_time("Data retrieval time")
 def retrieve_embeds(path=DATABASE, encrypted=DATABASE_INFO["encrypted"], name_keys=NAME_KEYS,
                     embedding_keys=EMBEDDING_KEYS):
     with open(path, "r") as json_file:

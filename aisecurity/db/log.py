@@ -8,6 +8,7 @@ MySQL and Firebase database handling.
 
 import json
 import time
+from timeit import default_timer as timer
 import warnings
 
 import mysql.connector
@@ -49,7 +50,7 @@ def init(logging, flush=False, thresholds=None):
     MODE = logging
 
     NUM_RECOGNIZED, NUM_UNKNOWN = 0, 0
-    LAST_LOGGED, UNK_LAST_LOGGED = time.time(), time.time()
+    LAST_LOGGED, UNK_LAST_LOGGED = timer(), timer()
     CURRENT_LOG, DISTS = {}, []
 
     if logging == "mysql":
@@ -142,7 +143,7 @@ def update_current_logs(is_recognized, best_match):
         flush_current(mode="unknown+known")
 
     if is_recognized:
-        now = time.time()
+        now = timer()
 
         if best_match not in CURRENT_LOG:
             CURRENT_LOG[best_match] = [now]
@@ -159,7 +160,7 @@ def update_current_logs(is_recognized, best_match):
             NUM_RECOGNIZED = 0
 
 def cooldown_ok(t):
-    return time.time() - t > THRESHOLDS["cooldown"]
+    return timer() - t > THRESHOLDS["cooldown"]
 
 def get_mode(d):
     return max(d.keys(), key=lambda key: len(d[key]))
@@ -182,7 +183,7 @@ def log_person(logging, student_name, times):
             "date": now[0],
             "time": now[1]
         }
-        DATABASE.child("known").child(*get_now(time.time())).set(data)
+        DATABASE.child("known").child(*get_now(timer())).set(data)
 
     elif logging == "django" and MODE == "django":
         student_id = get_id(student_name)
@@ -200,7 +201,7 @@ def log_person(logging, student_name, times):
 
 
 def log_unknown(logging, path_to_img):
-    now = get_now(time.time())
+    now = get_now(timer())
 
     if logging == "mysql" and MODE == "mysql":
         add = "INSERT INTO Unknown (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
@@ -214,10 +215,10 @@ def log_unknown(logging, path_to_img):
             "date": now[0],
             "time": now[1]
         }
-        DATABASE.child("unknown").child(*get_now(time.time())).set(data)
+        DATABASE.child("unknown").child(*get_now(timer())).set(data)
 
     elif logging == "django" and MODE == "django":
-        # TODO: log {*get_now(time.time()): path_to_img} in django db
+        # TODO: log {*get_now(timer()): path_to_img} in django db
             # DJANGO: u = UnknownLog(time=datetime.datetime.now(), path_to_img=path_to_img)
             #         u.save()
             # from models.py; import datetime, unknownlog
@@ -236,11 +237,11 @@ def flush_current(mode="known", flush_times=True):
         NUM_RECOGNIZED = 0
 
         if flush_times:
-            LAST_LOGGED = time.time()
+            LAST_LOGGED = timer()
 
     if "unknown" in mode:
         DISTS = []
         NUM_UNKNOWN = 0
 
         if flush_times:
-            UNK_LAST_LOGGED = time.time()
+            UNK_LAST_LOGGED = timer()

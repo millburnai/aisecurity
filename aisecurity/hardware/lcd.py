@@ -8,7 +8,7 @@ LCD utils.
 
 import concurrent.futures
 import functools
-import time
+from timeit import default_timer as timer
 import warnings
 
 from keras import backend as K

@@ -8,18 +8,18 @@ Miscellaneous tools for time and event handling.
 
 import asyncio
 import functools
-import time
+from timeit import default_timer as timer
 import warnings
 
 
 # DECORATORS
-def timer(message="Time elapsed"):
+def print_time(message="Time elapsed"):
     def _timer(func):
         @functools.wraps(func)
         def _func(*args, **kwargs):
-            start = time.time()
+            start = timer()
             result = func(*args, **kwargs)
-            print("{}: {}s".format(message, round(time.time() - start, 3)))
+            print("{}: {}s".format(message, round(timer() - start, 4)))
             return result
 
         return _func

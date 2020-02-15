@@ -6,7 +6,7 @@ Keypad utils.
 
 """
 
-import time
+from timeit import default_timer as timer
 import warnings
 
 import asyncio
@@ -70,9 +70,9 @@ async def monitor():
     #  3. add a config entry for 0.021 seconds and 3 and 1 (line ~79)-- what does it do?
 
     LCD_DEVICE.set_message("ID: ")
-    start = time.time()
+    start = timer()
 
-    while time.time() - start < CONFIG["seconds_to_input"]:
+    while timer() - start < CONFIG["seconds_to_input"]:
         time.sleep(0.021)
 
         for row in CONFIG["rows"]:
@@ -82,7 +82,7 @@ async def monitor():
                 if GPIO.input(column):
                     button_id = (CONFIG["rows"].index(row) * 3) + (CONFIG["columns"].index(column) + 1)
                     press(button_id)
-                    start = time.time()
+                    start = timer()
 
 
                 time.sleep(0.021)

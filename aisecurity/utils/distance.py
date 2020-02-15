@@ -222,10 +222,10 @@ class DistMetric:
 
 
 if __name__ == "__main__":
-    from time import time
+    from timeit import default_timer as timer
 
     for trial_num, test in enumerate(np.random.random((10, 128, 1))):
-        start = time()
+        start = timer()
 
         data = np.random.random((100, 1))
         second_test = np.random.random(test.shape)
@@ -304,4 +304,4 @@ if __name__ == "__main__":
             if differences[metric] != 0.:
                 print("Error - {}: difference of {}".format(metric, np.round(differences[metric], 5)))
         else:
-            print("Test {} finished without error ({}s)".format(trial_num + 1, round(time() - start, 5)))
+            print("Test {} finished without error ({}s)".format(trial_num + 1, round(timer() - start, 5)))

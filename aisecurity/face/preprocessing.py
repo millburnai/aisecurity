@@ -12,6 +12,7 @@ import cv2
 import numpy as np
 
 from aisecurity.face.detection import FACE_DETECTORS, detect_faces, detector_init
+from aisecurity.utils.events import print_time
 
 
 # CONSTANTS
@@ -36,6 +37,7 @@ def normalize(x, mode="per_image"):
     return normalized
 
 
+@print_time("Detection time")
 def crop_face(path_or_img, margin, face_detector="mtcnn", alpha=0.9):
     try:
         img = cv2.imread(path_or_img).astype(np.uint8)
