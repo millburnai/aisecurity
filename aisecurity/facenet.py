@@ -12,7 +12,7 @@ import asyncio
 import itertools
 import json
 import os
-import time
+from timeit import default_timer as timer
 import warnings
 
 import cv2
@@ -30,7 +30,7 @@ from aisecurity.optim import engine
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.distance import DistMetric
-from aisecurity.utils.events import timer, run_async_method
+from aisecurity.utils.events import print_time, run_async_method
 from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
 from aisecurity.utils.visuals import get_video_cap, add_graphics
 from aisecurity.face.detection import detector_init
@@ -53,7 +53,7 @@ class FaceNet:
 
 
     # INITS
-    @timer(message="Model load time")
+    @print_time("Model load time")
     def __init__(self, model_path=DEFAULT_MODEL, data_path=DATABASE, sess=None, input_name=None, output_name=None,
                  input_shape=None, **hyperparams):
         """Initializes FaceNet object
@@ -102,7 +102,6 @@ class FaceNet:
         self.MODE = "keras"
 
         self.facenet = keras.models.load_model(filepath)
-        self.predict_fn = lambda img: self.facenet.predict(np.expand_dims(img, axis=0)).reshape(1, -1)
 
         self.img_norm = self.MODELS["_default"]["params"]["img_norm"]
         IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
@@ -135,8 +134,6 @@ class FaceNet:
         self._tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
 
         self.facenet = self.sess.graph
-        output_tensor = self.facenet.get_tensor_by_name(self.output_name)
-        self.predict_fn = lambda img: self.sess.run(output_tensor, feed_dict=self._make_feed_dict(img)).reshape(1, -1)
 
         try:
             if input_shape is not None:
@@ -194,7 +191,6 @@ class FaceNet:
         # needed to fix https://stackoverflow.com/questions/58756919/python-tensorrt-cudnn-status-mapping-error-error
 
         self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
-        self.predict_fn = lambda img: self.facenet.inference(np.expand_dims(img, axis=0), output_shape=(1, -1))
 
         self.img_norm = self.MODELS["_default"]["params"]["img_norm"]
         IMG_CONSTANTS["img_size"] = tuple(reversed(self.facenet.input_shape))[:-1]
@@ -349,6 +345,22 @@ class FaceNet:
             feed_dict[tensor] = value
         return feed_dict
 
+    @print_time("Embedding time")
+    def embed(self, img):
+        """Embeds cropped face
+
+        :param img: img as a cropped face with shape (h, w, 3)
+
+        """
+
+        if self.MODE == "keras":
+            return self.facenet.predict(np.expand_dims(img, axis=0)).reshape(1, -1)
+        elif self.MODE == "tf-trt":
+            output_tensor = self.facenet.get_tensor_by_name(self.output_name)
+            return self.sess.run(output_tensor, feed_dict=self._make_feed_dict(img)).reshape(1, -1)
+        elif self.MODE == "trt":
+            return self.facenet.inference(np.expand_dims(img, axis=0), output_shape=(1, -1))
+
     def predict(self, path_or_img, face_detector="mtcnn", margin=IMG_CONSTANTS["margin"]):
         """Embeds and normalizes an image from path or array
 
@@ -365,14 +377,13 @@ class FaceNet:
 
         normalized_face = normalize(cropped_face, mode=self.img_norm)
 
-        raw_embedding = self.predict_fn(normalized_face)
+        raw_embedding = self.embed(normalized_face)
         normalized_embedding = self.dist_metric(raw_embedding)
 
         return normalized_embedding, face_coords
 
 
     # FACIAL RECOGNITION HELPER
-    @timer(message="Detection and recognition time")
     def recognize(self, img, **kwargs):
         """Facial recognition
 
@@ -462,15 +473,14 @@ class FaceNet:
         missed_frames = 0
         frames = 0
 
-        last_gpu_checkup = time.time()
+        last_gpu_checkup = timer()
 
         # CAM LOOP
         while True:
             _, frame = cap.read()
             original_frame = frame.copy()
 
-            if socket is not None and (frames - missed_frames) % 100 == 0:
-                print(frames - missed_frames)
+            if socket and frames - missed_frames % 100 == 0:
                 socket.send(str(frames - missed_frames))
 
             if resize:
@@ -664,16 +674,16 @@ class FaceNet:
 
         next_check = log.THRESHOLDS["missed_frames"]
 
-        if frames == 0 or time.time() - last_gpu_checkup > next_check:
+        if frames == 0 or timer() - last_gpu_checkup > next_check:
             self.predict_fn(cv2.resize(frame, IMG_CONSTANTS["img_size"]))
             print("Regular computation check")
 
-            last_gpu_checkup = time.time()
+            last_gpu_checkup = timer()
 
             if use_lcd:
                 lcd.LCD_DEVICE.clear()
 
-        elif not (time.time() - log.LAST_LOGGED > next_check or time.time() - log.UNK_LAST_LOGGED > next_check):
-            last_gpu_checkup = time.time()
+        elif not (timer() - log.LAST_LOGGED > next_check or timer() - log.UNK_LAST_LOGGED > next_check):
+            last_gpu_checkup = timer()
 
         return last_gpu_checkup
