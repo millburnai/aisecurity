@@ -393,10 +393,12 @@ class FaceNet:
 
         """
 
-        exit_failure = itertools.repeat(-1, 5)
+        exit_failure = itertools.repeat(-1, 6)
 
         try:
             assert self._db, "data must be provided"
+
+            start = timer()
 
             embedding, face = self.predict(img, **kwargs)
             if face == -1:  # no face detected
@@ -408,7 +410,9 @@ class FaceNet:
             dist = self.dist_metric(embedding, best_embed, mode="calc+norm", ignore=self.ignore)
             is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
-            return embedding, is_recognized, best_match, dist, face
+            elapsed = round(timer() - start, 4)
+
+            return embedding, is_recognized, best_match, dist, face, elapsed
 
         except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
             if "query data dimension" in str(error):
@@ -490,14 +494,14 @@ class FaceNet:
                 last_gpu_checkup = self.keep_gpu_warm(frame, frames, last_gpu_checkup, use_lcd)
 
             # facial detection and recognition
-            embedding, is_recognized, best_match, dist, face = self.recognize(frame, face_detector=face_detector)
+            embedding, is_recognized, best_match, dist, face, elapsed = self.recognize(frame, face_detector=face_detector)
 
             if face != -1:
                 print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
 
                 # add graphics, lcd, and log
                 if use_graphics:
-                    add_graphics(original_frame, face, width, height, is_recognized, best_match, resize)
+                    add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
 
                 if use_lcd and is_recognized:
                     lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
