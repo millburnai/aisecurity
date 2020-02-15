@@ -675,7 +675,7 @@ class FaceNet:
         next_check = log.THRESHOLDS["missed_frames"]
 
         if frames == 0 or timer() - last_gpu_checkup > next_check:
-            self.predict_fn(cv2.resize(frame, IMG_CONSTANTS["img_size"]))
+            self.embed(cv2.resize(frame, IMG_CONSTANTS["img_size"]))
             print("Regular computation check")
 
             last_gpu_checkup = timer()
