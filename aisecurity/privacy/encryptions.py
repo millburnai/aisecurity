@@ -69,7 +69,7 @@ def get_nonce(key_file, position):
 
 # ENCRYPT AND DECRYPT
 def encrypt(data, cipher):
-    cipher_text, tag = cipher.encrypt_and_digest(data)
+    cipher_text, __ = cipher.encrypt_and_digest(data)
     return cipher_text
 
 

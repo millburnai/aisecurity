@@ -8,7 +8,7 @@ LCD utils.
 
 import concurrent.futures
 import functools
-from timeit import default_timer as timer
+import time
 import warnings
 
 from keras import backend as K
@@ -34,8 +34,8 @@ except (NotImplementedError, ModuleNotFoundError, ValueError):
     warnings.warn("LCD not found")
 
 try:
-    i2c = busio.I2C(board.SCL, board.SDA)
-    i2c.scan()
+    I2C = busio.I2C(board.SCL, board.SDA)
+    I2C.scan()
 except (RuntimeError, NameError) as error:
     if isinstance(error, RuntimeError):
         raise RuntimeError("Wire configuration incorrect")
@@ -75,11 +75,11 @@ def init():
 class LCD:
 
     def __init__(self, mode="physical"):
-        assert mode == "physical" or mode == "dev", "supported modes are physical (physical LCD) and dev (testing)"
+        assert mode in ("physical", "dev"), "supported modes are physical (physical LCD) and dev (testing)"
         self._lcd = None
 
         try:
-            self._lcd = character_lcd(i2c, 16, 2, backlight_inverted=False)
+            self._lcd = character_lcd(I2C, 16, 2, backlight_inverted=False)
             self.mode = "physical"
             assert self.mode == mode  # making sure that physical doesn't override user choice
         except (NameError, AssertionError):
@@ -218,17 +218,17 @@ def add_lcd_display(best_match, use_server):
             data = request.json()
 
             if data["accept"]:
-                LCD_DEVICE.set_message("ID Accepted\n{}".format(best_match), color="green")
+                LCD_DEVICE.set_message("ID Accepted\n{}".format(best_match), backlight="green")
             elif "visitor" in best_match.lower():
-                LCD_DEVICE.set_message("Welcome to MHS,\n{}".format(best_match), color="violet")
+                LCD_DEVICE.set_message("Welcome to MHS,\n{}".format(best_match), backlight="violet")
             else:
-                LCD_DEVICE.set_message("No Senior Priv\n{}".format(best_match), color="red")
+                LCD_DEVICE.set_message("No Senior Priv\n{}".format(best_match), backlight="red")
 
         else:
             if "visitor" in best_match.lower():
-                LCD_DEVICE.set_message("Welcome to MHS,\n{}".format(best_match), color="violet")
+                LCD_DEVICE.set_message("Welcome to MHS,\n{}".format(best_match), backlight="violet")
             else:
-                LCD_DEVICE.set_message("[Server Error]\n{}".format(best_match), color="green")
+                LCD_DEVICE.set_message("[Server Error]\n{}".format(best_match), backlight="green")
 
 
 # PROGRESS BAR DECORATOR

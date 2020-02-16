@@ -8,10 +8,10 @@ Data utils.
 
 import json
 import os
-import tqdm
 import warnings
 
 import numpy as np
+import tqdm
 
 from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.utils.events import print_time, in_dev
@@ -84,72 +84,3 @@ def retrieve_embeds(path=DATABASE, encrypted=DATABASE_INFO["encrypted"], name_ke
         ignore.remove(item)
 
     return DataEncryption.decrypt_data(data, ignore=ignore, name_keys=name_keys, embedding_keys=embedding_keys)
-
-
-# EMBEDDING PROCESSING (DEV!)
-
-# EMBED PROCESSING FUNCS
-@in_dev()
-def subtract_mean(data, **kwargs):
-    mean = np.mean(list(data.values()), **kwargs)
-    return {person: (embedding - mean).tolist() for person, embedding in data.items()}
-
-# ... maybe add more?
-@in_dev()
-def faux_concatenate_flip(data, **kwargs):
-    # NOTE: this function doesn't actually concat flipped and non-flipped, just concats the same embeddings twice
-    # in order to maintain dimensionality
-    return {person: np.concatenate([embedding, embedding]).tolist() for person, embedding in data.items()}
-
-
-# IMPLEMENTS ABOVE FOR DUMP SUPPORT
-@in_dev()
-def process_embeds(data, func, data_dump_path, config, config_dump_path, data_dump_mode="w+", config_dump_mode="w+",
-                   **kwargs):
-    if data_dump_path:
-        with open(data_dump_path, data_dump_mode) as data_file:
-            json.dump(func(data, **kwargs), data_file, indent=4, ensure_ascii=False)
-
-    if config_dump_mode:
-        with open(config_dump_path, config_dump_mode) as config_file:
-            norm_id = func.__name__
-            if norm_id not in DistMetric.NORMALIZATIONS:
-                warnings.warn("{} an unrecognized normalization, not adding to config".format(norm_id))
-            else:
-                config["metric"] += "+{}".format(func.__name__)
-
-            json.dump(config, config_file, indent=4)
-
-
-if __name__ == "__main__":
-    process_embeds(
-        retrieve_embeds(path="/home/ryan/.aisecurity/database/embeddings_subtracted_mean.json", encrypted=""),
-        faux_concatenate_flip,
-        "/home/ryan/.aisecurity/database/embeddings_subtracted_mean_flipped.json",
-        DATABASE_INFO,
-        "/home/ryan/.aisecurity/database/embeddings_subtracted_mean_flipped_info.json"
-    )
-
-    # import editdistance
-    #
-    # data = retrieve_embeds("/home/ryan/.aisecurity/database/embeddings.json", encrypted=["names"],
-    #                        name_keys="/home/ryan/.aisecurity/keys/name_keys.txt",
-    #                        embedding_keys="/home/ryan/.aisecurity/keys/embedding_keys.txt")
-    #
-    # with open("/home/ryan/scratchpad/aisecurity/people.txt", "r") as file:
-    #     aisecurity_students = file.readlines()
-    #
-    # filtered_data = {}
-    # for student in aisecurity_students:
-    #     closest_match, __ = min(
-    #         [(person, editdistance.eval(student, person)) for person in data.keys()],
-    #         key=lambda t: t[1]
-    #     )
-    #     filtered_data[student.strip("\n")] = data[closest_match]
-    #
-    # filtered_data["ryan_park"] = data["ryan_park"]
-    # filtered_data["liam_pilarski"] = data["liam_pilarski"]
-    #
-    # encrypted_data = DataEncryption.encrypt_data(filtered_data, ignore=["embeddings"])
-    # with open("/home/ryan/.aisecurity/database/test.json", "w") as file:
-    #     json.dump(encrypted_data, file, indent=4, ensure_ascii=False)

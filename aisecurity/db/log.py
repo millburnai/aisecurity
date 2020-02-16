@@ -13,7 +13,6 @@ import warnings
 
 import mysql.connector
 import pyrebase
-from pyrebase import *
 import requests
 from termcolor import cprint
 
@@ -189,11 +188,9 @@ def log_person(logging, student_name, times):
         student_id = get_id(student_name)
         student_name = student_name.replace("_", " ").title()
         # TODO: log {*now: student_id, student_name} in django db
-            # DJANGO: s = StudentLog(student_id=student_id, name=student_name, time=datetime.datetime.now()) 
+            # DJANGO: s = StudentLog(student_id=student_id, name=student_name, time=datetime.datetime.now())
             #         s.save()
             # from models.py; import studentlog, datetime
-        
-        pass
 
     flush_current(mode="known")
 

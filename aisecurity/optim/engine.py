@@ -23,13 +23,13 @@ INIT_SUCCESS = True
 try:
     import pycuda.autoinit
     import pycuda.driver as cuda
-except Exception as e:  # don't know which exception
+except (ModuleNotFoundError, ImportError) as e:  # don't know which exception
     warnings.warn("cannot import pycuda.autoinit or pycuda.driver: '{}'".format(e))
     INIT_SUCCESS = False
 
 try:
     import tensorrt as trt
-except Exception as e:  # don't know which exception
+except (ModuleNotFoundError, ImportError) as e:  # don't know which exception
     warnings.warn("cannot import tensorrt: '{}'".format(e))
     INIT_SUCCESS = False
 
