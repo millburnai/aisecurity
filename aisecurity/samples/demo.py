@@ -13,7 +13,7 @@ from aisecurity.facenet import FaceNet
 from aisecurity.utils.paths import DEFAULT_MODEL
 
 
-def demo(path=None, dist_metric="auto", logging=None, use_dynamic=True, use_picam=False, use_graphics=True,
+def demo(path=DEFAULT_MODEL, dist_metric="auto", logging=None, use_dynamic=True, use_picam=False, use_graphics=True,
          use_lcd=False, use_keypad=False, resize=None, flip=0, device=0, face_detector="mtcnn", update_static=False,
          allow_gpu_growth=False):
 
@@ -24,7 +24,7 @@ def demo(path=None, dist_metric="auto", logging=None, use_dynamic=True, use_pica
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
 
-    facenet = FaceNet(path if path else DEFAULT_MODEL)
+    facenet = FaceNet(path)
 
     input("\nPress ENTER to continue:")
 
