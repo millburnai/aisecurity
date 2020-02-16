@@ -18,7 +18,6 @@ import warnings
 import cv2
 import keras
 from keras import backend as K
-import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
@@ -27,7 +26,6 @@ from termcolor import cprint
 from aisecurity.dataflow.data import retrieve_embeds
 from aisecurity.db import log
 from aisecurity.optim import engine
-from aisecurity.privacy.encryptions import DataEncryption
 from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.events import print_time, run_async_method
@@ -197,7 +195,8 @@ class FaceNet:
 
 
     # MUTATORS
-    def _screen_data(self, key, value):
+    @staticmethod
+    def _screen_data(key, value):
         """Checks if key-value pair is valid for data dict
 
         :param key: new key
@@ -563,7 +562,7 @@ class FaceNet:
         assert not logging or logging == "mysql" or logging == "firebase", "only mysql and firebase logging supported"
         assert 0 < framerate <= 120, "framerate must be between 0 and 120"
         assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
-        assert face_detector == "mtcnn" or face_detector == "haarcascade", "only mtcnn and haarcascade supported"
+        assert face_detector in ("mtcnn", "haarcascade"), "only mtcnn and haarcascade supported"
 
         run_async_method(
             self._real_time_recognize,
@@ -572,44 +571,6 @@ class FaceNet:
             resize=resize, flip=flip, device=device, face_detector=face_detector, update_static=update_static,
             socket=socket,
         )
-
-
-    # DISPLAY
-    def show_embeds(self, encrypted=False, single=False):
-        """Shows self.data in visual form
-
-        :param encrypted: encrypt data keys (names) before displaying (default: False)
-        :param single: show only a single name/embedding pair (default: False)
-
-        """
-
-        assert self.data, "data must be provided to show embeddings"
-
-        def closest_multiples(n):
-            if n == 0 or n == 1:
-                return n, n
-            factors = [((i, int(n / i)), (abs(i - int(n / i)))) for i in range(1, n) if n % i == 0]
-            return sorted(factors, key=lambda n: n[1])[0][0]
-
-        if encrypted:
-            data = DataEncryption.encrypt_data(self.data, ignore=["embeddings"], decryptable=False)
-        else:
-            data = self.data
-
-        for person in data:
-            embed = np.asarray(data[person])
-            embed = embed.reshape(*closest_multiples(embed.shape[0]))
-
-            plt.imshow(embed, cmap="gray")
-            try:
-                plt.title(person)
-            except TypeError:
-                warnings.warn("encrypted name cannot be displayed due to presence of non-UTF8-decodable values")
-            plt.axis("off")
-            plt.show()
-
-            if single and person == list(data.keys())[0]:
-                break
 
 
     # LOGGING

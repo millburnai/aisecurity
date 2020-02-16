@@ -62,7 +62,7 @@ if __name__ == "__main__":
     # ARG PARSE
     parser = argparse.ArgumentParser()
     parser.add_argument("--path_to_model", help="path to facenet model (default: ~/.aisecurity/models/ms_celeb_1m.h5)",
-                        type=str, default=None)
+                        type=str, default=DEFAULT_MODEL)
     parser.add_argument("--dist_metric", help="distance metric (default: auto)", type=str, default="auto")
     parser.add_argument("--logging", help="logging type, mysql or firebase (default: None)", type=none_or_str,
                         default=None)

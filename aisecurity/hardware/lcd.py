@@ -126,6 +126,9 @@ class LCD:
             # set backlight if supported
             display_dict[backlight]()
 
+    def clear(self):
+        self._lcd.clear()
+
 
     # RETRIEVERS
     @property
@@ -147,6 +150,9 @@ class LCDSimulation:
         if key == "message" and value:
             cprint(value, attrs=["bold"])
         super(LCDSimulation, self).__setattr__(key, value)
+
+    def clear(self):
+        self.message = "[Message cleared]"
 
 
 # LCD PROGRESS BAR
