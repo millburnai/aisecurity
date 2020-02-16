@@ -471,8 +471,8 @@ class FaceNet:
         cap = get_video_cap(width, height, picamera=use_picam, framerate=framerate, flip=flip, device=device)
         assert cap.isOpened(), "video capture failed to initialize"
 
-        detector_init(min_face_size=int(0.5 * (face_width + face_height) / 3))
-        # face needs to fill at least 1/3 of the frame
+        detector_init(min_face_size=int(0.5 * (face_width + face_height) / 2))
+        # face needs to fill at least ~1/2 of the frame
 
         missed_frames = 0
         frames = 0

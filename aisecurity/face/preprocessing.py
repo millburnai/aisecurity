@@ -61,7 +61,7 @@ def crop_face(path_or_img, margin, face_detector="mtcnn", alpha=0.9):
         img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
 
     else:
-        face = {"box": list(itertools.repeat(-1, 4)), "keypoints": {}, "confidence": 1.0}
+        face = {"box": list(itertools.repeat(-1, 4)), "keypoints": {}, "confidence": 0.0}
 
     resized = cv2.resize(img, IMG_CONSTANTS["img_size"])
     return resized, face
