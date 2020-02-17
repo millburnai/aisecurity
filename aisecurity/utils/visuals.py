@@ -7,6 +7,7 @@ Graphics utils.
 """
 
 import cv2
+import numpy as np
 
 from aisecurity.face.preprocessing import IMG_CONSTANTS
 
@@ -103,10 +104,12 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
         cv2.line(overlay, features["mouth_right"], features["nose"], color, radius)
 
     def add_fps(frame, elapsed, font_size, thickness):
+        x, y = 10, 20
         text = "FPS: {}".format(round(1. / elapsed, 2))
         font = cv2.FONT_HERSHEY_DUPLEX
+        color = cv2.bitwise_not(np.mean(frame[:x, :y], axis=(0, 1), dtype=np.uint8)).flatten().tolist()
 
-        cv2.putText(frame, text, (10, 20), font, font_size, (0, 0, 0), thickness)
+        cv2.putText(frame, text, (x, y), font, font_size, color, thickness)
 
     features = person["keypoints"]
     x, y, height, width = person["box"]
