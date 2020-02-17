@@ -107,7 +107,7 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
         x, y = 10, 20
         text = "FPS: {}".format(round(1. / elapsed, 2))
         font = cv2.FONT_HERSHEY_DUPLEX
-        color = cv2.bitwise_not(np.mean(frame[:x, :y], axis=(0, 1), dtype=np.uint8)).flatten().tolist()
+        color = (255. - np.mean(frame[:x, :y], axis=(0, 1))).flatten().tolist()
 
         cv2.putText(frame, text, (x, y), font, font_size, color, thickness)
 
