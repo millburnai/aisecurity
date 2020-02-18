@@ -166,7 +166,7 @@ class DistMetric:
         if mode == "norm":
             if len(args) == 1:
                 arg = args[0]
-                arg = arg.reshape(np.array(arg).shape if np.array(arg).shape != () else (-1, 1))
+                arg = np.array(arg).reshape(np.array(arg).shape if np.array(arg).shape != () else (-1, 1))
 
                 normalized = self.apply_norms(arg)
 
@@ -303,5 +303,5 @@ if __name__ == "__main__":
         for metric in differences:
             if differences[metric] != 0.:
                 print("Error - {}: difference of {}".format(metric, np.round(differences[metric], 5)))
-        else:
-            print("Test {} finished without error ({}s)".format(trial_num + 1, round(timer() - start, 5)))
+            else:
+                print("Test {} finished without error ({}s)".format(trial_num + 1, round(timer() - start, 5)))
