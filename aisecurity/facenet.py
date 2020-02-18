@@ -23,7 +23,7 @@ from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
 
-from aisecurity.dataflow.data import retrieve_embeds
+from aisecurity.dataflow.data import retrieve_embeds, dump_and_encrypt
 from aisecurity.db import log
 from aisecurity.optim import engine
 from aisecurity.hardware import keypad, lcd
@@ -224,13 +224,14 @@ class FaceNet:
 
         person, embeddings = self._screen_data(person, embeddings)
 
-        if person in self.data:
-            self._db[person].append(np.array(embeddings).flatten())
-        else:
-            self._db[person] = [np.array(embeddings).flatten()]
+        self._db[person] = np.array(embeddings)
 
         if train_knn:
             self._train_knn()
+
+        # for this person, delete his oldest embedding if ther are >10 embeddings for him
+        if len(self.data[person]) > 2:
+            self._db[person] = self._db[person][1:]
 
     def set_data(self, data, config=None):
         """Sets data property
@@ -428,7 +429,7 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
-                                   use_lcd, use_keypad, framerate, resize, flip, device, face_detector, update_static,
+                                   use_lcd, use_keypad, framerate, resize, flip, device, face_detector, data_mutability,
                                    socket):
         """Real-time facial recognition under the hood (dev use only)
 
@@ -446,7 +447,7 @@ class FaceNet:
         :param flip: flip method: +1 = +90º rotation
         :param device: camera device (/dev/video{device})
         :param face_detector: face detector type ("mtcnn" or "haarcascade")
-        :param update_static: update static database on prompt or not (-dev-)
+        :param data_mutability: level on which static data is mutable (0, 1, or 2)
         :param socket: in dev
         :returns: number of frames elapsed
 
@@ -507,7 +508,7 @@ class FaceNet:
 
 
                 if frames > 5:  # five frames before logging starts
-                    self.log_activity(logging, is_recognized, best_match, embedding, use_dynamic, update_static)
+                    self.log_activity(logging, is_recognized, best_match, embedding, use_dynamic, data_mutability)
                     log.DISTS.append(dist)
 
             else:
@@ -529,13 +530,16 @@ class FaceNet:
         cap.release()
         cv2.destroyAllWindows()
 
+        if data_mutability == 2:
+            dump_and_encrypt(self.data, DATABASE, encrypt=DATABASE_INFO["encrypted"])
+
         return frames
 
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
                             use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
-                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", update_static=False,
+                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=0,
                             socket=None):
         """Real-time facial recognition
 
@@ -553,7 +557,10 @@ class FaceNet:
         :param flip: flip method: +1 = +90º rotation (default: 0)
         :param device: camera device (/dev/video{device}) (default: 0)
         :param face_detector: face detector type ("mtcnn" or "haarcascade") (default: "mtcnn")
-        :param update_static: update static database or not (default: False)
+        :param data_mutability: level of data mutability (0-2) (default: 0)
+                                0: No data mutability
+                                1: Prompt for verification on recognition and update database
+                                2: Write updated data at end of real_time_recognize
         :param socket: in dev
 
         """
@@ -568,13 +575,13 @@ class FaceNet:
             self._real_time_recognize,
             width=width, height=height, dist_metric=dist_metric, logging=logging, use_dynamic=use_dynamic,
             use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd, use_keypad=use_keypad, framerate=framerate,
-            resize=resize, flip=flip, device=device, face_detector=face_detector, update_static=update_static,
+            resize=resize, flip=flip, device=device, face_detector=face_detector, data_mutability=data_mutability,
             socket=socket,
         )
 
 
     # LOGGING
-    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, update_static):
+    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, data_mutability):
         """Logs facial recognition activity
 
         :param logging: logging type-- None, "firebase", or "mysql"
@@ -583,7 +590,7 @@ class FaceNet:
         :param mode: logging type: "firebase" or "mysql"
         :param embedding: embedding vector
         :param use_dynamic: use dynamic database or not
-        :param update_static: update static database or not
+        :param data_mutability: level of static data mutability
 
         """
 
@@ -608,21 +615,20 @@ class FaceNet:
 
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
-        if update_static and (update_recognized or update_unrecognized):
+        if data_mutability and (update_recognized or update_unrecognized):
             is_correct = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
+            # TODO: replace with input from keyboard
 
             if len(is_correct) == 0 or is_correct[0] == "y":
                 self.update_data(best_match, embedding)
-
             else:
                 name = input("Who are you? ").lower().replace(" ", "_")
 
                 if name in self.data:
                     self.update_data(name, embedding)
+                    cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
                 else:
                     cprint("'{}' is not in database".format(name), attrs=["bold"])
-
-                cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
 
 
     # COMPUTATION CHECK
@@ -640,7 +646,7 @@ class FaceNet:
         next_check = log.THRESHOLDS["missed_frames"]
 
         if frames == 0 or timer() - last_gpu_checkup > next_check:
-            self.embed(cv2.resize(frame, IMG_CONSTANTS["img_size"]))
+            self.embed(normalize(cv2.resize(frame, IMG_CONSTANTS["img_size"]), mode=self.img_norm))
             print("Regular computation check")
 
             last_gpu_checkup = timer()
