@@ -293,9 +293,9 @@ class FaceNet:
             self.expanded_embeds = []
 
             for name, embeddings in self.data.items():
-                for idx, embedding in enumerate(embeddings):
+                for embed in embeddings:
                     self.expanded_names.append(name)
-                    self.expanded_embeds.append(embedding)
+                    self.expanded_embeds.append(embed)
 
             # always use minkowski distance, other metrics are just normalizing before minkowski to act
             # as the desired metric (ex: cosine)
