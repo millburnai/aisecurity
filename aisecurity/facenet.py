@@ -223,15 +223,15 @@ class FaceNet:
         """
 
         person, embeddings = self._screen_data(person, embeddings)
+        embeddings = [np.array(embed).reshape(-1, ) for embed in embeddings]
 
-        self._db[person] = np.array(embeddings)
+        if person in self.data:
+            self._db[person].extend(embeddings)
+        else:
+            self._db[person] = embeddings
 
         if train_knn:
             self._train_knn()
-
-        # for this person, delete his oldest embedding if ther are >10 embeddings for him
-        if len(self.data[person]) > 2:
-            self._db[person] = self._db[person][1:]
 
     def set_data(self, data, config=None):
         """Sets data property
@@ -611,7 +611,7 @@ class FaceNet:
 
             if use_dynamic:
                 visitor_num = len([person for person in self._db if "visitor" in person]) + 1
-                self.update_data("visitor_{}".format(visitor_num), embedding)
+                self.update_data("visitor_{}".format(visitor_num), [embedding])
 
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
@@ -620,12 +620,12 @@ class FaceNet:
             # TODO: replace with input from keyboard
 
             if len(is_correct) == 0 or is_correct[0] == "y":
-                self.update_data(best_match, embedding)
+                self.update_data(best_match, [embedding])
             else:
                 name = input("Who are you? ").lower().replace(" ", "_")
 
                 if name in self.data:
-                    self.update_data(name, embedding)
+                    self.update_data(name, [embedding])
                     cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
                 else:
                     cprint("'{}' is not in database".format(name), attrs=["bold"])
