@@ -11,7 +11,7 @@ import itertools
 import cv2
 import numpy as np
 
-from aisecurity.face.detection import FACE_DETECTORS, detect_faces, detector_init
+from aisecurity.face.detection import detect_faces
 from aisecurity.utils.events import print_time
 
 
@@ -43,9 +43,6 @@ def crop_face(path_or_img, margin, face_detector="mtcnn", alpha=0.9):
         img = cv2.imread(path_or_img).astype(np.uint8)
     except (SystemError, TypeError):  # if img is actually image
         img = path_or_img.astype(np.uint8)
-
-    if not FACE_DETECTORS["mtcnn"] and not FACE_DETECTORS["haarcascade"]:
-        detector_init()
 
     if face_detector:
         result = detect_faces(img, mode=face_detector)

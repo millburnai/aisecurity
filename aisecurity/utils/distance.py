@@ -205,8 +205,7 @@ class DistMetric:
             raise ValueError("supported modes are 'calc', 'norm', and 'calc+norm'")
 
     def __str__(self):
-        result = "Distance ("
-        result += self.dist
+        result = "Distance ({}".format(self.dist)
         for norm_id in self.normalizations:
             result += "+{}".format(norm_id)
         result += ")"
@@ -282,7 +281,6 @@ if __name__ == "__main__":
             DistMetric.NORMALIZATIONS["l2_normalize"]["func"](second_test) - np.mean(data)
         ])
         differences[dist_metric.get_config() + "+{recursive}"] = np.sum(np.sum(true_value) - np.sum(result))
-
 
         dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean+sigmoid", data=data)
         result = dist_metric(test, second_test, mode="calc+norm")
