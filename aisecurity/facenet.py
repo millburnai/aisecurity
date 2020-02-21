@@ -521,8 +521,8 @@ class FaceNet:
             if use_graphics:
                 cv2.imshow("AI Security v0.9a", original_frame)
 
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
 
             frames += 1
             await asyncio.sleep(1e-6)
