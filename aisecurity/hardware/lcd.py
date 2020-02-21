@@ -165,17 +165,14 @@ class LCDProgressBar:
         self.marker = marker
         self.progress = 0
 
-        self.is_on = False
-
-    def display_off(self, msg=""):
-        self.lcd.set_message(msg)
-        self.is_on = False
-        self.flush(previous_msg=msg)
+    def reset(self, previous_msg=None):
+        self.progress = 0.
+        if previous_msg:
+            self.lcd.set_message("{}\n[{}]".format(previous_msg, " " * self.bar_length))
+        else:
+            self.lcd.set_message("[{}]".format(" " * self.bar_length))
 
     def _update(self, percent, previous_msg=None):
-        if not self.is_on:
-            self.is_on = True
-
         self.progress += percent
 
         done = self.marker * round(self.progress * self.bar_length)
@@ -186,30 +183,25 @@ class LCDProgressBar:
         else:
             self.lcd.set_message("[{}{}]".format(done, left))
 
-        self.is_on = True
-
         if self.progress >= 1. or self.progress < 0.:
             self.progress = 0.
 
     def update(self, amt=1, previous_msg=None):
+        if amt < 0 or amt > self.total:
+            amt = self.total
         self._update(amt / self.total, previous_msg)
 
-    def flush(self, previous_msg=None):
-        if previous_msg:
-            self.lcd.set_message("{}\n[{}]".format(previous_msg, " " * self.bar_length))
-        else:
-            self.lcd.set_message("[{}]".format(" " * self.bar_length))
 
 
 ################################ FUNCTIONS AND DECORATORS ################################
 
 # ADD DISPLAY
-def add_lcd_display(best_match, use_server):
+def on_recognized(best_match, use_server):
     global LCD_DEVICE, PROGRESS_BAR
 
     if LCD_DEVICE and PROGRESS_BAR:
         LCD_DEVICE.clear()
-        PROGRESS_BAR.display_off()
+        PROGRESS_BAR.reset()
 
         best_match = best_match.replace("_", " ").title()
 
