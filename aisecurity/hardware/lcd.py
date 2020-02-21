@@ -82,7 +82,7 @@ class LCD:
             self._lcd = character_lcd(I2C, 16, 2, backlight_inverted=False)
             self.mode = "physical"
             assert self.mode == mode  # making sure that physical doesn't override user choice
-        except (NameError, AssertionError):
+        except (ValueError, NameError, AssertionError):
             self._lcd = LCDSimulation()
             self.mode = "dev"
 
