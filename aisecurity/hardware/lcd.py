@@ -152,7 +152,7 @@ class LCDSimulation:
         super(LCDSimulation, self).__setattr__(key, value)
 
     def clear(self):
-        self.message = "[Message cleared]"
+        self.message = "<Message cleared>"
 
 
 # LCD PROGRESS BAR

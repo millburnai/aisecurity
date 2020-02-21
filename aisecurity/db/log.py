@@ -138,6 +138,8 @@ def get_percent_diff(item, log):
 def update_current_logs(is_recognized, best_match):
     global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN
 
+    update_progress = False
+
     if len(DISTS) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
         flush_current(mode="unknown+known")
 
@@ -152,11 +154,15 @@ def update_current_logs(is_recognized, best_match):
         if len(CURRENT_LOG[best_match]) == 1 or get_percent_diff(best_match, CURRENT_LOG) <= THRESHOLDS["percent_diff"]:
             NUM_RECOGNIZED += 1
             NUM_UNKNOWN = 0
+            update_progress = True
 
     else:
         NUM_UNKNOWN += 1
         if NUM_UNKNOWN >= THRESHOLDS["num_unknown"]:
             NUM_RECOGNIZED = 0
+
+    return update_progress
+
 
 def cooldown_ok(t):
     return timer() - t > THRESHOLDS["cooldown"]

@@ -474,7 +474,7 @@ class FaceNet:
         detector_init(min_face_size=int(0.5 * (face_width + face_height) / 2))
         # face needs to fill at least ~1/2 of the frame
 
-        missed_frames = 0
+        absent_frames = 0
         frames = 0
 
         last_gpu_checkup = timer()
@@ -484,8 +484,8 @@ class FaceNet:
             _, frame = cap.read()
             original_frame = frame.copy()
 
-            if socket and frames - missed_frames % 100 == 0:
-                socket.send(str(frames - missed_frames))
+            if socket and frames - absent_frames % 100 == 0:
+                socket.send(str(frames - absent_frames))
 
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
@@ -499,22 +499,18 @@ class FaceNet:
             if face != -1:
                 print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
 
-                # add graphics, lcd, and log
+                # add graphics, lcd, logging
+                self.log_activity(
+                    logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist
+                )
+
                 if use_graphics:
                     add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
 
-                if use_lcd and is_recognized:
-                    lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
-
-
-                if frames > 5:  # five frames before logging starts
-                    self.log_activity(logging, is_recognized, best_match, embedding, use_dynamic, data_mutability)
-                    log.DISTS.append(dist)
-
             else:
-                missed_frames += 1
-                if missed_frames > log.THRESHOLDS["missed_frames"]:
-                    missed_frames = 0
+                absent_frames += 1
+                if absent_frames > log.THRESHOLDS["missed_frames"]:
+                    absent_frames = 0
                     log.flush_current(mode="known+unknown", flush_times=False)
                 print("No face detected")
 
@@ -581,7 +577,7 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, data_mutability):
+    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist):
         """Logs facial recognition activity
 
         :param logging: logging type-- None, "firebase", or "mysql"
@@ -591,13 +587,18 @@ class FaceNet:
         :param embedding: embedding vector
         :param use_dynamic: use dynamic database or not
         :param data_mutability: level of static data mutability
+        :param use_lcd: use lcd or not
+        :param dist: distance between best match and current frame
 
         """
 
-        log.update_current_logs(is_recognized, best_match)
+        update_progress = log.update_current_logs(is_recognized, best_match)
 
         update_recognized = log.NUM_RECOGNIZED >= log.THRESHOLDS["num_recognized"] and log.cooldown_ok(log.LAST_LOGGED)
         update_unrecognized = log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and log.cooldown_ok(log.UNK_LAST_LOGGED)
+
+        if use_lcd and update_progress:
+            lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
         if update_recognized:
             if log.get_percent_diff(best_match, log.CURRENT_LOG) <= log.THRESHOLDS["percent_diff"]:
@@ -629,6 +630,8 @@ class FaceNet:
                     cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
                 else:
                     cprint("'{}' is not in database".format(name), attrs=["bold"])
+
+        log.DISTS.append(dist)
 
 
     # COMPUTATION CHECK
