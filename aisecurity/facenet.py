@@ -592,28 +592,25 @@ class FaceNet:
 
         """
 
-        update_progress = log.update_current_logs(is_recognized, best_match)
-
-        update_recognized = log.NUM_RECOGNIZED >= log.THRESHOLDS["num_recognized"] and log.cooldown_ok(log.LAST_LOGGED)
-        update_unrecognized = log.NUM_UNKNOWN >= log.THRESHOLDS["num_unknown"] and log.cooldown_ok(log.UNK_LAST_LOGGED)
-
-        if use_lcd and update_progress:
-            lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
+        update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
 
         if update_recognized:
-            if log.get_percent_diff(best_match, log.CURRENT_LOG) <= log.THRESHOLDS["percent_diff"]:
-                recognized_person = log.get_mode(log.CURRENT_LOG)
-                log.log_person(logging, recognized_person, times=log.CURRENT_LOG[recognized_person])
+            recognized_person = log.get_mode(log.CURRENT_LOG)
+            log.log_person(logging, recognized_person, times=log.CURRENT_LOG[recognized_person])
 
-                lcd.add_lcd_display(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
+            lcd.on_recognized(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
         elif update_unrecognized:
             log.log_unknown(logging, "<DEPRECATED>")
+
+            if use_lcd:
+                lcd.PROGRESS_BAR.reset(previous_msg="Recognizing...")
 
             if use_dynamic:
                 visitor_num = len([person for person in self._db if "visitor" in person]) + 1
                 self.update_data("visitor_{}".format(visitor_num), [embedding])
 
+                lcd.PROGRESS_BAR.update(amt=np.inf, previous_msg="Visitor {} created".format(visitor_num))
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
         if data_mutability and (update_recognized or update_unrecognized):
@@ -630,6 +627,10 @@ class FaceNet:
                     cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
                 else:
                     cprint("'{}' is not in database".format(name), attrs=["bold"])
+
+        if use_lcd and update_progress:
+            if not 1. / lcd.PROGRESS_BAR.total + lcd.PROGRESS_BAR.progress  >= 1. or update_recognized:
+                lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
         log.DISTS.append(dist)
 

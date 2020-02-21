@@ -142,6 +142,9 @@ def update_current_logs(is_recognized, best_match):
 
     if len(DISTS) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
         flush_current(mode="unknown+known")
+        flushed = True
+    else:
+        flushed = False
 
     if is_recognized:
         now = timer()
@@ -151,24 +154,33 @@ def update_current_logs(is_recognized, best_match):
         else:
             CURRENT_LOG[best_match].append(now)
 
-        if len(CURRENT_LOG[best_match]) == 1 or get_percent_diff(best_match, CURRENT_LOG) <= THRESHOLDS["percent_diff"]:
+        percent_diff_ok = get_percent_diff(best_match, CURRENT_LOG) <= THRESHOLDS["percent_diff"]
+
+        if percent_diff_ok or flushed:
             NUM_RECOGNIZED += 1
             NUM_UNKNOWN = 0
-            update_progress = True
+
+            if percent_diff_ok and not flushed:
+                update_progress = True
 
     else:
         NUM_UNKNOWN += 1
         if NUM_UNKNOWN >= THRESHOLDS["num_unknown"]:
             NUM_RECOGNIZED = 0
 
-    return update_progress
+    update_recognized = NUM_RECOGNIZED >= THRESHOLDS["num_recognized"] and cooldown_ok(LAST_LOGGED) \
+                        and get_percent_diff(best_match, CURRENT_LOG) <= THRESHOLDS["percent_diff"]
+    update_unrecognized = NUM_UNKNOWN >= THRESHOLDS["num_unknown"] and cooldown_ok(UNK_LAST_LOGGED)
+
+    return update_progress, update_recognized, update_unrecognized
 
 
-def cooldown_ok(t):
-    return timer() - t > THRESHOLDS["cooldown"]
+def cooldown_ok(elapsed):
+    return timer() - elapsed > THRESHOLDS["cooldown"]
 
-def get_mode(d):
-    return max(d.keys(), key=lambda key: len(d[key]))
+
+def get_mode(log):
+    return max(log.keys(), key=lambda person: len(log[person]))
 
 
 # LOGGING FUNCTIONS
