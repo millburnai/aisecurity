@@ -594,6 +594,12 @@ class FaceNet:
 
         update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
 
+        if use_lcd and update_progress:
+            if update_recognized:
+                lcd.PROGRESS_BAR.update(amt=np.inf, previous_msg="Recognizing...")
+            elif not 1. / lcd.PROGRESS_BAR.total + lcd.PROGRESS_BAR.progress >= 1.:
+                lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
+
         if update_recognized:
             recognized_person = log.get_mode(log.CURRENT_LOG)
             log.log_person(logging, recognized_person, times=log.CURRENT_LOG[recognized_person])
@@ -627,10 +633,6 @@ class FaceNet:
                     cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
                 else:
                     cprint("'{}' is not in database".format(name), attrs=["bold"])
-
-        if use_lcd and update_progress:
-            if not 1. / lcd.PROGRESS_BAR.total + lcd.PROGRESS_BAR.progress  >= 1. or update_recognized:
-                lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
         log.DISTS.append(dist)
 

@@ -175,6 +175,9 @@ class LCDProgressBar:
     def _update(self, percent, previous_msg=None):
         self.progress += percent
 
+        if self.progress >= 1.:
+            self.progress = 1.
+
         done = self.marker * round(self.progress * self.bar_length)
         left = " " * (self.bar_length - len(done))
 
@@ -183,14 +186,12 @@ class LCDProgressBar:
         else:
             self.lcd.set_message("[{}{}]".format(done, left))
 
-        if self.progress >= 1. or self.progress < 0.:
-            self.progress = 0.
-
     def update(self, amt=1, previous_msg=None):
-        if amt < 0 or amt > self.total:
+        if amt > self.total:
             amt = self.total
+        elif amt < 0:
+            raise ValueError("amt cannot be negative")
         self._update(amt / self.total, previous_msg)
-
 
 
 ################################ FUNCTIONS AND DECORATORS ################################
