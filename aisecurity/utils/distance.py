@@ -169,19 +169,12 @@ class DistMetric:
 
     # "PUBLIC" FUNCTIONS
     def apply_norms(self, *args, dist_norm=True):
-        if len(args) == 1:
-            arg = np.array(args[0])
-            arg = arg.reshape(arg.shape if arg.shape != () else (-1, 1))
-
-            normalized = self._apply_norms(arg)
-
-        else:
-            normalized = [self.apply_norms(arg) for arg in args]
+        normalized = np.array([self._apply_norms(arg) for arg in args])
 
         if dist_norm:
             normalized = self.DISTS[self.dist]["norm"](normalized)
 
-        return np.array(normalized)
+        return normalized if len(normalized) > 1 else normalized[0]
 
     def distance(self, a, b, apply_norms=True, ignore_norms=None):
         if ignore_norms is None:
@@ -237,7 +230,6 @@ if __name__ == "__main__":
         differences = {}
 
         dist_metric = DistMetric("cosine")
-
         tests = [np.random.random(test.shape) for _ in range(100)]
         norm_tests = dist_metric.apply_norms(*tests)
         dists = [(idx, np.linalg.norm(a - b)) for (idx, a), b in zip(enumerate(norm_tests[:-1]), norm_tests[1:])]
