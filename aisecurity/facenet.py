@@ -509,6 +509,11 @@ class FaceNet:
                     log.flush_current(mode="known+unknown", flush_times=False)
                 print("No face detected")
 
+            if use_lcd:
+                lcd_clear = log.THRESHOLDS["missed_frames"] / log.THRESHOLDS["num_recognized"]
+                if log.LAST_LOGGED - timer() > lcd_clear or log.UNK_LAST_LOGGED - timer() > lcd_clear:
+                    lcd.reset()
+
             if use_graphics:
                 cv2.imshow("AI Security v0.9a", original_frame)
 
