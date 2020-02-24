@@ -98,11 +98,9 @@ class DistMetric:
 
     # INITS
     def __init__(self, dist, normalizations=None, data=None, **kwargs):
-        if "+" in dist:
-            # ex: DistMetric("euclidean+subtract_mean+l2_normalize")
+        if "+" in dist:  # ex: DistMetric("euclidean+subtract_mean+l2_normalize")
             self.dist, *self.normalizations = dist.split("+")
-        else:
-            # ex: DistMetric("euclidean", ["subtract_mean", "l2_normalize"])
+        else:  # ex: DistMetric("euclidean", ["subtract_mean", "l2_normalize"])
             self.dist = dist
             self.normalizations = normalizations if normalizations else []
 
@@ -145,7 +143,7 @@ class DistMetric:
 
         return normalized
 
-    def apply_norms(self, arg):
+    def _apply_norms(self, arg):
         normalized = arg
 
         for norm_id in self.normalizations:
@@ -161,49 +159,52 @@ class DistMetric:
         return normalized
 
 
-    # MAGIC FUNCTIONS
-    def __call__(self, *args, mode="norm", ignore=None):
-        if mode == "norm":
-            if len(args) == 1:
-                arg = args[0]
-                arg = np.array(arg).reshape(np.array(arg).shape if np.array(arg).shape != () else (-1, 1))
+    # "PUBLIC" FUNCTIONS
+    def apply_norms(self, *args, dist_norm=True):
+        if len(args) == 1:
+            arg = np.array(args[0])
+            arg = arg.reshape(arg.shape if arg.shape != () else (-1, 1))
 
-                normalized = self.apply_norms(arg)
-
-            else:
-                normalized = [self.__call__(arg) for arg in args]
-
-            dist_normalized = np.array([self.DISTS[self.dist]["norm"](arr) for arr in normalized])
-            return dist_normalized
-
-        elif "calc" in mode:
-            assert len(args) == 2, "'calc' requires two args only, got {} arg(s)".format(len(args))
-
-            if "norm" in mode:
-                args = list(args)
-
-                if ignore is None:
-                    ignore = {}
-
-                # applying norm list arg by arg
-                for idx, arg in enumerate(args):
-                    if idx not in ignore.keys():
-                        args[idx] = self.__call__(args[idx])
-
-                    else:
-                        # applying norms one by one for the 'ignore' arg
-                        for norm_id in self.get_config().split("+")[1:]:  # cfg[0] is 'dist' mode
-                            if norm_id not in ignore[idx]:
-                                args[idx] = self._apply_norm(norm_id, args[idx])
-
-            dist = self.DISTS[self.dist]["calc"](*args)
-            normalized_dist = self.apply_norms(dist)
-
-            return normalized_dist
+            normalized = self._apply_norms(arg)
 
         else:
-            raise ValueError("supported modes are 'calc', 'norm', and 'calc+norm'")
+            normalized = [self.apply_norms(arg) for arg in args]
 
+        if dist_norm:
+            normalized = self.DISTS[self.dist]["norm"](normalized)
+
+        return np.array(normalized)
+
+    def distance(self, a, b, apply_norms=True, ignore_norms=None):
+        if ignore_norms is None:
+            ignore_norms = {}
+
+        args = [a, b]
+
+        if apply_norms:
+            # applying norms arg by arg
+            for idx, arg in enumerate(args):
+                if idx > len(ignore_norms) - 1:
+                    args[idx] = self.apply_norms(args[idx], dist_norm=False)
+
+                else:
+                    # applying norms one by one for the 'ignore' arg
+                    for norm_id in self.get_config().split("+")[1:]:  # cfg[0] is 'dist' mode
+                        if norm_id not in ignore_norms[idx]:
+                            args[idx] = self._apply_norm(norm_id, args[idx])
+
+        dist = self.DISTS[self.dist]["calc"](*args)
+        normalized_dist = self._apply_norms(dist)
+
+        return normalized_dist
+
+
+    # RETRIEVERS
+    def get_config(self):
+        return self.__str__().replace("Distance (", "").replace(")", "")
+
+
+    # MAGIC FUNCTIONS
     def __str__(self):
         result = "Distance ({}".format(self.dist)
         for norm_id in self.normalizations:
@@ -213,11 +214,6 @@ class DistMetric:
 
     def __repr__(self):
         return self.__str__()
-
-
-    # RETRIEVERS
-    def get_config(self):
-        return self.__str__().replace("Distance (", "").replace(")", "")
 
 
 if __name__ == "__main__":

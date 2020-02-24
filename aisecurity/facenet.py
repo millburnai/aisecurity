@@ -278,10 +278,10 @@ class FaceNet:
             raise ValueError("{} not a supported dist metric".format(dist_metric))
 
         # check against data config
-        self.ignore = {0: self.dist_metric.get_config()}
+        self.ignore_norms = [self.dist_metric.get_config()]
 
         if self.cfg_dist_metric != self.dist_metric.get_config():
-            self.ignore[1] = self.cfg_dist_metric
+            self.ignore_norms.append(self.cfg_dist_metric)
 
             warnings.warn("provided DistMetric ({}) is not the same as the data config metric ({}) ".format(
                 self.dist_metric.get_config(), self.cfg_dist_metric))
@@ -378,7 +378,7 @@ class FaceNet:
         normalized_face = normalize(cropped_face, mode=self.img_norm)
 
         raw_embedding = self.embed(normalized_face)
-        normalized_embedding = self.dist_metric(raw_embedding)
+        normalized_embedding = self.dist_metric.apply_norms(raw_embedding)
 
         return normalized_embedding, face_coords
 
@@ -407,7 +407,7 @@ class FaceNet:
             best_match = self._knn.predict(embedding)[0]
             best_embed = self.expanded_embeds[self.expanded_names.index(best_match)]
 
-            dist = self.dist_metric(embedding, best_embed, mode="calc+norm", ignore=self.ignore)
+            dist = self.dist_metric.distance(embedding, best_embed, ignore_norms=self.ignore_norms)
             is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
             elapsed = round(timer() - start, 4)
