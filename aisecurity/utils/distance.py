@@ -7,10 +7,10 @@ Distance metrics for facial recognition.
 """
 
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
+from scipy.spatial.distance import cosine
 
 
-# LAMBDA DICTS
+################################ Lambda dictionaries ###############################
 
 # OFTEN-USED CHECKS
 _CHECKS = {
@@ -33,7 +33,7 @@ _DIST_FORMAT = {
 }
 
 
-# FUNCTIONAL DICT CONSTRUCTORS
+################################ Functional dictionary constructors ###############################
 def _test_format(format, **kwargs):
     checked = kwargs.copy()
 
@@ -53,22 +53,30 @@ def construct_norm(**kwargs):
     return _test_format(_NORM_FORMAT, **kwargs)
 
 
-# DISTMETRIC
+################################ Statistics and linear algebra ###############################
+def svd_whiten(x):
+    # https://stackoverflow.com/questions/6574782/how-to-whiten-matrix-in-pca
+    u, s, vh = np.linalg.svd(x, full_matrices=False)
+    return np.dot(u, vh)
+
+
+################################ DistMetric ###############################
 class DistMetric:
 
     DISTS = {
         # "norm" describes the transformations to be applied before Euclidean distance is calculated
         # "calc" is the actual calculation of distance
         # note: composition of "norm" and np.linalg.norm will produce same K-NN ordering as passing "calc" as metric
-        # into K-NN but will not necessarily output the same distance
+        # into K-NN but will not necessarily output the same distance (hence the 'calc' attr of dist functional dicts)
         "euclidean": construct_dist(
             norm=lambda x: x,
             calc=lambda a, b: np.linalg.norm(a - b)
         ),
         "cosine": construct_dist(
-            # definitely not right... has to be a transformation s.t. x^T x = 1 for all x in a, b
-            norm=lambda x: x / np.sqrt(np.maximum(np.sum(np.square(x), axis=-1, keepdims=True), 1e-6)),
-            calc=lambda a, b: cosine_similarity(a.reshape(1, -1), b.reshape(1, -1))
+            # norm has to be a transformation s.t. x^T x = 1 for all x in a, b
+            # (https://stackoverflow.com/questions/34144632/using-cosine-distance-with-scikit-learn-kneighborsclassifier)
+            norm=lambda x: svd_whiten(x),
+            calc=lambda a, b: cosine(a.flatten(), b.flatten())
         )
     }
 
@@ -217,6 +225,7 @@ class DistMetric:
 
 
 if __name__ == "__main__":
+    # TODO: rewrite as unit test
     from timeit import default_timer as timer
 
     for trial_num, test in enumerate(np.random.random((10, 128, 1))):
@@ -228,58 +237,68 @@ if __name__ == "__main__":
         differences = {}
 
         dist_metric = DistMetric("cosine")
-        norm_test, norm_second_test = dist_metric(test.reshape(-1, 1), second_test.reshape(1, -1), mode="norm")
-        print(DistMetric.NORMALIZATIONS["l2_normalize"]["func"](second_test) - norm_second_test)
-        result = DistMetric("euclidean")(norm_test, norm_second_test, mode="calc")
-        true_value = cosine_similarity(
-            test.reshape(1, -1),
-            second_test.reshape(1, -1)
-        )
-        differences[dist_metric.get_config() + "+calc_with_euclidean"] = np.sum(true_value - result)
+
+        tests = [np.random.random(test.shape) for _ in range(100)]
+        norm_tests = dist_metric.apply_norms(*tests)
+        dists = [(idx, np.linalg.norm(a - b)) for (idx, a), b in zip(enumerate(norm_tests[:-1]), norm_tests[1:])]
+        result = np.array(list(zip(*sorted(dists, key=lambda pair: pair[1])))[0])
+        true_dists = [(idx, cosine(a, b)) for (idx, a), b in zip(enumerate(tests[:-1]), tests[1:])]
+        true_value = np.array(list(zip(*sorted(true_dists, key=lambda pair: pair[1])))[0])
+        differences[dist_metric.get_config() + "+{calc_with_euclidean}"] = np.sum(result - true_value)
+
+        dist_metric = DistMetric("cosine")
+        result = dist_metric.distance(test, second_test)
+        true_value = cosine(test.flatten(), second_test.flatten())
+        differences[dist_metric.get_config() + "+{calc}"] = np.sum(true_value - result)
 
         dist_metric = DistMetric("cosine+subtract_mean", data=data)
-        result = dist_metric(test.reshape(-1, 1), second_test.reshape(1, -1), mode="calc+norm")
-        true_value = cosine_similarity(
-            (test - np.mean(data)).reshape(1, -1),
-            (second_test - np.mean(data)).reshape(1, -1)
-        )
-        differences[dist_metric.get_config()] = np.sum(true_value - result)
+        result = dist_metric.distance(test, second_test, apply_norms=True)
+        true_value = cosine(test - np.mean(data), second_test - np.mean(data))
+        differences[dist_metric.get_config() + "+{calc}"] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+subtract_mean", data=data)
-        result = dist_metric(test)
+        result = dist_metric.apply_norms(test)
         true_value = test - np.mean(data)
         differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+subtract_mean", data=data)
-        result = dist_metric(test, second_test, mode="calc+norm")
+        result = dist_metric.distance(test, second_test)
         true_value = np.linalg.norm(test - np.mean(data) - (second_test - np.mean(data)))
-        differences[dist_metric.get_config()] = np.sum(true_value - result)
+        differences[dist_metric.get_config() + "+{calc}"] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+l2_normalize", data=data)
-        result = dist_metric(test)
+        result = dist_metric.apply_norms(test)
         true_value = DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test)
         differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+subtract_mean+l2_normalize", data=data)
-        result = dist_metric(test)
+        result = dist_metric.apply_norms(test)
         true_value = DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test - np.mean(data))
         differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean", data=data)
-        result = dist_metric(test)
+        result = dist_metric.apply_norms(test)
         true_value = DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data)
         differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean", data=data)
-        result = dist_metric(test, second_test)
+        result = dist_metric.apply_norms(test, second_test)
         true_value = np.array([
             DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data),
             DistMetric.NORMALIZATIONS["l2_normalize"]["func"](second_test) - np.mean(data)
         ])
         differences[dist_metric.get_config() + "+{recursive}"] = np.sum(np.sum(true_value) - np.sum(result))
 
+        dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean", data=data)
+        result = dist_metric.distance(test, second_test)
+        true_value = np.linalg.norm(
+            DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data)
+            - (DistMetric.NORMALIZATIONS["l2_normalize"]["func"](second_test) - np.mean(data))
+        )
+        differences[dist_metric.get_config() + "+{calc}"] = np.sum(true_value - result)
+
         dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean+sigmoid", data=data)
-        result = dist_metric(test, second_test, mode="calc+norm")
+        result = dist_metric.distance(test, second_test)
         true_value = DistMetric.NORMALIZATIONS["sigmoid"]["func"](
             np.linalg.norm(
                 (DistMetric.NORMALIZATIONS["l2_normalize"]["func"](test) - np.mean(data)) -
@@ -289,13 +308,14 @@ if __name__ == "__main__":
         differences[dist_metric.get_config()] = np.sum(true_value - result)
 
         dist_metric = DistMetric("euclidean+l2_normalize+subtract_mean", data=data)
-        result = dist_metric(test, second_test, mode="calc+norm",
-                             ignore={0: "euclidean+l2_normalize+subtract_mean", 1: "euclidean+l2_normalize"})
+        result = dist_metric.distance(
+            test, second_test, ignore_norms=["euclidean+l2_normalize+subtract_mean", "euclidean+l2_normalize"]
+        )
         true_value = np.linalg.norm(test - (second_test - np.mean(data)))
         differences[dist_metric.get_config() + "+ignore"] = np.sum(true_value - result)
 
         for metric in differences:
             if differences[metric] != 0.:
                 print("Error - {}: difference of {}".format(metric, np.round(differences[metric], 5)))
-            else:
-                print("Test {} finished without error ({}s)".format(trial_num + 1, round(timer() - start, 5)))
+
+        print("Test {} finished in {}s".format(trial_num + 1, round(timer() - start, 5)))
