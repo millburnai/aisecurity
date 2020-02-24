@@ -477,8 +477,6 @@ class FaceNet:
         absent_frames = 0
         frames = 0
 
-        last_gpu_checkup = timer()
-
         # CAM LOOP
         while True:
             _, frame = cap.read()
@@ -489,9 +487,6 @@ class FaceNet:
 
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
-
-            if use_picam:
-                last_gpu_checkup = self.keep_gpu_warm(frame, frames, last_gpu_checkup, use_lcd)
 
             # facial detection and recognition
             embedding, is_recognized, best_match, dist, face, elapsed = self.recognize(frame, face_detector=face_detector)
@@ -635,32 +630,3 @@ class FaceNet:
                     cprint("'{}' is not in database".format(name), attrs=["bold"])
 
         log.DISTS.append(dist)
-
-
-    # COMPUTATION CHECK
-    def keep_gpu_warm(self, frame, frames, last_gpu_checkup, use_lcd):
-        """Keeps GPU computations running so that facial recognition speed stays constant. Only needed on Jetson Nano
-
-        :param frame: frame as array
-        :param frames: number of frames elapsed
-        :param last_gpu_checkup: last computation check time
-        :param use_lcd: use LCD or not
-        :returns: this computation check time
-
-        """
-
-        next_check = log.THRESHOLDS["missed_frames"]
-
-        if frames == 0 or timer() - last_gpu_checkup > next_check:
-            self.embed(normalize(cv2.resize(frame, IMG_CONSTANTS["img_size"]), mode=self.img_norm))
-            print("Regular computation check")
-
-            last_gpu_checkup = timer()
-
-            if use_lcd:
-                lcd.LCD_DEVICE.clear()
-
-        elif not (timer() - log.LAST_LOGGED > next_check or timer() - log.UNK_LAST_LOGGED > next_check):
-            last_gpu_checkup = timer()
-
-        return last_gpu_checkup
