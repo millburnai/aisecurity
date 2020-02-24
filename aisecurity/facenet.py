@@ -106,9 +106,6 @@ class FaceNet:
         self.img_norm = self.MODELS["_default"]["params"]["img_norm"]
         IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
 
-    def response_received():
-        self.response_not_received = False
-
 
     # TF-TRT INIT
     def _tf_trt_init(self, filepath, input_name, output_name, sess, input_shape):
@@ -454,6 +451,7 @@ class FaceNet:
         :param face_detector: face detector type ("mtcnn" or "haarcascade")
         :param data_mutability: level on which static data is mutable (0, 1, or 2)
         :param socket: in dev
+        :param id: in dev
         :returns: number of frames elapsed
 
         """
@@ -481,10 +479,10 @@ class FaceNet:
 
         absent_frames = 0
         frames = 0
-        
+
         if socket:
             socket.send(json.dumps({"id":"1"}))
-        
+
         # CAM LOOP
         while True:
             _, frame = cap.read()
@@ -569,6 +567,7 @@ class FaceNet:
                                 1: Prompt for verification on recognition and update database
                                 2: Write updated data at end of real_time_recognize
         :param socket: in dev
+        :param id: in dev
 
         """
 
@@ -588,7 +587,8 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist, socket):
+    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist,
+                     socket):
         """Logs facial recognition activity
 
         :param logging: logging type-- None, "firebase", or "mysql"
@@ -600,9 +600,10 @@ class FaceNet:
         :param data_mutability: level of static data mutability
         :param use_lcd: use lcd or not
         :param dist: distance between best match and current frame
+        :param socket: in dev
 
         """
-        socket.send(json.dumps({"best_match":best_match}))
+
         update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
 
         if use_lcd and update_progress:
@@ -644,5 +645,9 @@ class FaceNet:
                     cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
                 else:
                     cprint("'{}' is not in database".format(name), attrs=["bold"])
+
+        # in dev
+        if socket:
+            socket.send(json.dumps({"best_match": best_match}))
 
         log.DISTS.append(dist)
