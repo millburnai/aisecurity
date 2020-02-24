@@ -41,8 +41,7 @@ def on_open(ws, id, **kwargs):
 
     kwargs["socket"] = ws
     kwargs["use_picam"] = True
-
-    ws.send(json.dumps({"id":str(id)}))
+    kwargs["id"] = id
 
     thread.start_new_thread(FaceNet().real_time_recognize, args, kwargs=kwargs)
 
@@ -66,4 +65,4 @@ def real_time_recognize_socket(socket_url, id):
 
 ################################ Testing ###############################
 if __name__ == "__main__":
-    real_time_recognize_socket("ws://172.31.217.136:8000/v1/guard/live")
+    real_time_recognize_socket("ws://172.31.217.136:8000/v1/guard/live", 1)

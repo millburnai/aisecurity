@@ -430,7 +430,7 @@ class FaceNet:
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
                                    use_lcd, use_keypad, framerate, resize, flip, device, face_detector, data_mutability,
-                                   socket):
+                                   socket, id):
         """Real-time facial recognition under the hood (dev use only)
 
         :param width: width of frame (only matters if use_graphics is True)
@@ -477,13 +477,16 @@ class FaceNet:
         absent_frames = 0
         frames = 0
 
+        if socket:
+            socket.send(json.dumps({"id":str(id)}))
+
         # CAM LOOP
         while True:
             _, frame = cap.read()
             original_frame = frame.copy()
 
             if socket and frames - absent_frames % 100 == 0:
-                socket.send(str(frames - absent_frames))
+                socket.send(json.dumps({"best_match":str(frames - absent_frames)})
 
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
@@ -536,7 +539,7 @@ class FaceNet:
     def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
                             use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
                             framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=0,
-                            socket=None):
+                            socket=None, id=None):
         """Real-time facial recognition
 
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
@@ -572,7 +575,7 @@ class FaceNet:
             width=width, height=height, dist_metric=dist_metric, logging=logging, use_dynamic=use_dynamic,
             use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd, use_keypad=use_keypad, framerate=framerate,
             resize=resize, flip=flip, device=device, face_detector=face_detector, data_mutability=data_mutability,
-            socket=socket,
+            socket=socket, id=id,
         )
 
 
