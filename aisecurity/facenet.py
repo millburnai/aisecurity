@@ -481,10 +481,10 @@ class FaceNet:
 
         absent_frames = 0
         frames = 0
-        '''
+        
         if socket:
-            socket.send(json.dumps({"id":str(id)}))
-        '''
+            socket.send(json.dumps({"id":"1"}))
+        
         # CAM LOOP
         while True:
             _, frame = cap.read()
@@ -507,7 +507,7 @@ class FaceNet:
 
                 # add graphics, lcd, logging
                 self.log_activity(
-                    logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist, socket
+                    logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist, socket,
                 )
 
                 if use_graphics:
@@ -588,7 +588,7 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist):
+    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist, socket):
         """Logs facial recognition activity
 
         :param logging: logging type-- None, "firebase", or "mysql"

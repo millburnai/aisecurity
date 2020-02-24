@@ -46,19 +46,19 @@ def on_open(ws, id, **kwargs):
     kwargs["use_picam"] = True
     kwargs["id"] = id
 
-    thread.start_new_thread(facenet.real_time_recognize, args, kwargs=kwargs)
+    thread.start_new_thread(facenet.real_time_recognize(use_picam=True, id=id, use_graphics=True, socket=ws))
 
 
 # SOCKET RECOGNITION
 @in_dev("real_time_recognize_socket is in production")
-def real_time_recognize_socket(socket_url, id):
+def real_time_recognize_socket(socket_url, id, **kwargs):
     websocket.enableTrace(True)
     ws = websocket.WebSocketApp(
         socket_url,
         on_message=on_message,
         on_error=on_error,
         on_close=on_close,
-        on_open=lambda id: on_open(id)
+        on_open=lambda id: on_open(id, kwargs)
     )
 
     print("Websocket initialized")
@@ -68,4 +68,4 @@ def real_time_recognize_socket(socket_url, id):
 
 ################################ Testing ###############################
 if __name__ == "__main__":
-    real_time_recognize_socket("ws://172.31.217.136:8000/v1/guard/live", 1)
+    real_time_recognize_socket("ws://172.31.217.136:8000/v1/nano", 1)
