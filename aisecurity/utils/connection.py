@@ -23,10 +23,13 @@ except ImportError:
 
 ################################ Functions ###############################
 
+facenet = FaceNet()
+
 # SOCKET EVENTS
 def on_message(ws, msg):
-    return json.loads(msg)
-
+    msg = json.loads(msg)
+    print(msg)
+    #facenet.response_received()
 
 def on_error(ws, error):
     print(error)
@@ -43,7 +46,7 @@ def on_open(ws, id, **kwargs):
     kwargs["use_picam"] = True
     kwargs["id"] = id
 
-    thread.start_new_thread(FaceNet().real_time_recognize, args, kwargs=kwargs)
+    thread.start_new_thread(facenet.real_time_recognize, args, kwargs=kwargs)
 
 
 # SOCKET RECOGNITION

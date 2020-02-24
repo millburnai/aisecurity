@@ -14,6 +14,7 @@ import json
 import os
 from timeit import default_timer as timer
 import warnings
+import time
 
 import cv2
 import keras
@@ -43,7 +44,7 @@ class FaceNet:
     # HYPERPARAMETERS
     HYPERPARAMS = {
         "alpha": 0.75,
-        "mtcnn_alpha": 0.9
+        "mtcnn_alpha": 0.9,
     }
 
     # PRE-BUILT MODEL CONFIGS
@@ -80,6 +81,7 @@ class FaceNet:
 
         self._db = {}
         self._knn = None
+        #self.response_not_received = True
 
         if data_path:
             self.set_data(retrieve_embeds(data_path), config=DATABASE_INFO)
@@ -103,6 +105,9 @@ class FaceNet:
 
         self.img_norm = self.MODELS["_default"]["params"]["img_norm"]
         IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
+
+    def response_received():
+        self.response_not_received = False
 
 
     # TF-TRT INIT
@@ -476,18 +481,21 @@ class FaceNet:
 
         absent_frames = 0
         frames = 0
-
+        '''
         if socket:
             socket.send(json.dumps({"id":str(id)}))
-
+        '''
         # CAM LOOP
         while True:
             _, frame = cap.read()
             original_frame = frame.copy()
-
+            '''
             if socket and frames - absent_frames % 100 == 0:
-                socket.send(json.dumps({"best_match":str(frames - absent_frames)})
-
+                socket.send(json.dumps({"best_match":str(frames - absent_frames)}))
+                while self.response_not_received:
+                    time.sleep(.01)
+                self.response_not_received = True
+            '''
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
@@ -499,7 +507,7 @@ class FaceNet:
 
                 # add graphics, lcd, logging
                 self.log_activity(
-                    logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist
+                    logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist, socket
                 )
 
                 if use_graphics:
@@ -594,7 +602,7 @@ class FaceNet:
         :param dist: distance between best match and current frame
 
         """
-
+        socket.send(json.dumps({"best_match":best_match}))
         update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
 
         if use_lcd and update_progress:
