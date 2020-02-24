@@ -36,25 +36,27 @@ def on_close(ws):
     print("{} closed".format(ws))
 
 
-def on_open(ws, **kwargs):
+def on_open(ws, id, **kwargs):
     args = ()
 
     kwargs["socket"] = ws
     kwargs["use_picam"] = True
+
+    ws.send(json.dumps({"id":str(id)}))
 
     thread.start_new_thread(FaceNet().real_time_recognize, args, kwargs=kwargs)
 
 
 # SOCKET RECOGNITION
 @in_dev("real_time_recognize_socket is in production")
-def real_time_recognize_socket(socket_url):
+def real_time_recognize_socket(socket_url, id):
     websocket.enableTrace(True)
     ws = websocket.WebSocketApp(
         socket_url,
         on_message=on_message,
         on_error=on_error,
         on_close=on_close,
-        on_open=on_open
+        on_open=lambda id: on_open(id)
     )
 
     print("Websocket initialized")
