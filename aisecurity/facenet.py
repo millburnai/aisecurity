@@ -31,6 +31,8 @@ from aisecurity.utils.visuals import get_video_cap, add_graphics
 from aisecurity.face.detection import detector_init
 from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_face
 
+signal = True
+
 
 ################################ FaceNet ###############################
 class FaceNet:
@@ -76,7 +78,7 @@ class FaceNet:
         self._db = {}
         self._knn = None
         
-        self.signal = True
+        
 
         if data_path:
             self.set_data(retrieve_embeds(data_path), config=DATABASE_INFO)
@@ -310,10 +312,12 @@ class FaceNet:
         return graph_def
     
     def signal_received(self):
-        return self.signal
+        global signal
+        return signal
 
     def turn_signal_on(self):
-        self.signal = False
+        global signal 
+        signal = False
 
     def _make_feed_dict(self, img):
         """Makes feed dict for sess.run (TF-TRT only)
@@ -619,5 +623,6 @@ class FaceNet:
             while not self.signal_received():
                 time.sleep(.01)
             print("yeet")
-            self.signal = True
+            global signal
+            signal = True
         log.DISTS.append(dist)
