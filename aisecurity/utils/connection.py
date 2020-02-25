@@ -29,7 +29,7 @@ facenet = FaceNet()
 def on_message(ws, msg):
     msg = json.loads(msg)
     print(msg)
-    #facenet.response_received()
+    facenet.turn_signal_on()
 
 def on_error(ws, error):
     print(error)
