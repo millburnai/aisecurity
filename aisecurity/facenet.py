@@ -30,6 +30,7 @@ from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFI
 from aisecurity.utils.visuals import get_video_cap, add_graphics
 from aisecurity.face.detection import detector_init
 from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_face
+import websocket
 
 signal = True
 
@@ -456,6 +457,8 @@ class FaceNet:
         frames = 0
 
         if socket:
+            self.ws = websocket.WebSocket()
+            ws.connect("ws://172.31.217.136:8000/v1/nano")
             socket.send(json.dumps({"id":"1"}))
 
         # CAM LOOP
@@ -520,7 +523,7 @@ class FaceNet:
     def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
                             use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
                             framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=0,
-                            socket=None, id=None):
+                            socket=False, id=None):
         """Real-time facial recognition
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
@@ -619,15 +622,7 @@ class FaceNet:
 
         # in dev
         if socket:
-            global signal
-            signal = True
-            socket.send(json.dumps({"best_match": best_match}))
-            print(self.signal_received())
-            print(signal)
-            while self.signal_received():
-                print(self.signal_received())
-                print(signal)
-                time.sleep(.01)
-            print("yeet")
+            ws.send(json.dumps({"best_match": best_match}))
+            print(ws.recv())
             signal = True
         log.DISTS.append(dist)

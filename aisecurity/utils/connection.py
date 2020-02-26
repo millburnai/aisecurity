@@ -31,6 +31,7 @@ def on_message(ws, msg):
     msg = json.loads(msg)
     print(msg)
     facenet.turn_signal_on()
+    ws.send(json.dumps({"id":"1"}))
 
 def on_error(ws, error):
     print(error)
