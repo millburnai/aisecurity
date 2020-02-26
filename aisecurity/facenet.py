@@ -331,14 +331,6 @@ class FaceNet:
             graph_def = tf.GraphDef()
             graph_def.ParseFromString(graph_file.read())
         return graph_def
-    
-    def signal_received(self):
-        global signal
-        return signal
-
-    def turn_signal_on(self):
-        global signal 
-        signal = False
 
     def _make_feed_dict(self, img):
         """Makes feed dict for sess.run (TF-TRT only)
