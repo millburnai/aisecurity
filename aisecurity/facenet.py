@@ -32,7 +32,6 @@ from aisecurity.face.detection import detector_init
 from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_face
 import websocket
 
-signal = True
 
 
 ################################ FaceNet ###############################
@@ -622,7 +621,7 @@ class FaceNet:
 
         # in dev
         if socket:
-            ws.send(json.dumps({"best_match": best_match}))
-            print(ws.recv())
-            signal = True
+            self.ws.send(json.dumps({"best_match": best_match}))
+            print(self.ws.recv())
+
         log.DISTS.append(dist)
