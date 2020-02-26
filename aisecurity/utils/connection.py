@@ -27,11 +27,7 @@ facenet = FaceNet()
 
 # SOCKET EVENTS
 def on_message(ws, msg):
-    print("oops")
-    msg = json.loads(msg)
-    print(msg)
-    facenet.turn_signal_on()
-    ws.send(json.dumps({"id":"1"}))
+    return json.loads(msg)
 
 def on_error(ws, error):
     print(error)
