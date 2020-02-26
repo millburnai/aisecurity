@@ -4,6 +4,7 @@ from aisecurity.utils.paths import *
 from . import dataflow
 from . import db
 from . import facenet
+from . import face
 from . import hardware
 from . import optim
 from . import privacy
