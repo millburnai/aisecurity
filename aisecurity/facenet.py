@@ -588,6 +588,9 @@ class FaceNet:
         if update_recognized:
             recognized_person = log.get_mode(log.CURRENT_LOG)
             log.log_person(logging, recognized_person, times=log.CURRENT_LOG[recognized_person])
+            if socket:
+                self.ws.send(json.dumps({"best_match": best_match}))
+                print(self.ws.recv())
 
             lcd.on_recognized(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
@@ -620,8 +623,5 @@ class FaceNet:
                     cprint("'{}' is not in database".format(name), attrs=["bold"])
 
         # in dev
-        if socket:
-            self.ws.send(json.dumps({"best_match": best_match}))
-            print(self.ws.recv())
 
         log.DISTS.append(dist)
