@@ -457,8 +457,8 @@ class FaceNet:
 
         if socket:
             self.ws = websocket.WebSocket()
-            ws.connect("ws://172.31.217.136:8000/v1/nano")
-            socket.send(json.dumps({"id":"1"}))
+            self.ws.connect("ws://172.31.217.136:8000/v1/nano")
+            self.ws.send(json.dumps({"id":"1"}))
 
         # CAM LOOP
         while True:
