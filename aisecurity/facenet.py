@@ -619,10 +619,15 @@ class FaceNet:
 
         # in dev
         if socket:
+            global signal
+            signal = True
             socket.send(json.dumps({"best_match": best_match}))
-            while not self.signal_received():
+            print(self.signal_received())
+            print(signal)
+            while self.signal_received():
+                print(self.signal_received())
+                print(signal)
                 time.sleep(.01)
             print("yeet")
-            global signal
             signal = True
         log.DISTS.append(dist)
