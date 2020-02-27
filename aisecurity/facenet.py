@@ -11,6 +11,7 @@ import asyncio
 import itertools
 import json
 import os
+import time
 from timeit import default_timer as timer
 import warnings
 
@@ -482,18 +483,13 @@ class FaceNet:
             self.ws = websocket.WebSocket()
             self.ws.connect("ws://172.31.217.136:8000/v1/nano")
             self.ws.send(json.dumps({"id":"1"}))
+            print("Connected to server")
 
         # CAM LOOP
         while True:
             _, frame = cap.read()
             original_frame = frame.copy()
-            '''
-            if socket and frames - absent_frames % 100 == 0:
-                socket.send(json.dumps({"best_match":str(frames - absent_frames)}))
-                while self.response_not_received:
-                    time.sleep(.01)
-                self.response_not_received = True
-            '''
+
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
@@ -531,6 +527,7 @@ class FaceNet:
 
             frames += 1
             await asyncio.sleep(1e-6)
+            time.sleep(0.01)
 
         cap.release()
         cv2.destroyAllWindows()
