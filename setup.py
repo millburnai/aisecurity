@@ -12,7 +12,7 @@ from setuptools import setup, find_packages
 SUPPORTED_TF_VERSIONS = ["1.12", "1.14", "1.15"]
 
 INSTALL_REQUIRES = ["adafruit-circuitpython-charlcd", "keras", "matplotlib", "mysql-connector-python", "Pyrebase",
-                    "pycryptodome", "requests", "scikit-learn", "websocket"]
+                    "pycryptodome", "requests", "scikit-learn", "websocket-client"]
 
 try:
     import tensorflow as tf
