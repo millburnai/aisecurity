@@ -379,7 +379,7 @@ class FaceNet:
         normalized_face = normalize(cropped_face, mode=self.img_norm)
 
         raw_embedding = self.embed(normalized_face)
-        normalized_embedding = self.dist_metric.apply_norms(raw_embedding)
+        normalized_embedding = self.dist_metric.apply_norms(raw_embedding).reshape(raw_embedding.shape)
 
         return normalized_embedding, face_coords
 
@@ -617,7 +617,10 @@ class FaceNet:
 
             if socket:
                 print("Sending via websocket...")
-                self.ws.send(json.dumps({"best_match": best_match}))
+                try:
+                    self.ws.send(json.dumps({"best_match": best_match}))
+                except ConnectionResetError:
+                    print("Connected closed")
                 print(self.ws.recv())
 
         elif update_unrecognized:
