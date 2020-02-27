@@ -619,6 +619,7 @@ class FaceNet:
             lcd.on_recognized(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
             if socket:
+                print("Sending via websocket...")
                 self.ws.send(json.dumps({"best_match": best_match}))
                 print(self.ws.recv())
 

@@ -23,8 +23,6 @@ except ImportError:
 
 ################################ Functions ###############################
 
-facenet = FaceNet()
-
 # SOCKET EVENTS
 def on_message(ws, msg):
     return json.loads(msg)
@@ -43,6 +41,8 @@ def on_open(ws, id, **kwargs):
     kwargs["socket"] = ws
     kwargs["use_picam"] = True
     kwargs["id"] = id
+
+    facenet = FaceNet()
 
     thread.start_new_thread(facenet.real_time_recognize(use_picam=True, id=id, use_graphics=True, socket=ws))
 
