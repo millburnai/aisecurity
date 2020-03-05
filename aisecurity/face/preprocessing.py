@@ -39,20 +39,25 @@ def normalize(x, mode="per_image"):
 
 @print_time("Detection time")
 def crop_face(path_or_img, margin, face_detector="mtcnn", alpha=0.9):
+    exit_failure = itertools.repeat(-1, 2)
+
     try:
-        img = cv2.imread(path_or_img).astype(np.uint8)
+        img = cv2.imread(path_or_img).astype(np.uint8)[:, :, ::-1]
     except (SystemError, TypeError):  # if img is actually image
-        img = path_or_img.astype(np.uint8)
+        try:
+            img = path_or_img.astype(np.uint8)
+        except AttributeError:
+            return exit_failure
 
     if face_detector:
         result = detect_faces(img, mode=face_detector)
         if len(result) == 0:
-            return itertools.repeat(-1, 2)
+            return exit_failure
 
         face = max(result, key=lambda person: person["confidence"])
         if face["confidence"] < alpha:
             print("{}% face detection confidence is too low".format(round(face["confidence"] * 100, 2)))
-            return itertools.repeat(-1, 2)
+            return exit_failure
 
         x, y, width, height = face["box"]
         img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
