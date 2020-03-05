@@ -85,11 +85,6 @@ def init(logging, flush=False, thresholds=None):
             MODE = "<no database>"
             warnings.warn(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
 
-    elif logging == "django":
-        # TODO: fill in init for django logging
-        MODE = "<no database>"
-        warnings.warn("django logging supported yet")
-
     else:
         MODE = "<no database>"
         warnings.warn("{} not a supported logging option. No logging will occur".format(logging))
@@ -202,14 +197,6 @@ def log_person(logging, student_name, times):
         }
         DATABASE.child("known").child(*get_now(timer())).set(data)
 
-    elif logging == "django" and MODE == "django":
-        student_id = get_id(student_name)
-        student_name = student_name.replace("_", " ").title()
-        # TODO: log {*now: student_id, student_name} in django db
-            # DJANGO: s = StudentLog(student_id=student_id, name=student_name, time=datetime.datetime.now())
-            #         s.save()
-            # from models.py; import studentlog, datetime
-
     flush_current(mode="known")
 
     cprint("Regular activity ({}) logged with {}".format(student_name, MODE), color="green", attrs=["bold"])
@@ -231,13 +218,6 @@ def log_unknown(logging, path_to_img):
             "time": now[1]
         }
         DATABASE.child("unknown").child(*get_now(timer())).set(data)
-
-    elif logging == "django" and MODE == "django":
-        # TODO: log {*get_now(timer()): path_to_img} in django db
-            # DJANGO: u = UnknownLog(time=datetime.datetime.now(), path_to_img=path_to_img)
-            #         u.save()
-            # from models.py; import datetime, unknownlog
-        pass
 
     flush_current(mode="unknown")
 
