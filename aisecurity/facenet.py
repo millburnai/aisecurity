@@ -431,7 +431,7 @@ class FaceNet:
     # REAL-TIME FACIAL RECOGNITION HELPER
     async def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
                                    use_lcd, use_keypad, framerate, resize, flip, device, face_detector, data_mutability,
-                                   socket, id):
+                                   socket):
         """Real-time facial recognition under the hood (dev use only)
 
         :param width: width of frame (only matters if use_graphics is True)
@@ -450,7 +450,6 @@ class FaceNet:
         :param face_detector: face detector type ("mtcnn" or "haarcascade")
         :param data_mutability: level on which static data is mutable (0, 1, or 2)
         :param socket: in dev
-        :param id: in dev
         :returns: number of frames elapsed
 
         """
@@ -532,17 +531,14 @@ class FaceNet:
         cap.release()
         cv2.destroyAllWindows()
 
-        if data_mutability == 2:
-            dump_and_encrypt(self.data, DATABASE, encrypt=DATABASE_INFO["encrypted"])
-
         return frames
 
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
                             use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
-                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=0,
-                            socket=False, id=None):
+                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=False,
+                            socket=False):
         """Real-time facial recognition
 
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
@@ -559,12 +555,8 @@ class FaceNet:
         :param flip: flip method: +1 = +90º rotation (default: 0)
         :param device: camera device (/dev/video{device}) (default: 0)
         :param face_detector: face detector type ("mtcnn" or "haarcascade") (default: "mtcnn")
-        :param data_mutability: level of data mutability (0-2) (default: 0)
-                                0: No data mutability
-                                1: Prompt for verification on recognition and update database
-                                2: Write updated data at end of real_time_recognize
+        :param data_mutability: if true, prompt for verification on recognition and update database (default: False)
         :param socket: in dev
-        :param id: in dev
 
         """
 
@@ -579,7 +571,7 @@ class FaceNet:
             width=width, height=height, dist_metric=dist_metric, logging=logging, use_dynamic=use_dynamic,
             use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd, use_keypad=use_keypad, framerate=framerate,
             resize=resize, flip=flip, device=device, face_detector=face_detector, data_mutability=data_mutability,
-            socket=socket, id=id,
+            socket=socket
         )
 
 
@@ -594,7 +586,7 @@ class FaceNet:
         :param mode: logging type: "firebase" or "mysql"
         :param embedding: embedding vector
         :param use_dynamic: use dynamic database or not
-        :param data_mutability: level of static data mutability
+        :param data_mutability: static data mutability or not
         :param use_lcd: use lcd or not
         :param dist: distance between best match and current frame
         :param socket: in dev
