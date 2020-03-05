@@ -11,14 +11,13 @@ from setuptools import setup, find_packages
 # TENSORFLOW INSTALL
 SUPPORTED_TF_VERSIONS = ["1.12", "1.14", "1.15"]
 
-INSTALL_REQUIRES = ["adafruit-circuitpython-charlcd", "keras", "matplotlib", "mysql-connector-python", "Pyrebase",
-                    "pycryptodome", "requests", "scikit-learn", "websocket-client"]
+INSTALL_REQUIRES = ["keras", "matplotlib", "pycryptodome", "scikit-learn", "opencv-python"]
 
 try:
     import tensorflow as tf
     assert any(version in tf.__version__ for version in SUPPORTED_TF_VERSIONS)
 except (ModuleNotFoundError, AssertionError):
-    INSTALL_REQUIRES.append("tensorflow==1.15.2")
+    INSTALL_REQUIRES.insert(0, "tensorflow==1.15.2")
 
 
 # SETUP
