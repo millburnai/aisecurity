@@ -75,7 +75,7 @@ class DistMetric:
         "cosine": construct_dist(
             # norm has to be a transformation s.t. x^T x = 1 for all x in a, b
             # (https://stackoverflow.com/questions/34144632/using-cosine-distance-with-scikit-learn-kneighborsclassifier)
-            norm=lambda x: svd_whiten(x),
+            norm=lambda x: x / np.linalg.norm(x), # svd_whiten(x),
             calc=lambda a, b: cosine(a.flatten(), b.flatten())
         )
     }
@@ -236,7 +236,7 @@ if __name__ == "__main__":
         result = np.array(list(zip(*sorted(dists, key=lambda pair: pair[1])))[0])
         true_dists = [(idx, cosine(a, b)) for (idx, a), b in zip(enumerate(tests[:-1]), tests[1:])]
         true_value = np.array(list(zip(*sorted(true_dists, key=lambda pair: pair[1])))[0])
-        differences[dist_metric.get_config() + "+{calc_with_euclidean}"] = np.sum(result - true_value)
+        differences[dist_metric.get_config() + "+{calc_with_euclidean}"] = np.linalg.norm(result - true_value)
 
         dist_metric = DistMetric("cosine")
         result = dist_metric.distance(test, second_test)
