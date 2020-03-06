@@ -26,3 +26,17 @@ After installing, you might want to change the key location settings in `~/.aise
 
 All weight files (.h5 and .pb models) are available in this [Dropbox folder](https://www.dropbox.com/sh/k9ci2nphj7i7dde/AACaQuxUJ6GoPHFxW6FtJlZca?dl=0).
 
+# Usage
+
+Check code for more detailed documentation.
+
+## Demonstration
+
+To run basic facial recognition with the provided dataset:
+
+```python
+import aisecurity
+
+facenet = aisecurity.FaceNet()
+facenet.real_time_recognize()
+```
