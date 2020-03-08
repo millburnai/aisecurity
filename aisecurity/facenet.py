@@ -429,7 +429,7 @@ class FaceNet:
 
 
     # REAL-TIME FACIAL RECOGNITION HELPER
-    async def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
+    def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
                                    use_lcd, use_keypad, framerate, resize, flip, device, face_detector, data_mutability,
                                    socket):
         """Real-time facial recognition under the hood (dev use only)
@@ -525,7 +525,7 @@ class FaceNet:
                     break
 
             frames += 1
-            await asyncio.sleep(1e-6)
+            #await asyncio.sleep(1e-6)
             time.sleep(0.01)
 
         cap.release()
