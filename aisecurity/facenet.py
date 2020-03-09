@@ -427,6 +427,12 @@ class FaceNet:
             else:
                 raise error
 
+    def websocket_initialize(self):
+        self.ws = websocket.WebSocket()
+        self.ws.connect("ws://172.31.217.136:8000/v1/nano")
+        self.ws.send(json.dumps({"id":"1"}))
+        print("Connected to server")
+
 
     # REAL-TIME FACIAL RECOGNITION HELPER
     def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
@@ -479,13 +485,15 @@ class FaceNet:
         frames = 0
 
         if socket:
-            self.ws = websocket.WebSocket()
-            self.ws.connect("ws://172.31.217.136:8000/v1/nano")
-            self.ws.send(json.dumps({"id":"1"}))
-            print("Connected to server")
+            self.websocket_initialize()
 
         # CAM LOOP
         while True:
+            try:
+                self.ws.recv()
+            except
+                self.websocket_initialize()
+            
             _, frame = cap.read()
             original_frame = frame.copy()
 
