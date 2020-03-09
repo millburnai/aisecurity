@@ -53,13 +53,6 @@ def construct_norm(**kwargs):
     return _test_format(_NORM_FORMAT, **kwargs)
 
 
-################################ Statistics and linear algebra ###############################
-def svd_whiten(x):
-    # https://stackoverflow.com/questions/6574782/how-to-whiten-matrix-in-pca
-    u, s, vh = np.linalg.svd(x, full_matrices=False)
-    return np.dot(u, vh)
-
-
 ################################ DistMetric ###############################
 class DistMetric:
 
@@ -89,7 +82,7 @@ class DistMetric:
         "subtract_mean": construct_norm(
             apply_to=_CHECKS["is_vector"],
             use_stat=True,
-            func=lambda x, stats: x - stats["mean"]
+            func=lambda x, mean: x - mean
         ),
         "l2_normalize": construct_norm(
             apply_to=_CHECKS["is_vector"],
@@ -105,12 +98,9 @@ class DistMetric:
 
 
     # INITS
-    def __init__(self, dist, normalizations=None, data=None, **kwargs):
-        if "+" in dist:  # ex: DistMetric("euclidean+subtract_mean+l2_normalize")
-            self.dist, *self.normalizations = dist.split("+")
-        else:  # ex: DistMetric("euclidean", ["subtract_mean", "l2_normalize"])
-            self.dist = dist
-            self.normalizations = normalizations if normalizations else []
+    def __init__(self, constructor, data=None, **kwargs):
+        # eg: DistMetric("euclidean+subtract_mean+l2_normalize")
+        self.dist, *self.normalizations = constructor.split("+")
 
         assert self.dist in self.DISTS, "supported dists are {}".format(list(self.DISTS.keys()))
         assert self.normalizations is None or all(norm in self.NORMALIZATIONS for norm in self.normalizations), \
@@ -119,13 +109,9 @@ class DistMetric:
         # data setting
         if any(self.NORMALIZATIONS[norm_id]["use_stat"] for norm_id in self.normalizations):
             assert data is not None, "data must be provided for normalizations that use data statistics"
-
-            self.stats = {
-                "mean": np.mean(data, **kwargs),
-                "std": np.std(data, **kwargs)
-            }
-
-        self.data = data
+            self.mean = np.mean(data, **kwargs)
+        else:
+            self.mean = None
 
 
     # HELPER FUNCTIONS
@@ -142,7 +128,7 @@ class DistMetric:
             args = []
 
             if use_stat:
-                args.append(self.stats)
+                args.append(self.mean)
 
             for action in actions.values():
                 tmp = action(tmp, *args)
@@ -169,12 +155,16 @@ class DistMetric:
 
     # "PUBLIC" FUNCTIONS
     def apply_norms(self, *args, dist_norm=True):
-        normalized = np.array([self._apply_norms(arg) for arg in args])
+        if len(args) == 1:
+            normalized = np.array(self._apply_norms(args[0]))
 
-        if dist_norm:
-            normalized = self.DISTS[self.dist]["norm"](normalized)
+            if dist_norm:
+                normalized = self.DISTS[self.dist]["norm"](normalized)
 
-        return normalized if len(normalized) > 1 else normalized[0]
+            return normalized
+
+        else:
+            return np.array([self.apply_norms(arg, dist_norm=dist_norm) for arg in args])
 
     def distance(self, a, b, apply_norms=True, ignore_norms=None):
         if ignore_norms is None:

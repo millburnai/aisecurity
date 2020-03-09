@@ -24,12 +24,12 @@ import tensorflow as tf
 from termcolor import cprint
 import websocket
 
-from aisecurity.dataflow.data import retrieve_embeds, dump_and_encrypt
+from aisecurity.dataflow.data import retrieve_embeds
 from aisecurity.db import log
 from aisecurity.optim import engine
 from aisecurity.hardware import keypad, lcd
 from aisecurity.utils.distance import DistMetric
-from aisecurity.utils.events import print_time, run_async_method
+from aisecurity.utils.events import print_time
 from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
 from aisecurity.utils.visuals import get_video_cap, add_graphics
 from aisecurity.face.detection import detector_init
@@ -434,29 +434,29 @@ class FaceNet:
         print("Connected to server")
 
 
-    # REAL-TIME FACIAL RECOGNITION HELPER
-    def _real_time_recognize(self, width, height, dist_metric, logging, use_dynamic, use_picam, use_graphics,
-                                   use_lcd, use_keypad, framerate, resize, flip, device, face_detector, data_mutability,
-                                   socket):
-        """Real-time facial recognition under the hood (dev use only)
+    # REAL-TIME FACIAL RECOGNITION
+    def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
+                            use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
+                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=False,
+                            socket=None):
+        """Real-time facial recognition
 
-        :param width: width of frame (only matters if use_graphics is True)
-        :param height: height of frame (only matters if use_graphics is True)
-        :param metric: DistMetric object
-        :param logging: logging type-- None, "firebase", or "mysql"
-        :param use_dynamic: use dynamic database for visitors or not
-        :param use_picam: use picamera or not
-        :param use_graphics: display video feed or not
-        :param use_lcd: use LCD or not. If LCD is not connected, will default to LCD simulation and warn
-        :param use_keypad: use keypad or not. If keypad not connected, will default to False and warn
-        :param framerate: frame rate (recommended <120)
-        :param resize: resize scale (float between 0. and 1.)
-        :param flip: flip method: +1 = +90º rotation
-        :param device: camera device (/dev/video{device})
-        :param face_detector: face detector type ("mtcnn" or "haarcascade")
-        :param data_mutability: level on which static data is mutable (0, 1, or 2)
+        :param width: width of frame (only matters if use_graphics is True) (default: 640)
+        :param height: height of frame (only matters if use_graphics is True) (default: 360)
+        :param dist_metric: DistMetric object or str distance metric (default: "euclidean+l2_normalize")
+        :param logging: logging type-- None, "firebase", or "mysql" (default: None)
+        :param use_dynamic: use dynamic database for visitors or not (default: False)
+        :param use_picam: use picamera or not (default: False)
+        :param use_graphics: display video feed or not (default: True)
+        :param use_lcd: use LCD or not. If LCD isn't connected, will default to LCD simulation and warn (default: False)
+        :param use_keypad: use keypad or not. If keypad not connected, will default to False and warn (default: False)
+        :param framerate: frame rate, only matters if use_picamera is True (recommended <120) (default: 20)
+        :param resize: resize scale (float between 0. and 1.) (default: None)
+        :param flip: flip method: +1 = +90º rotation (default: 0)
+        :param device: camera device (/dev/video{device}) (default: 0)
+        :param face_detector: face detector type ("mtcnn" or "haarcascade") (default: "mtcnn")
+        :param data_mutability: if true, prompt for verification on recognition and update database (default: False)
         :param socket: in dev
-        :returns: number of frames elapsed
 
         """
 
@@ -540,47 +540,6 @@ class FaceNet:
         cv2.destroyAllWindows()
 
         return frames
-
-
-    # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
-                            use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
-                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=False,
-                            socket=False):
-        """Real-time facial recognition
-
-        :param width: width of frame (only matters if use_graphics is True) (default: 640)
-        :param height: height of frame (only matters if use_graphics is True) (default: 360)
-        :param dist_metric: DistMetric object or str distance metric (default: "euclidean+l2_normalize")
-        :param logging: logging type-- None, "firebase", or "mysql" (default: None)
-        :param use_dynamic: use dynamic database for visitors or not (default: False)
-        :param use_picam: use picamera or not (default: False)
-        :param use_graphics: display video feed or not (default: True)
-        :param use_lcd: use LCD or not. If LCD isn't connected, will default to LCD simulation and warn (default: False)
-        :param use_keypad: use keypad or not. If keypad not connected, will default to False and warn (default: False)
-        :param framerate: frame rate, only matters if use_picamera is True (recommended <120) (default: 20)
-        :param resize: resize scale (float between 0. and 1.) (default: None)
-        :param flip: flip method: +1 = +90º rotation (default: 0)
-        :param device: camera device (/dev/video{device}) (default: 0)
-        :param face_detector: face detector type ("mtcnn" or "haarcascade") (default: "mtcnn")
-        :param data_mutability: if true, prompt for verification on recognition and update database (default: False)
-        :param socket: in dev
-
-        """
-
-        assert width > 0 and height > 0, "width and height must be positive integers"
-        assert not logging or logging == "mysql" or logging == "firebase", "only mysql and firebase logging supported"
-        assert 0 < framerate <= 120, "framerate must be between 0 and 120"
-        assert resize is None or 0. < resize < 1., "resize must be between 0 and 1"
-        assert face_detector in ("mtcnn", "haarcascade"), "only mtcnn and haarcascade supported"
-
-        run_async_method(
-            self._real_time_recognize,
-            width=width, height=height, dist_metric=dist_metric, logging=logging, use_dynamic=use_dynamic,
-            use_picam=use_picam, use_graphics=use_graphics, use_lcd=use_lcd, use_keypad=use_keypad, framerate=framerate,
-            resize=resize, flip=flip, device=device, face_detector=face_detector, data_mutability=data_mutability,
-            socket=socket
-        )
 
 
     # LOGGING

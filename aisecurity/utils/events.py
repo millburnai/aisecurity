@@ -6,7 +6,6 @@ Miscellaneous tools for time and event handling.
 
 """
 
-import asyncio
 import functools
 from timeit import default_timer as timer
 import warnings
@@ -38,16 +37,3 @@ def in_dev(message="currently in development; do not use in production"):
         return _func
 
     return _in_dev
-
-
-# ASYNC
-def run_async_method(func, *args, **kwargs):
-    '''
-    async def async_helper(func, *args, **kwargs):
-        await func(*args, **kwargs)
-
-    loop = asyncio.new_event_loop()
-    task = loop.create_task(async_helper(func, *args, **kwargs))
-    loop.run_until_complete(task)
-    '''
-    func(*args, **kwargs)
