@@ -489,11 +489,13 @@ class FaceNet:
 
         # CAM LOOP
         while True:
-            try:
-                self.ws.recv()
-            except
-                self.websocket_initialize()
-            
+
+            if socket:
+                try:
+                    self.ws.recv()
+                except:
+                    self.websocket_initialize()
+
             _, frame = cap.read()
             original_frame = frame.copy()
 
