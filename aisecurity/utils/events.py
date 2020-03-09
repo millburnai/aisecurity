@@ -42,9 +42,12 @@ def in_dev(message="currently in development; do not use in production"):
 
 # ASYNC
 def run_async_method(func, *args, **kwargs):
+    '''
     async def async_helper(func, *args, **kwargs):
         await func(*args, **kwargs)
 
     loop = asyncio.new_event_loop()
     task = loop.create_task(async_helper(func, *args, **kwargs))
     loop.run_until_complete(task)
+    '''
+    func(*args, **kwargs)
