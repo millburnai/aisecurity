@@ -8,11 +8,17 @@ Graph control and flow.
 
 
 import subprocess
+import warnings
 
 from keras import backend as K
 import tensorflow as tf
-import tensorflow.contrib.tensorrt as trt
 from tensorflow.python.framework import graph_io
+
+try:
+    import tensorflow.contrib.tensorrt as trt
+except ModuleNotFoundError:
+    # tf-trt not supported on windows and tensorflow>1.14
+    warnings.warn("tf-trt graph functions cannot be used")
 
 from aisecurity.utils.events import print_time
 
