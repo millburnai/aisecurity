@@ -13,7 +13,7 @@ import subprocess
 import aisecurity
 
 # download stuff and set up stuff
-subprocess.call(["make_config.sh"])
+subprocess.call(["make_config.sh"], shell=True)
 
 # paths
 CONFIG_HOME = os.path.expanduser("~") + "/.aisecurity"
