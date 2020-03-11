@@ -5,14 +5,25 @@
 
 ERRORS=0
 
-# .aisecurity
-if [ ! -d "$HOME/.aisecurity" ] ; then
-  echo -e "\033[0;95mCreating ~/.aisecurity\033[0m"
-  mkdir "$HOME/.aisecurity"
+# get home path
+OS=($OSTYPE)
+
+if [[ $OS == "darwin"* ]] ; then
+  ROOT=$HOME;
+elif [[ $OS == "linux-gnu" ]] ; then
+  ROOT=$HOME;
+elif [[ $OS == "msys" ]] ; then
+  ROOT=$HOMEPATH;
 fi
 
-cd "$HOME/.aisecurity/" || { echo -e "\033[0;31mError: unable to access ~/.aisecurity\033[0m" ; exit 1; }
-config_path=$(pwd )
+# .aisecurity
+if [ ! -d "$ROOT/.aisecurity" ] ; then
+  echo -e "\033[0;95mCreating ~/.aisecurity\033[0m"
+  mkdir "$ROOT/.aisecurity"
+fi
+
+cd "$ROOT/.aisecurity/" || { echo -e "\033[0;31mError: unable to access ~/.aisecurity\033[0m" ; exit 1; }
+config_path=$(pwd)
 
 # aisecurity.json
 if [ ! -f "$config_path/aisecurity.json" ] ; then
