@@ -66,7 +66,7 @@ def init(logging, flush=False, thresholds=None):
             DATABASE.commit()
 
             if flush:
-                instructions = open(CONFIG_HOME + "/bin/drop.sql")
+                instructions = open(CONFIG_HOME + "/bin/drop.sql", encoding="utf-8")
                 for cmd in instructions:
                     if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"):
                         CURSOR.execute(cmd)
@@ -78,7 +78,9 @@ def init(logging, flush=False, thresholds=None):
 
     elif logging == "firebase":
         try:
-            FIREBASE = pyrebase.initialize_app(json.load(open(CONFIG_HOME + "/logging/firebase.json")))
+            FIREBASE = pyrebase.initialize_app(
+                json.load(open(CONFIG_HOME + "/logging/firebase.json", encoding="utf-8"))
+            )
             DATABASE = FIREBASE.database()
 
         except (FileNotFoundError, json.JSONDecodeError):

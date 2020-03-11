@@ -48,7 +48,7 @@ class FaceNet:
     }
 
     # PRE-BUILT MODEL CONFIGS
-    MODELS = json.load(open(CONFIG_HOME + "/config/models.json"))
+    MODELS = json.load(open(CONFIG_HOME + "/config/models.json", encoding="utf-8"))
 
 
     # INITS

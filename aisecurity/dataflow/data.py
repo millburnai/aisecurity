@@ -57,7 +57,7 @@ def dump_and_encrypt(data, dump_path, encrypt=None, mode="w+"):
         data[person] = [embed.tolist() for embed in embeddings]
     encrypted_data = DataEncryption.encrypt_data(data, ignore=ignore)
 
-    with open(dump_path, mode) as dump_file:
+    with open(dump_path, mode, encoding="utf-8") as dump_file:
         json.dump(encrypted_data, dump_file, ensure_ascii=False, indent=4)
 
     return encrypted_data
@@ -75,7 +75,7 @@ def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None, full_overwri
     encrypted_data = dump_and_encrypt(data, dump_path, encrypt=encrypt, mode=mode)
 
     path_to_config = dump_path.replace(".json", "_info.json")
-    with open(path_to_config, "w+") as config_file:
+    with open(path_to_config, "w+", encoding="utf-8") as config_file:
         metadata = {"encrypted": encrypt, "metric": facenet.dist_metric.get_config()}
         json.dump(metadata, config_file, indent=4)
 
@@ -87,7 +87,7 @@ def retrieve_embeds(path=DATABASE, encrypted=DATABASE_INFO["encrypted"], name_ke
                     embedding_keys=EMBEDDING_KEYS):
     ignore = encrypt_to_ignore(encrypted)
 
-    with open(path, "r") as json_file:
+    with open(path, "r", encoding="utf-8") as json_file:
         data = json.load(json_file)
 
     return DataEncryption.decrypt_data(data, ignore=ignore, name_keys=name_keys, embedding_keys=embedding_keys)

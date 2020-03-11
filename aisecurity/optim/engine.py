@@ -138,7 +138,7 @@ class CudaEngineManager:
 
         """
 
-        with open(engine_file, "rb") as file, trt.Runtime(self.CONSTANTS["logger"]) as runtime:
+        with open(engine_file, "rb", encoding="utf-8") as file, trt.Runtime(self.CONSTANTS["logger"]) as runtime:
             self.engine = runtime.deserialize_cuda_engine(file.read())
 
     @print_time("Engine building and serializing time")
@@ -202,7 +202,7 @@ class CudaEngineManager:
         self.parse_uff(uff_file, input_name, input_shape, output_name)
         self.build_and_serialize_engine()
 
-        with open(target_file, "wb") as file:
+        with open(target_file, "wb", encoding="utf-8") as file:
             file.write(self.engine)
 
     def caffe_write_cuda_engine(self, caffe_model_file, caffe_deploy_file, output_name, target_file):
@@ -218,7 +218,7 @@ class CudaEngineManager:
         self.parse_caffe(caffe_model_file, caffe_deploy_file, output_name)
         self.build_and_serialize_engine()
 
-        with open(target_file, "wb") as file:
+        with open(target_file, "wb", encoding="utf-8") as file:
             file.write(self.engine)
 
 
@@ -248,7 +248,7 @@ class CudaEngine:
     """Class-oriented cuda engine manager wrapper"""
 
     # PREBUILT MODELS
-    MODELS = json.load(open(CONFIG_HOME + "/config/cuda_models.json"))
+    MODELS = json.load(open(CONFIG_HOME + "/config/cuda_models.json", encoding="utf-8"))
 
 
     # INITS

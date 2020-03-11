@@ -19,10 +19,10 @@ subprocess.call(["make_config.sh"], shell=True)
 CONFIG_HOME = os.path.expanduser("~") + "/.aisecurity"
 HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
 
-CONFIG = json.load(open(CONFIG_HOME + "/aisecurity.json"))
+CONFIG = json.load(open(CONFIG_HOME + "/aisecurity.json", encoding="utf-8"))
 
 DATABASE = CONFIG["database_location"]
-DATABASE_INFO = json.load(open(CONFIG["database_info"]))
+DATABASE_INFO = json.load(open(CONFIG["database_info"], encoding="utf-8"))
 
 NAME_KEYS = CONFIG["name_keys"]
 EMBEDDING_KEYS = CONFIG["embedding_keys"]
