@@ -35,8 +35,8 @@ def require_permission(func):
 # GENERATING ENCRYPTION INFO
 @require_permission
 def generate_key(key_file):
-    open(key_file, "w", encoding="utf-8").close()
-    with open(key_file, "wb", encoding="utf-8") as keys:
+    open(key_file, "w").close()
+    with open(key_file, "wb") as keys:
         key = get_random_bytes(_BIT_ENCRYPTION)
         keys.write(key)
 
@@ -54,14 +54,14 @@ def generate_cipher(key_file, alloc_mem):
 # RETRIEVALS
 @require_permission
 def get_key(key_file):
-    with open(key_file, "rb", encoding="utf-8") as keys:
+    with open(key_file, "rb") as keys:
         key = b"".join(keys.readlines())[:_BIT_ENCRYPTION]
     return key
 
 
 @require_permission
 def get_nonce(key_file, position):
-    with open(key_file, "rb", encoding="utf-8") as keys:
+    with open(key_file, "rb") as keys:
         joined_nonces = b"".join(keys.readlines())[_BIT_ENCRYPTION:]
         nonce = joined_nonces[position * _BIT_ENCRYPTION:(position + 1) * _BIT_ENCRYPTION]
     return nonce
