@@ -6,14 +6,14 @@
 ERRORS=0
 
 # get home path
-OS=$(OSTYPE)
-
-if [[ $OS == "darwin"* ]] ; then
+if [[ $OSTYPE == "darwin"* ]] ; then
   ROOT=$HOME;
-elif [[ $OS == "linux-gnu" ]] ; then
+elif [[ $OSTYPE == "linux-gnu" ]] ; then
   ROOT=$HOME;
-elif [[ $OS == "msys" ]] ; then
+elif [[ $OSTYPE == "msys" ]] ; then
   ROOT=$HOMEPATH;
+else
+  echo "$OSTYPE not supported" && exit 1;
 fi
 
 # .aisecurity
