@@ -29,7 +29,7 @@ config_path=$(pwd)
 if [ ! -f "$config_path/aisecurity.json" ] ; then
   echo -e "\033[0;95mCreating ~/.aisecurity/aisecurity.json\033[0m"
   touch "$config_path/aisecurity.json"
-  alt_config_path="${config_path/\/c\//C:}";
+  alt_config_path="${config_path/\/c/C:}";
   printf '{\n    "default_model": "%s/models/ms_celeb_1m.h5",\n    "name_keys": "%s/keys/test_name_keys.txt",\n    "embedding_keys": "%s/keys/test_embedding_keys.txt",\n    "database_location": "%s/database/test.json",\n    "database_info": "%s/database/test_info.json",\n    "mysql_user": "root",\n    "mysql_password": "root"\n}\n' \
   "$alt_config_path" "$alt_config_path" "$alt_config_path" "$alt_config_path" "$alt_config_path" > "$config_path/aisecurity.json"
 fi
