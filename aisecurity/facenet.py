@@ -7,7 +7,6 @@ Reference paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
 
-import asyncio
 import itertools
 import json
 import os
@@ -490,14 +489,7 @@ class FaceNet:
 
         # CAM LOOP
         while True:
-            #self.websocket_initialize()
-            '''
-            if socket:
-                try:
-                    self.ws.recv()
-                except:
-                    self.websocket_initialize()
-            '''
+
             _, frame = cap.read()
             original_frame = frame.copy()
 
@@ -537,7 +529,6 @@ class FaceNet:
                     break
 
             frames += 1
-            #await asyncio.sleep(1e-6)
             time.sleep(0.01)
 
         cap.release()
