@@ -23,6 +23,7 @@ from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
 import websocket
+from websocket import create_connection
 
 from aisecurity.dataflow.data import retrieve_embeds
 from aisecurity.db import log
@@ -428,8 +429,8 @@ class FaceNet:
                 raise error
 
     def websocket_initialize(self):
-        self.ws = websocket.WebSocket()
-        self.ws.connect("ws://172.31.217.136:8000/v1/nano")
+        websocket.enableTrace(True)
+        self.ws = create_connection("ws://67.205.155.37:8000/v1/nano")
         self.ws.send(json.dumps({"id":"1"}))
         print("Connected to server")
 
