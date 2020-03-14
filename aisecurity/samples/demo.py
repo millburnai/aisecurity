@@ -14,8 +14,8 @@ from aisecurity.utils.paths import DEFAULT_MODEL
 
 
 def demo(path=DEFAULT_MODEL, dist_metric="auto", logging=None, use_dynamic=True, use_picam=False, use_graphics=True,
-         use_lcd=False, use_keypad=False, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=False,
-         allow_gpu_growth=False, socket=False):
+         use_lcd=False, use_keypad=False, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=True,
+         allow_gpu_growth=False, socket=True):
 
     if allow_gpu_growth:
         tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
@@ -76,9 +76,9 @@ if __name__ == "__main__":
                         default=None)
     parser.add_argument("--device", help="camera device (default: 0)", type=to_int, default=0)
     parser.add_argument("--face_detector", help="type of face detector (default: mtcnn)", type=str, default="mtcnn")
-    parser.add_argument("--data_mutability", help="use this flag to allow a mutable db", action="store_true")
+    parser.add_argument("--data_mutability", help="use this flag to allow a mutable db", action="store_true", default=True)
     parser.add_argument("--allow_gpu_growth", help="use this flag to use GPU growth", action="store_true")
-    parser.add_argument("--socket", help="use this flag to use websocket", action="store_true", default=False)
+    parser.add_argument("--socket", help="use this flag to use websocket", action="store_true", default=True)
     args = parser.parse_args()
 
 

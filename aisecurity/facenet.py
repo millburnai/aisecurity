@@ -554,6 +554,7 @@ class FaceNet:
         :param socket: in dev
 
         """
+        message = None
 
         update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
 
@@ -575,8 +576,7 @@ class FaceNet:
                     self.ws.send(json.dumps({"best_match": best_match}))
                 except ConnectionResetError:
                     print("Connected closed")
-                print(self.ws.recv())
-                #self.ws.close()
+                message = json.loads(self.ws.recv())
 
         elif update_unrecognized:
             log.log_unknown(logging, "<DEPRECATED>")
@@ -592,13 +592,20 @@ class FaceNet:
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
         if data_mutability and (update_recognized or update_unrecognized):
-            is_correct = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
-            # TODO: replace with input from keyboard
 
-            if len(is_correct) == 0 or is_correct[0] == "y":
+            if socket:
+                is_correct = not bool(message)
+            else: 
+                user_input = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
+                is_correct = bool(len(user_input) == 0 or user_input[0] == "y")
+            # TODO: replace with input from keyboard
+            if is_correct:
                 self.update_data(best_match, [embedding])
             else:
-                name = input("Who are you? ").lower().replace(" ", "_")
+                if socket:
+                    name = message
+                else:
+                    name = input("Who are you? ").lower().replace(" ", "_")
 
                 if name in self.data:
                     self.update_data(name, [embedding])
