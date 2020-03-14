@@ -490,13 +490,14 @@ class FaceNet:
 
         # CAM LOOP
         while True:
-
+            #self.websocket_initialize()
+            '''
             if socket:
                 try:
                     self.ws.recv()
                 except:
                     self.websocket_initialize()
-
+            '''
             _, frame = cap.read()
             original_frame = frame.copy()
 
@@ -584,6 +585,7 @@ class FaceNet:
                 except ConnectionResetError:
                     print("Connected closed")
                 print(self.ws.recv())
+                #self.ws.close()
 
         elif update_unrecognized:
             log.log_unknown(logging, "<DEPRECATED>")
