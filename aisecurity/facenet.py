@@ -36,10 +36,11 @@ from aisecurity.face.detection import detector_init
 from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_face
 
 
-################################ FaceNet ###############################
+#h############################### FaceNet ###############################
 class FaceNet:
     """Class implementation of FaceNet"""
-
+    
+    latest_rec = [None, 0]
 
     # HYPERPARAMETERS
     HYPERPARAMS = {
@@ -437,6 +438,7 @@ class FaceNet:
         try:
             self.ws.send(json.dumps({"best_match": best_match}))
             print("Sending via websocket...")
+            return json.loads(self.ws.recv())
         except ConnectionResetError:
             print("Connection Error")
             self.websocket_initialize()
@@ -570,6 +572,16 @@ class FaceNet:
         :param socket: in dev
 
         """
+        
+        def update_latest():
+            print(self.latest_rec)
+            if is_recognized and self.latest_rec[0] == best_match:
+                self.latest_rec[1] += 1
+            elif is_recognized:
+                self.latest_rec = [best_match, 1] 
+
+        update_latest()
+
         message = None
 
         update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
@@ -580,17 +592,18 @@ class FaceNet:
             elif not 1. / lcd.PROGRESS_BAR.total + lcd.PROGRESS_BAR.progress >= 1.:
                 lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
-        if update_recognized:
-            recognized_person = log.get_mode(log.CURRENT_LOG)
-            log.log_person(logging, recognized_person, times=log.CURRENT_LOG[recognized_person])
+        update_recognized = bool(self.latest_rec[1] > 3)
 
-            lcd.on_recognized(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
+        if update_recognized:
+            latest_rec = [None, 0]
+            #recognized_person = log.get_mode(log.CURRENT_LOG)
+            #log.log_person(logging, recognized_person, times=log.CURRENT_LOG[recognized_person])
+
+            #lcd.on_recognized(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
             if socket:
-                self.websocket_send(best_match)
-                
-                message = json.loads(self.ws.recv())
-
+                message = self.websocket_send(best_match)
+        '''
         elif update_unrecognized:
             log.log_unknown(logging, "<DEPRECATED>")
 
@@ -603,7 +616,7 @@ class FaceNet:
 
                 lcd.PROGRESS_BAR.update(amt=np.inf, previous_msg="Visitor {} created".format(visitor_num))
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
-
+        '''
         if data_mutability and (update_recognized or update_unrecognized):
 
             if socket:
