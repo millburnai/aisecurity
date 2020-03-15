@@ -433,6 +433,16 @@ class FaceNet:
         self.ws.send(json.dumps({"id":"1"}))
         print("Connected to server")
 
+    def websocket_send(self, best_match):
+        try:
+            self.ws.send(json.dumps({"best_match": best_match}))
+            print("Sending via websocket...")
+        except ConnectionResetError:
+            print("Connection Error")
+            self.websocket_initialize()
+            self.websocket_send(best_match)
+
+
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
@@ -577,11 +587,8 @@ class FaceNet:
             lcd.on_recognized(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
             if socket:
-                print("Sending via websocket...")
-                try:
-                    self.ws.send(json.dumps({"best_match": best_match}))
-                except ConnectionResetError:
-                    print("Connected closed")
+                self.websocket_send(best_match)
+                
                 message = json.loads(self.ws.recv())
 
         elif update_unrecognized:
