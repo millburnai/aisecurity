@@ -483,6 +483,7 @@ class FaceNet:
 
         absent_frames = 0
         frames = 0
+        last_frame = (None, None)
 
         if socket:
             self.websocket_initialize()
@@ -503,9 +504,14 @@ class FaceNet:
                 print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
 
                 # add graphics, lcd, logging
-                self.log_activity(
-                    logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist, socket,
-                )
+
+                if (best_match == last_frame[0] and time.time() - last_frame[1] > 3) or best_match != last_frame[0]:
+
+                    self.log_activity(
+                        logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist, socket,
+                    )
+
+                    last_frame = (best_match, time.time())
 
                 if use_graphics:
                     add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
