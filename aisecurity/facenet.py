@@ -13,6 +13,7 @@ import os
 import time
 from timeit import default_timer as timer
 import warnings
+import gc
 
 import cv2
 import keras
@@ -429,18 +430,23 @@ class FaceNet:
                 raise error
 
     def websocket_initialize(self):
-        websocket.enableTrace(True)
-        self.ws = create_connection("ws://67.205.155.37:8000/v1/nano")
-        self.ws.send(json.dumps({"id":"1"}))
-        print("Connected to server")
+        gc.collect()
+        try:
+            websocket.enableTrace(True)
+            self.ws = create_connection("ws://67.205.155.37:8000/v1/nano")
+            self.ws.send(json.dumps({"id":"1"}))
+            print("Connected to server")
+        except Exception as e:
+            print(e)
+            self.websocket_initialize()
 
     def websocket_send(self, best_match):
         try:
             self.ws.send(json.dumps({"best_match": best_match}))
             print("Sending via websocket...")
             return json.loads(self.ws.recv())
-        except ConnectionResetError:
-            print("Connection Error")
+        except Exception as e:
+            print(e)
             self.websocket_initialize()
             self.websocket_send(best_match)
 
@@ -517,13 +523,9 @@ class FaceNet:
 
                 # add graphics, lcd, logging
 
-                if (best_match == last_frame[0] and time.time() - last_frame[1] > 3) or best_match != last_frame[0]:
-
-                    self.log_activity(
-                        logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist, socket,
-                    )
-
-                    last_frame = (best_match, time.time())
+                self.log_activity(
+                    logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist, socket,
+                )
 
                 if use_graphics:
                     add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
