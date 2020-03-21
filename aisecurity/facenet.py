@@ -429,21 +429,20 @@ class FaceNet:
             else:
                 raise error
 
-    def websocket_initialize(self):
-
+    def websocket_initialize(self, socket):
         gc.collect()
 
         try:
             websocket.enableTrace(True)
-            self.ws = create_connection("ws://67.205.155.37:8000/v1/nano")
+            self.ws = create_connection("ws://"+socket+"/v1/nano")
             self.ws.send(json.dumps({"id":"1"}))
             print("Connected to server")
 
         except Exception as e:
             print(e)
-            self.websocket_initialize()
+            self.websocket_initialize(socket)
 
-    def websocket_send(self, best_match):
+    def websocket_send(self, best_match, socket):
 
         try:
             self.ws.send(json.dumps({"best_match": best_match}))
@@ -452,8 +451,8 @@ class FaceNet:
 
         except Exception as e:
             print(e)
-            self.websocket_initialize()
-            self.websocket_send(best_match)
+            self.websocket_initialize(socket)
+            self.websocket_send(best_match, socket)
 
 
 
@@ -509,7 +508,7 @@ class FaceNet:
         last_frame = (None, None)
 
         if socket:
-            self.websocket_initialize()
+            self.websocket_initialize(socket)
 
         # CAM LOOP
         while True:
@@ -612,7 +611,7 @@ class FaceNet:
             #lcd.on_recognized(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
             if socket:
-                message = self.websocket_send(best_match)
+                message = self.websocket_send(best_match, socket)
         '''
         elif update_unrecognized:
             log.log_unknown(logging, "<DEPRECATED>")
