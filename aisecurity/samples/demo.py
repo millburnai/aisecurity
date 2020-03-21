@@ -15,7 +15,7 @@ from aisecurity.utils.paths import DEFAULT_MODEL
 
 def demo(path=DEFAULT_MODEL, dist_metric="auto", logging=None, use_dynamic=True, use_picam=True, use_graphics=True,
          use_lcd=False, use_keypad=False, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=True,
-         allow_gpu_growth=False, socket=True):
+         allow_gpu_growth=False, socket="67.205.155.37:8000"):
 
     if allow_gpu_growth:
         tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()

@@ -430,21 +430,26 @@ class FaceNet:
                 raise error
 
     def websocket_initialize(self):
+
         gc.collect()
+
         try:
             websocket.enableTrace(True)
             self.ws = create_connection("ws://67.205.155.37:8000/v1/nano")
             self.ws.send(json.dumps({"id":"1"}))
             print("Connected to server")
+
         except Exception as e:
             print(e)
             self.websocket_initialize()
 
     def websocket_send(self, best_match):
+
         try:
             self.ws.send(json.dumps({"best_match": best_match}))
             print("Sending via websocket...")
             return json.loads(self.ws.recv())
+
         except Exception as e:
             print(e)
             self.websocket_initialize()
@@ -513,8 +518,6 @@ class FaceNet:
             try:
                 original_frame = frame.copy()
             except AttributeError as e:
-                print(e)
-                time.sleep(.01)
                 os.system('reboot')
 
             if resize:
