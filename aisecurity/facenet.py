@@ -510,7 +510,12 @@ class FaceNet:
         while True:
 
             _, frame = cap.read()
-            original_frame = frame.copy()
+            try:
+                original_frame = frame.copy()
+            except AttributeError as e:
+                print(e)
+                time.sleep(.01)
+                os.system('reboot')
 
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)

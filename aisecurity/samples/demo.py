@@ -13,7 +13,7 @@ from aisecurity.facenet import FaceNet
 from aisecurity.utils.paths import DEFAULT_MODEL
 
 
-def demo(path=DEFAULT_MODEL, dist_metric="auto", logging=None, use_dynamic=True, use_picam=False, use_graphics=True,
+def demo(path=DEFAULT_MODEL, dist_metric="auto", logging=None, use_dynamic=True, use_picam=True, use_graphics=True,
          use_lcd=False, use_keypad=False, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=True,
          allow_gpu_growth=False, socket=True):
 
