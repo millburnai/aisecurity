@@ -11,7 +11,7 @@ from setuptools import setup, find_packages
 # TENSORFLOW INSTALL
 SUPPORTED_TF_VERSIONS = ["1.12", "1.14", "1.15"]
 
-INSTALL_REQUIRES = ["keras", "matplotlib", "pycryptodome", "scikit-learn", "opencv-python", "mtcnn"]
+INSTALL_REQUIRES = ["keras", "matplotlib", "pycryptodome", "scikit-learn", "opencv-python", "mtcnn", "websocket-client"]
 
 try:
     import tensorflow as tf
