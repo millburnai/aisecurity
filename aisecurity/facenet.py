@@ -426,34 +426,6 @@ class FaceNet:
             else:
                 raise error
 
-    # ----- moved to connection.py
-    def websocket_initialize(self, socket):
-        gc.collect()
-
-        try:
-            websocket.enableTrace(True)
-            self.ws = create_connection(socket) #"ws://"+socket+"/v1/nano")
-            self.ws.send(json.dumps({"id":"1"}))
-            print("Connected to server")
-
-        except Exception as e:
-            print(e)
-            self.websocket_initialize(socket)
-
-    # ----- moved to connection.py
-    def websocket_send(self, best_match, socket):
-
-        try:
-            self.ws.send(json.dumps({"best_match": best_match}))
-            print("Sending via websocket...")
-            return json.loads(self.ws.recv())
-
-        except Exception as e:
-            print(e)
-            self.websocket_initialize(socket)
-            self.websocket_send(best_match, socket)
-
-
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
@@ -488,7 +460,6 @@ class FaceNet:
         if dist_metric:
             self.set_dist_metric(dist_metric)
         if socket:
-            # self.websocket_initialize(socket)
             connection.init(socket)
         if resize:
             face_width, face_height = width * resize, height * resize
@@ -571,23 +542,8 @@ class FaceNet:
 
         """
 
-        # message = None
         use_socket = bool(connection.SOCKET)
         update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
-
-        # ------------ OTHER LOGGING ALGORITHM ------------
-        # ** IN ORDER TO USE THIS, JUST UNCOMMENT THIS PART AND UNCOMMENT THE LINE IN connection.py**
-        #
-        # def update_latest():
-        #     print(connection.LATEST_REC)
-        #     if is_recognized and connection.LATEST_REC[0] == best_match:
-        #         connection.LATEST_REC[1] += 1
-        #     elif is_recognized:
-        #         connection.LATEST_REC = [best_match, 1]
-        #
-        # update_latest()
-        # update_recognized = bool(connection.LATEST_REC[1] > 3)
-        # update_unrecognized = False  # <-- so you don't have to comment out the `elif update_recognized:` part
 
         if use_lcd and update_progress:
             if update_recognized:
@@ -602,7 +558,6 @@ class FaceNet:
             lcd.on_recognized(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
             if use_socket:
-                # message = self.websocket_send(best_match, use_socket)
                 connection.send(best_match)
 
         elif update_unrecognized:
@@ -622,7 +577,6 @@ class FaceNet:
             if use_socket:
                 # TODO: should instead get confirmation from pi via user input to keypad
                 is_correct = bool(connection.RECV)
-                # is_correct = not bool(message)
             else:
                 user_input = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
                 is_correct = bool(len(user_input) == 0 or user_input[0] == "y")
@@ -633,7 +587,6 @@ class FaceNet:
                 if use_socket:
                     # TODO: should get response from pi when user enters id via keypad
                     name = connection.RECV
-                    # name = message
                 else:
                     name = input("Who are you? ").lower().replace(" ", "_")
 

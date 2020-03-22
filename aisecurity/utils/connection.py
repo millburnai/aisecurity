@@ -18,8 +18,6 @@ SOCKET_ADDRESS = None
 
 RECV = None
 
-# LATEST_REC = [None, 0]   <- UNCOMMENT FOR OTHER LOGGING ALGORITHM
-
 
 ################################ Websocket ###############################
 def init(socket):
