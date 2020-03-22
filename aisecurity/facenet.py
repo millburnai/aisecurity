@@ -28,6 +28,7 @@ from websocket import create_connection
 from aisecurity.dataflow.data import retrieve_embeds
 from aisecurity.db import log
 from aisecurity.optim import engine
+from aisecurity.utils import connection
 from aisecurity.utils import lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.events import print_time
@@ -40,8 +41,6 @@ from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_face
 #h############################### FaceNet ###############################
 class FaceNet:
     """Class implementation of FaceNet"""
-    
-    latest_rec = [None, 0]
 
     # HYPERPARAMETERS
     HYPERPARAMS = {
@@ -427,12 +426,13 @@ class FaceNet:
             else:
                 raise error
 
+    # ----- moved to connection.py
     def websocket_initialize(self, socket):
         gc.collect()
 
         try:
             websocket.enableTrace(True)
-            self.ws = create_connection("ws://"+socket+"/v1/nano")
+            self.ws = create_connection(socket) #"ws://"+socket+"/v1/nano")
             self.ws.send(json.dumps({"id":"1"}))
             print("Connected to server")
 
@@ -440,6 +440,7 @@ class FaceNet:
             print(e)
             self.websocket_initialize(socket)
 
+    # ----- moved to connection.py
     def websocket_send(self, best_match, socket):
 
         try:
@@ -456,9 +457,8 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
-                            use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, use_keypad=False,
-                            framerate=20, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=False,
-                            socket=None):
+                            use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, framerate=20,
+                            resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=False, socket=None):
         """Real-time facial recognition
 
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
@@ -469,7 +469,6 @@ class FaceNet:
         :param use_picam: use picamera or not (default: False)
         :param use_graphics: display video feed or not (default: True)
         :param use_lcd: use LCD or not. If LCD isn't connected, will default to LCD simulation and warn (default: False)
-        :param use_keypad: use keypad or not. If keypad not connected, will default to False and warn (default: False)
         :param framerate: frame rate, only matters if use_picamera is True (recommended <120) (default: 20)
         :param resize: resize scale (float between 0. and 1.) (default: None)
         :param flip: flip method: +1 = +90º rotation (default: 0)
@@ -486,10 +485,11 @@ class FaceNet:
             log.server_init()
         if use_lcd:
             lcd.init()
-        if use_keypad:
-            keypad.init()
         if dist_metric:
             self.set_dist_metric(dist_metric)
+        if socket:
+            # self.websocket_initialize(socket)
+            connection.init(socket)
         if resize:
             face_width, face_height = width * resize, height * resize
         else:
@@ -504,17 +504,12 @@ class FaceNet:
         absent_frames = 0
         frames = 0
 
-        if socket:
-            self.websocket_initialize(socket)
-
         # CAM LOOP
         while True:
 
             _, frame = cap.read()
-            try:
-                original_frame = frame.copy()
-            except AttributeError as e:
-                os.system('reboot')
+            original_frame = frame.copy()
+            # exception here should be caught by script using aisecurity, not aisecurity itself
 
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
@@ -527,7 +522,7 @@ class FaceNet:
 
                 # add graphics, lcd, logging
                 self.log_activity(
-                    logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist, socket,
+                    logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist
                 )
 
                 if use_graphics:
@@ -561,8 +556,7 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist,
-                     socket):
+    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist):
         """Logs facial recognition activity
 
         :param logging: logging type-- None, "firebase", or "mysql"
@@ -574,22 +568,26 @@ class FaceNet:
         :param data_mutability: static data mutability or not
         :param use_lcd: use lcd or not
         :param dist: distance between best match and current frame
-        :param socket: in dev
 
         """
-        
-        def update_latest():
-            print(self.latest_rec)
-            if is_recognized and self.latest_rec[0] == best_match:
-                self.latest_rec[1] += 1
-            elif is_recognized:
-                self.latest_rec = [best_match, 1] 
 
-        update_latest()
-
-        message = None
-
+        # message = None
+        use_socket = bool(connection.SOCKET)
         update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
+
+        # ------------ OTHER LOGGING ALGORITHM ------------
+        # ** IN ORDER TO USE THIS, JUST UNCOMMENT THIS PART AND UNCOMMENT THE LINE IN connection.py**
+        #
+        # def update_latest():
+        #     print(connection.LATEST_REC)
+        #     if is_recognized and connection.LATEST_REC[0] == best_match:
+        #         connection.LATEST_REC[1] += 1
+        #     elif is_recognized:
+        #         connection.LATEST_REC = [best_match, 1]
+        #
+        # update_latest()
+        # update_recognized = bool(connection.LATEST_REC[1] > 3)
+        # update_unrecognized = False  # <-- so you don't have to comment out the `elif update_recognized:` part
 
         if use_lcd and update_progress:
             if update_recognized:
@@ -597,18 +595,16 @@ class FaceNet:
             elif not 1. / lcd.PROGRESS_BAR.total + lcd.PROGRESS_BAR.progress >= 1.:
                 lcd.PROGRESS_BAR.update(previous_msg="Recognizing...")
 
-        update_recognized = bool(self.latest_rec[1] > 3)
-
         if update_recognized:
-            latest_rec = [None, 0]
-            #recognized_person = log.get_mode(log.CURRENT_LOG)
-            #log.log_person(logging, recognized_person, times=log.CURRENT_LOG[recognized_person])
+            recognized_person = log.get_mode(log.CURRENT_LOG)
+            log.log_person(logging, recognized_person, times=log.CURRENT_LOG[recognized_person])
 
-            #lcd.on_recognized(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
+            lcd.on_recognized(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
 
-            if socket:
-                message = self.websocket_send(best_match, socket)
-        '''
+            if use_socket:
+                # message = self.websocket_send(best_match, use_socket)
+                connection.send(best_match)
+
         elif update_unrecognized:
             log.log_unknown(logging, "<DEPRECATED>")
 
@@ -621,20 +617,23 @@ class FaceNet:
 
                 lcd.PROGRESS_BAR.update(amt=np.inf, previous_msg="Visitor {} created".format(visitor_num))
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
-        '''
-        if data_mutability and (update_recognized or update_unrecognized):
 
-            if socket:
-                is_correct = not bool(message)
-            else: 
+        if data_mutability and (update_recognized or update_unrecognized):
+            if use_socket:
+                # TODO: should instead get confirmation from pi via user input to keypad
+                is_correct = bool(connection.RECV)
+                # is_correct = not bool(message)
+            else:
                 user_input = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
                 is_correct = bool(len(user_input) == 0 or user_input[0] == "y")
-            # TODO: replace with input from keyboard
+
             if is_correct:
                 self.update_data(best_match, [embedding])
             else:
-                if socket:
-                    name = message
+                if use_socket:
+                    # TODO: should get response from pi when user enters id via keypad
+                    name = connection.RECV
+                    # name = message
                 else:
                     name = input("Who are you? ").lower().replace(" ", "_")
 
