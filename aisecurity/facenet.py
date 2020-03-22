@@ -28,7 +28,7 @@ from websocket import create_connection
 from aisecurity.dataflow.data import retrieve_embeds
 from aisecurity.db import log
 from aisecurity.optim import engine
-from aisecurity.hardware import keypad, lcd
+from aisecurity.utils import lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.events import print_time
 from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
@@ -83,8 +83,6 @@ class FaceNet:
 
         self._db = {}
         self._knn = None
-        
-        
 
         if data_path:
             self.set_data(retrieve_embeds(data_path), config=DATABASE_INFO)
@@ -505,7 +503,6 @@ class FaceNet:
 
         absent_frames = 0
         frames = 0
-        last_frame = (None, None)
 
         if socket:
             self.websocket_initialize(socket)
@@ -529,7 +526,6 @@ class FaceNet:
                 print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
 
                 # add graphics, lcd, logging
-
                 self.log_activity(
                     logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist, socket,
                 )
