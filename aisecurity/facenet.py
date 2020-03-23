@@ -361,11 +361,11 @@ class FaceNet:
         elif self.MODE == "trt":
             return self.facenet.inference(np.expand_dims(img, axis=0), output_shape=(1, -1))
 
-    def predict(self, path_or_img, face_detector="mtcnn", margin=IMG_CONSTANTS["margin"]):
+    def predict(self, path_or_img, face_detector="both", margin=IMG_CONSTANTS["margin"]):
         """Embeds and normalizes an image from path or array
 
         :param path_or_img: path or image to predict on
-        :param face_detector: face detector (either mtcnn, haarcascade, or None) (default: "mtcnn")
+        :param face_detector: face detector (either mtcnn, haarcascade, or None) (default: "both")
         :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
         :returns: normalized embeddings, facial coordinates
 
