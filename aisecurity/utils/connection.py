@@ -54,5 +54,8 @@ def send(best_match):
         init(SOCKET_ADDRESS)
         send(best_match)
 
+
 def reset():
+    global RECV
+
     RECV = None
