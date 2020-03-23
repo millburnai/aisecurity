@@ -53,3 +53,6 @@ def send(best_match):
         print("[DEBUG]", e)
         init(SOCKET_ADDRESS)
         send(best_match)
+
+def reset():
+    RECV = None

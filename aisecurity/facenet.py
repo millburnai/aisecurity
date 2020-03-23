@@ -587,6 +587,7 @@ class FaceNet:
                 if use_socket:
                     # TODO: should get response from pi when user enters id via keypad
                     name = connection.RECV
+                    connection.reset()
                 else:
                     name = input("Who are you? ").lower().replace(" ", "_")
 
