@@ -576,7 +576,7 @@ class FaceNet:
         if data_mutability and (update_recognized or update_unrecognized):
             if use_socket:
                 # TODO: should instead get confirmation from pi via user input to keypad
-                is_correct = bool(connection.RECV)
+                is_correct = not bool(connection.RECV)
             else:
                 user_input = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
                 is_correct = bool(len(user_input) == 0 or user_input[0] == "y")
