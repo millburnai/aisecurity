@@ -46,7 +46,7 @@ def generate_cipher(key_file, alloc_mem):
     key = get_key(key_file)
     cipher = AES.new(key, AES.MODE_EAX)
     if alloc_mem:
-        with open(key_file, "ab", encoding="utf-8") as keys:
+        with open(key_file, "ab") as keys:
             keys.write(cipher.nonce)
     return cipher
 
