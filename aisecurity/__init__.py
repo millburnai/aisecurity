@@ -1,5 +1,5 @@
-# paths-- must be imported before anything else
 from aisecurity.utils.paths import *
+# paths-- must be imported before anything else
 
 from . import dataflow
 from . import db

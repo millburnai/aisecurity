@@ -428,14 +428,14 @@ class FaceNet:
 
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, dist_metric="euclidean+l2_normalize", logging=None,
-                            use_dynamic=False, use_picam=False, use_graphics=True, use_lcd=False, framerate=20,
-                            resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=False, socket=None):
+    def real_time_recognize(self, width=640, height=360, dist_metric=None, logging=None, use_dynamic=False,
+                            use_picam=False, use_graphics=True, use_lcd=False, framerate=20, resize=None, flip=0,
+                            device=0, face_detector="mtcnn", data_mutability=False, socket=None):
         """Real-time facial recognition
 
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
-        :param dist_metric: DistMetric object or str distance metric (default: "euclidean+l2_normalize")
+        :param dist_metric: DistMetric object or str distance metric (default: this.dist_metric)
         :param logging: logging type-- None, "firebase", or "mysql" (default: None)
         :param use_dynamic: use dynamic database for visitors or not (default: False)
         :param use_picam: use picamera or not (default: False)

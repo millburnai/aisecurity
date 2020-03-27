@@ -31,6 +31,7 @@ def detector_init(min_face_size=20, filepath=CONFIG_HOME+"/models/haarcascae_fro
 
 
 def detect_faces(img, mode="mtcnn"):
+    assert mode in ("both", "mtcnn", "haarcascade"), "supported modes are 'both', 'mtcnn', 'haarcascade')"
     assert MTCNN and HAARCASCADE, "call detector_init() before using detect_faces()"
 
     result = []
@@ -48,8 +49,5 @@ def detect_faces(img, mode="mtcnn"):
                 "keypoints": None,
                 "confidence": 1.0
             })
-
-    else:
-        raise ValueError("'{}' not a supported mode (supported are 'mtcnn' and 'haarcascade')".format(mode))
 
     return result
