@@ -13,7 +13,6 @@ import warnings
 
 import mysql.connector
 import pyrebase
-import requests
 from termcolor import cprint
 
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
@@ -37,8 +36,6 @@ FIREBASE = None
 NUM_RECOGNIZED, NUM_UNKNOWN = None, None
 LAST_LOGGED, UNK_LAST_LOGGED = None, None
 CURRENT_LOG, DISTS = None, None
-
-USE_SERVER = None
 
 
 # LOGGING INIT AND HELPERS
@@ -93,23 +90,6 @@ def init(logging, flush=False, thresholds=None):
 
     if thresholds:
         THRESHOLDS = {**THRESHOLDS, **thresholds}
-
-
-def server_init():
-    global USE_SERVER
-
-    try:
-        print("Connecting to server...")
-        requests.get(CONFIG["server_address"], timeout=1.)
-        USE_SERVER = True
-    except (requests.exceptions.Timeout, requests.exceptions.MissingSchema, KeyError) as error:
-        if isinstance(error, requests.exceptions.Timeout):
-            warnings.warn("ID server unreachable")
-        elif isinstance(error, requests.exceptions.MissingSchema):
-            warnings.warn("Invalid server address in config")
-        elif isinstance(error, KeyError):
-            warnings.warn("Server address missing in config")
-        USE_SERVER = False
 
 
 def get_now(seconds):
