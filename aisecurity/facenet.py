@@ -13,7 +13,6 @@ import os
 import time
 from timeit import default_timer as timer
 import warnings
-import gc
 
 import cv2
 import keras
@@ -22,8 +21,6 @@ import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
-import websocket
-from websocket import create_connection
 
 from aisecurity.dataflow.data import retrieve_embeds
 from aisecurity.db import log
@@ -350,6 +347,7 @@ class FaceNet:
         """Embeds cropped face
 
         :param img: img as a cropped face with shape (h, w, 3)
+        :returns: embedding as array with shape (1, -1)
 
         """
 
