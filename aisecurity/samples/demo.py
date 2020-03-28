@@ -14,7 +14,7 @@ from aisecurity.utils.paths import DEFAULT_MODEL
 
 
 def demo(path=DEFAULT_MODEL, dist_metric="auto", logging=None, use_dynamic=True, use_picam=True, use_graphics=True,
-         use_lcd=False, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=True,
+         use_pbar=False, resize=None, flip=0, device=0, face_detector="mtcnn", data_mutability=True,
          socket="ws://67.205.155.37:8000/v1/nano", allow_gpu_growth=False):
 
     if allow_gpu_growth:
@@ -30,7 +30,7 @@ def demo(path=DEFAULT_MODEL, dist_metric="auto", logging=None, use_dynamic=True,
 
     facenet.real_time_recognize(
         dist_metric=dist_metric, logging=logging, use_dynamic=use_dynamic, use_picam=use_picam,
-        use_graphics=use_graphics, resize=resize, use_lcd=use_lcd, flip=flip, device=device,
+        use_graphics=use_graphics, resize=resize, use_pbar=use_pbar, flip=flip, device=device,
         face_detector=face_detector, data_mutability=data_mutability, socket=socket
     )
 
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_dynamic", help="use this flag to use dynamic database", action="store_true")
     parser.add_argument("--no_graphics", help="use this flag to turn off graphics", action="store_true")
     parser.add_argument("--use_picam", help="use this flag to use a Picamera", action="store_true")
-    parser.add_argument("--use_lcd", help="use this flag to use LCD display", action="store_true")
+    parser.add_argument("--use_pbar", help="use this flag to use progress bar", action="store_true")
     parser.add_argument("--flip", help="flip method: +1 = +90º rotation (default: 0)", type=to_int, default=0)
     parser.add_argument("--resize", help="resize frame for faster recognition (default: None)", type=bounded_float,
                         default=None)
@@ -85,6 +85,7 @@ if __name__ == "__main__":
     demo(
         path=args.path_to_model, dist_metric=args.dist_metric, logging=args.logging,
         use_dynamic=args.use_dynamic, use_picam=args.use_picam, use_graphics=not args.no_graphics,
-        use_lcd=args.use_lcd,  flip=args.flip, resize=args.resize, device=args.device, face_detector=args.face_detector,
-        data_mutability=args.data_mutability, allow_gpu_growth=args.allow_gpu_growth, socket=args.socket
+        use_pbar=args.use_pbar,  flip=args.flip, resize=args.resize, device=args.device,
+        face_detector=args.face_detector, data_mutability=args.data_mutability, allow_gpu_growth=args.allow_gpu_growth,
+        socket=args.socket
     )

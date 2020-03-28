@@ -31,7 +31,7 @@ from aisecurity.optim import engine
 from aisecurity.utils import connection
 from aisecurity.utils import lcd
 from aisecurity.utils.distance import DistMetric
-from aisecurity.utils.events import print_time
+from aisecurity.utils.decorators import print_time
 from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
 from aisecurity.utils.visuals import get_video_cap, add_graphics
 from aisecurity.face.detection import detector_init
@@ -429,7 +429,7 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric=None, logging=None, use_dynamic=False,
-                            use_picam=False, use_graphics=True, use_lcd=False, framerate=20, resize=None, flip=0,
+                            use_picam=False, use_graphics=True, use_pbar=False, framerate=20, resize=None, flip=0,
                             device=0, face_detector="mtcnn", data_mutability=False, socket=None):
         """Real-time facial recognition
 
@@ -440,7 +440,7 @@ class FaceNet:
         :param use_dynamic: use dynamic database for visitors or not (default: False)
         :param use_picam: use picamera or not (default: False)
         :param use_graphics: display video feed or not (default: True)
-        :param use_lcd: use LCD or not. If LCD isn't connected, will default to LCD simulation and warn (default: False)
+        :param use_pbar: use progress bar or not. If Pi isn't reachable, will default to LCD simulation (default: False)
         :param framerate: frame rate, only matters if use_picamera is True (recommended <120) (default: 20)
         :param resize: resize scale (float between 0. and 1.) (default: None)
         :param flip: flip method: +1 = +90º rotation (default: 0)
@@ -453,14 +453,12 @@ class FaceNet:
 
         # INITS
         log.init(logging, flush=True)
-        if logging:
-            log.server_init()
-        if use_lcd:
-            lcd.init()
         if dist_metric:
             self.set_dist_metric(dist_metric)
         if socket:
             connection.init(socket)
+        if use_pbar:
+            lcd.init()
         if resize:
             face_width, face_height = width * resize, height * resize
         else:
@@ -493,7 +491,7 @@ class FaceNet:
 
                 # add graphics, lcd, logging
                 self.log_activity(
-                    logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist
+                    logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_pbar, dist
                 )
 
                 if use_graphics:
@@ -506,10 +504,8 @@ class FaceNet:
                     log.flush_current(mode="known+unknown", flush_times=False)
                 print("No face detected")
 
-            if use_lcd:
-                lcd_clear = log.THRESHOLDS["missed_frames"] / log.THRESHOLDS["num_recognized"]
-                if log.LAST_LOGGED - timer() > lcd_clear or log.UNK_LAST_LOGGED - timer() > lcd_clear:
-                    lcd.reset()
+            if use_pbar:
+                lcd.check_clear()
 
             if use_graphics:
                 cv2.imshow("AI Security v0.9a", original_frame)
@@ -527,7 +523,7 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_lcd, dist):
+    def log_activity(self, logging, is_recognized, best_match, embedding, use_dynamic, data_mutability, use_pbar, dist):
         """Logs facial recognition activity
 
         :param logging: logging type-- None, "firebase", or "mysql"
@@ -537,7 +533,7 @@ class FaceNet:
         :param embedding: embedding vector
         :param use_dynamic: use dynamic database or not
         :param data_mutability: static data mutability or not
-        :param use_lcd: use lcd or not
+        :param use_pbar: use use_pbar or not
         :param dist: distance between best match and current frame
 
         """
@@ -545,7 +541,7 @@ class FaceNet:
         use_socket = bool(connection.SOCKET)
         update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
 
-        if use_lcd and update_progress:
+        if use_pbar and update_progress:
             if update_recognized:
                 lcd.PROGRESS_BAR.update(amt=np.inf, previous_msg="Recognizing...")
             elif not 1. / lcd.PROGRESS_BAR.total + lcd.PROGRESS_BAR.progress >= 1.:
@@ -555,15 +551,13 @@ class FaceNet:
             recognized_person = log.get_mode(log.CURRENT_LOG)
             log.log_person(logging, recognized_person, times=log.CURRENT_LOG[recognized_person])
 
-            lcd.on_recognized(best_match, log.USE_SERVER)  # will silently fail if lcd not supported
-
             if use_socket:
-                connection.send(best_match)
+                connection.send(best_match=best_match)
 
         elif update_unrecognized:
             log.log_unknown(logging, "<DEPRECATED>")
 
-            if use_lcd:
+            if use_pbar:
                 lcd.PROGRESS_BAR.reset(previous_msg="Recognizing...")
 
             if use_dynamic:
@@ -584,12 +578,9 @@ class FaceNet:
             if is_correct:
                 self.update_data(best_match, [embedding])
             else:
-                if use_socket:
-                    # TODO: should get response from pi when user enters id via keypad
-                    name = connection.RECV
-                    connection.reset()
-                else:
-                    name = input("Who are you? ").lower().replace(" ", "_")
+                # TODO: should get response from pi when user enters id via keypad
+                name = connection.RECV if use_socket else input("Who are you? ").lower().replace(" ", "_")
+                connection.reset()
 
                 if name in self.data:
                     self.update_data(name, [embedding])
