@@ -13,7 +13,7 @@ import warnings
 import tqdm
 
 from aisecurity.privacy.encryptions import DataEncryption
-from aisecurity.utils.events import print_time
+from aisecurity.utils.decorators import print_time
 from aisecurity.utils.paths import DATABASE_INFO, DATABASE, NAME_KEYS, EMBEDDING_KEYS
 
 

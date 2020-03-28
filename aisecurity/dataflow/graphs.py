@@ -20,7 +20,7 @@ except ModuleNotFoundError:
     # tf-trt not supported on windows and tensorflow>1.14
     warnings.warn("tf-trt graph functions cannot be used")
 
-from aisecurity.utils.events import print_time
+from aisecurity.utils.decorators import print_time
 
 
 # MODEL CONVERSIONS

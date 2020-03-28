@@ -12,7 +12,7 @@ import warnings
 import numpy as np
 from aisecurity.utils.paths import CONFIG_HOME
 
-from aisecurity.utils.events import print_time
+from aisecurity.utils.decorators import print_time
 
 
 ################################ Setup ################################
