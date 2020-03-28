@@ -1,6 +1,6 @@
 """
 
-"aisecurity.utils.events"
+"aisecurity.utils.decorators"
 
 Miscellaneous tools for time and event handling.
 
@@ -24,6 +24,22 @@ def print_time(message="Time elapsed"):
         return _func
 
     return _timer
+
+
+def check_fail(threshold=3):
+    def _check_fail(func):
+        @functools.wraps(func)
+        def _func(*args, **kwargs):
+            failures = 0
+            while failures < threshold:
+                if func(*args, **kwargs):
+                    return True
+                failures += 1
+            return False
+
+        return _func
+
+    return _check_fail
 
 
 def in_dev(message="currently in development; do not use in production"):
