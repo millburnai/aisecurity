@@ -38,7 +38,7 @@ def normalize(x, mode="per_image"):
 
 
 @print_time("Detection time")
-def crop_face(path_or_img, margin, face_detector="mtcnn", alpha=0.9):
+def crop_face(path_or_img, margin, detector="mtcnn", alpha=0.9):
     exit_failure = itertools.repeat(-1, 2)
 
     try:
@@ -49,8 +49,8 @@ def crop_face(path_or_img, margin, face_detector="mtcnn", alpha=0.9):
         except AttributeError:
             return exit_failure
 
-    if face_detector:
-        result = detect_faces(img, mode=face_detector)
+    if detector:
+        result = detect_faces(img, mode=detector)
         if len(result) == 0:
             return exit_failure
 
