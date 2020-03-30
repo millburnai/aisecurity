@@ -27,8 +27,8 @@ LCD_DEVICE, PROGRESS_BAR = None, None
 def init():
     global LCD_DEVICE, PROGRESS_BAR
 
-    LCD_DEVICE = LCD(mode="pi")
-    LCD_DEVICE.set_message("Loading...\n[Initializing]")
+    LCD_DEVICE = LCD(mode="sim")
+    LCD_DEVICE.set_message("Loading...\n[ Initializing ]")
 
     PROGRESS_BAR = LCDProgressBar(lcd=LCD_DEVICE, total=log.THRESHOLDS["num_recognized"])
 
@@ -40,7 +40,6 @@ class LCD:
 
     def __init__(self, mode="pi"):
         assert mode in ("pi", "sim"), "supported modes are physical (physical LCD) and dev (testing)"
-        self.message = None
 
         try:
             assert connection.SOCKET, "connection.SOCKET must be initialized by using connection.init()"
@@ -55,17 +54,11 @@ class LCD:
 
     # FUNCTIONALITY
     def set_message(self, message):
-        self.message = message
 
         if self.mode == "pi":
-            connection.send({"LCD":self.message})
+            connection.send({"LCD":message})
         elif self.mode == "sim":
-            cprint(self.message, attrs=["bold"])
-
-    def clear(self):
-
-        if self.mode == "sim": self.set_message("<Message cleared>")
-        else: pass
+            cprint(message, attrs=["bold"])
 
 
 # LCD PROGRESS BAR
@@ -76,37 +69,23 @@ class LCDProgressBar:
         self.total = total
         self.bar_length = length - 2  # compensate for [] at beginning and end
         self.marker = marker
-        self.progress = 0
+        self.progress = 0.
+        self.empty = " " * self.bar_length
 
     def reset(self, previous_msg=None):
         self.progress = 0.
         if previous_msg:
             self.lcd.set_message("{}\n[{}]".format(previous_msg, " " * self.bar_length))
 
-    def _update(self, percent, previous_msg=None):
-        self.progress += percent
+    def update(self, previous_msg=None):
+        self.progress += 1/self.total
 
-        reset = False
-        if self.progress >= 1.:
-            self.progress = 1.
-            reset = True
+        done = (self.marker * round(self.progress * self.bar_length) + self.empty)[:self.bar_length]
 
-        done = self.marker * round(self.progress * self.bar_length)
-        left = " " * (self.bar_length - len(done))
+        self.lcd.set_message("{}\n[{}]".format(previous_msg, done))
 
-        if previous_msg:
-            self.lcd.set_message("{}\n[{}{}]".format(previous_msg, done, left))
-        else:
-            self.lcd.set_message("[{}{}]".format(done, left))
-
-        if reset:
+        if bool(self.progress>=1):
             self.progress = 0.
-
-    def update(self, amt=1, previous_msg=None):
-        if amt > self.total:
-            amt = self.total
-            
-        self._update(amt / self.total, previous_msg)
 
 
     # PROGRESS BAR DECORATOR
@@ -146,26 +125,16 @@ class LCDProgressBar:
 
 ################################ Functions ################################
 
-# RESET
-def reset():
-    global LCD_DEVICE, PROGRESS_BAR
-
-    LCD_DEVICE.clear()
-    PROGRESS_BAR.reset()
-
-
 # PERIODIC LCD CLEAR
 def check_clear():
     lcd_clear = log.THRESHOLDS["num_recognized"] / log.THRESHOLDS["missed_frames"]
     if log.LAST_LOGGED - timer() > lcd_clear or log.UNK_LAST_LOGGED - timer() > lcd_clear:
-        reset()
+        global PROGRESS_BAR
+        PROGRESS_BAR.reset()
 
 
 # PBAR UPDATE
 def update_progress(update_recognized):
     global PROGRESS_BAR
 
-    if update_recognized:
-        PROGRESS_BAR.update(amt=PROGRESS_BAR.total, previous_msg="Recognizing...")
-    elif not 1. / PROGRESS_BAR.total + PROGRESS_BAR.progress >= 1.:
-        PROGRESS_BAR.update(previous_msg="Recognizing...")
+    PROGRESS_BAR.update(previous_msg="Recognizing...")
