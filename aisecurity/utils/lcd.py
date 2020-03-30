@@ -5,7 +5,9 @@
 LCD utils.
 
 """
-
+import concurrent.futures
+import functools
+import time
 from timeit import default_timer as timer
 import warnings
 
@@ -96,7 +98,7 @@ class LCDProgressBar:
             self.lcd.set_message("[{}{}]".format(done, left))
 
         if reset:
-            self.reset(previous_msg=previous_msg)
+            self.progress = 0.
 
     def update(self, amt=1, previous_msg=None):
         if amt > self.total:
@@ -104,6 +106,41 @@ class LCDProgressBar:
         elif amt < 0:
             raise ValueError("amt cannot be negative")
         self._update(amt / self.total, previous_msg)
+
+
+    # PROGRESS BAR DECORATOR
+    @classmethod
+    def progress_bar(cls, lcd, expected_time, msg=None, marker="#"):
+        # https://stackoverflow.com/questions/59013308/python-progress-bar-for-non-loop-function
+
+        def _progress_bar(func):
+
+            def timed_progress_bar(future, expected_time, marker="#", previous_msg=None):
+                # complete early if future completes; wait for future if it doesn't complete in expected_time
+                pbar = cls(total=expected_time, lcd=lcd, marker=marker)
+
+                for sec in range(expected_time - 1):
+                    if future.done():
+                        pbar.update(expected_time - sec, previous_msg=previous_msg)
+                        return
+                    else:
+                        time.sleep(1)
+                        pbar.update(previous_msg=previous_msg)
+
+                future.result()
+                pbar.update(previous_msg=previous_msg)
+
+            @functools.wraps(func)
+            def _func(*args, **kwargs):
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(func, *args, **kwargs)
+                    timed_progress_bar(future, expected_time, marker, msg)
+
+                return future.result()
+
+            return _func
+
+        return _progress_bar
 
 
 ################################ Functions ################################
