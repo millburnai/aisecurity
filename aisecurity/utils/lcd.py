@@ -58,7 +58,7 @@ class LCD:
         self.message = message
 
         if self.mode == "pi":
-            connection.send({"message":self.message})
+            connection.send({"LCD":self.message})
         elif self.mode == "sim":
             cprint(self.message, attrs=["bold"])
 

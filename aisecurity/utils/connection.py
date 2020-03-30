@@ -75,7 +75,7 @@ def send(obj):
         SOCKET.send(json.dumps(obj))
         print("[DEBUG] Sending via websocket...")
 
-        RECV = json.loads(SOCKET.recv())
+        if "best_match" in obj: RECV = json.loads(SOCKET.recv())
 
         return True
 
