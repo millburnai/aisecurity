@@ -22,13 +22,12 @@ from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
 
-from aisecurity.dataflow.data import retrieve_embeds
+from aisecurity.dataflow.loader import print_time, retrieve_embeds
 from aisecurity.db import log
 from aisecurity.optim import engine
 from aisecurity.utils import connection
 from aisecurity.utils import lcd
 from aisecurity.utils.distance import DistMetric
-from aisecurity.utils.decorators import print_time
 from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
 from aisecurity.utils.visuals import get_video_cap, add_graphics
 from aisecurity.face.detection import detector_init
@@ -562,7 +561,6 @@ class FaceNet:
 
         if data_mutable and (update_recognized or update_unrecognized):
             if use_socket:
-                # TODO: should instead get confirmation from pi via user input to keypad
                 is_correct = not bool(connection.RECV)
             else:
                 user_input = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
@@ -571,7 +569,6 @@ class FaceNet:
             if is_correct:
                 self.update_data(best_match, [embedding])
             else:
-                # TODO: should get response from pi when user enters id via keypad
                 name = connection.RECV if use_socket else input("Who are you? ").lower().replace(" ", "_")
                 connection.reset()
 

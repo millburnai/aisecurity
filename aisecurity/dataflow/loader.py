@@ -1,11 +1,13 @@
 """
 
-"aisecurity.dataflow.data"
+"aisecurity.dataflow.loader"
 
-Data utils.
+Data loader and writer utils.
 
 """
 
+from timeit import default_timer as timer
+import functools
 import json
 import os
 import warnings
@@ -13,8 +15,22 @@ import warnings
 import tqdm
 
 from aisecurity.privacy.encryptions import DataEncryption
-from aisecurity.utils.decorators import print_time
 from aisecurity.utils.paths import DATABASE_INFO, DATABASE, NAME_KEYS, EMBEDDING_KEYS
+
+
+# DECORATORS
+def print_time(message="Time elapsed"):
+    def _timer(func):
+        @functools.wraps(func)
+        def _func(*args, **kwargs):
+            start = timer()
+            result = func(*args, **kwargs)
+            print("{}: {}s".format(message, round(timer() - start, 4)))
+            return result
+
+        return _func
+
+    return _timer
 
 
 # LOAD ON THE FLY

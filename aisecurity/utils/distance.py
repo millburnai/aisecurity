@@ -68,7 +68,7 @@ class DistMetric:
         "cosine": construct_dist(
             # norm has to be a transformation s.t. x^T x = 1 for all x in a, b
             # (https://stackoverflow.com/questions/34144632/using-cosine-distance-with-scikit-learn-kneighborsclassifier)
-            norm=lambda x: x / np.linalg.norm(x), # svd_whiten(x),
+            norm=lambda x: x / np.linalg.norm(x),
             calc=lambda a, b: cosine(a.flatten(), b.flatten())
         )
     }
@@ -208,7 +208,6 @@ class DistMetric:
 
 
 if __name__ == "__main__":
-    # TODO: rewrite as unit test
     from timeit import default_timer as timer
 
     for trial_num, test in enumerate(np.random.random((10, 128, 1))):

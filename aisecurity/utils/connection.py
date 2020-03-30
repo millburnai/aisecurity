@@ -6,21 +6,39 @@ Handles connection to websocket.
 
 """
 
+import functools
 import gc
 import json
 
 import websocket
 
-from aisecurity.utils.decorators import check_fail
-
 
 ################################ Setup and helpers###############################
+
+# GLOBALS
 FAIL_THRESHOLD = 3
 
 SOCKET = None
 SOCKET_ADDRESS = None
 
 RECV = None
+
+
+# DECORATORS
+def check_fail(threshold):
+    def _check_fail(func):
+        @functools.wraps(func)
+        def _func(*args, **kwargs):
+            failures = 0
+            while failures < threshold:
+                if func(*args, **kwargs):
+                    return True
+                failures += 1
+            return False
+
+        return _func
+
+    return _check_fail
 
 
 ################################ Websocket ###############################
