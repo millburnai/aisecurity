@@ -25,7 +25,7 @@ LCD_DEVICE, PROGRESS_BAR = None, None
 def init():
     global LCD_DEVICE, PROGRESS_BAR
 
-    LCD_DEVICE = LCD(mode="sim")
+    LCD_DEVICE = LCD(mode="pi")
     LCD_DEVICE.set_message("Loading...\n[Initializing]")
 
     PROGRESS_BAR = LCDProgressBar(lcd=LCD_DEVICE, total=log.THRESHOLDS["num_recognized"])
@@ -56,7 +56,7 @@ class LCD:
         self.message = message
 
         if self.mode == "pi":
-            connection.send(lcd_message=self.message)
+            connection.send({"message":self.message})
         elif self.mode == "sim":
             cprint(self.message, attrs=["bold"])
 

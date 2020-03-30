@@ -50,11 +50,11 @@ def init(socket):
 
 
 @check_fail(FAIL_THRESHOLD)
-def send(**kwargs):
+def send(obj):
     global SOCKET, RECV
 
     try:
-        SOCKET.send(json.dumps(**kwargs))
+        SOCKET.send(json.dumps(obj))
         print("[DEBUG] Sending via websocket...")
 
         RECV = json.loads(SOCKET.recv())
@@ -64,7 +64,7 @@ def send(**kwargs):
     except Exception as e:
         print("[DEBUG]", e)
         init(SOCKET_ADDRESS)
-        send(**kwargs)
+        send(obj)
 
         return False
 

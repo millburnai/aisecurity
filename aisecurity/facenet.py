@@ -545,7 +545,7 @@ class FaceNet:
             log.log_person(logging, person, times=log.CURRENT_LOG[person])
 
             if use_socket:
-                connection.send(best_match=best_match)
+                connection.send({"best_match":best_match})
 
         elif update_unrecognized:
             log.log_unknown(logging, "<DEPRECATED>")
