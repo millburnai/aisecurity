@@ -11,8 +11,8 @@ import itertools
 import cv2
 import numpy as np
 
+from aisecurity.dataflow.loader import print_time
 from aisecurity.face.detection import detect_faces
-from aisecurity.utils.decorators import print_time
 
 
 # CONSTANTS

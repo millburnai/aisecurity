@@ -14,13 +14,14 @@ from keras import backend as K
 import tensorflow as tf
 from tensorflow.python.framework import graph_io
 
+from aisecurity.dataflow.loader import print_time
+
+# AUTOINIT
 try:
     import tensorflow.contrib.tensorrt as trt
 except ModuleNotFoundError:
     # tf-trt not supported on windows and tensorflow>1.14
     warnings.warn("tf-trt graph functions cannot be used")
-
-from aisecurity.utils.decorators import print_time
 
 
 # MODEL CONVERSIONS

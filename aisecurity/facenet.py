@@ -22,13 +22,12 @@ from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
 
-from aisecurity.dataflow.data import retrieve_embeds
+from aisecurity.dataflow.loader import print_time, retrieve_embeds
 from aisecurity.db import log
 from aisecurity.optim import engine
 from aisecurity.utils import connection
 from aisecurity.utils import lcd
 from aisecurity.utils.distance import DistMetric
-from aisecurity.utils.decorators import print_time
 from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
 from aisecurity.utils.visuals import get_video_cap, add_graphics
 from aisecurity.face.detection import detector_init

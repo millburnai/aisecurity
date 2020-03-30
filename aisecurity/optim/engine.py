@@ -10,10 +10,9 @@ import json
 import warnings
 
 import numpy as np
+
+from aisecurity.dataflow.loader import print_time
 from aisecurity.utils.paths import CONFIG_HOME
-
-from aisecurity.utils.decorators import print_time
-
 
 ################################ Setup ################################
 
