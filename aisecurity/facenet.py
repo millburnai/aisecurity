@@ -561,7 +561,6 @@ class FaceNet:
 
         if data_mutable and (update_recognized or update_unrecognized):
             if use_socket:
-                # TODO: should instead get confirmation from pi via user input to keypad
                 is_correct = not bool(connection.RECV)
             else:
                 user_input = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
@@ -570,7 +569,6 @@ class FaceNet:
             if is_correct:
                 self.update_data(best_match, [embedding])
             else:
-                # TODO: should get response from pi when user enters id via keypad
                 name = connection.RECV if use_socket else input("Who are you? ").lower().replace(" ", "_")
                 connection.reset()
 
