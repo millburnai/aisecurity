@@ -25,7 +25,7 @@ LCD_DEVICE, PROGRESS_BAR = None, None
 def init():
     global LCD_DEVICE, PROGRESS_BAR
 
-    LCD_DEVICE = LCD()
+    LCD_DEVICE = LCD(mode="sim")
     LCD_DEVICE.set_message("Loading...\n[Initializing]")
 
     PROGRESS_BAR = LCDProgressBar(lcd=LCD_DEVICE, total=log.THRESHOLDS["num_recognized"])
