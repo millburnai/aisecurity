@@ -18,7 +18,7 @@ def demo(path=DEFAULT_MODEL, dist_metric="auto", logging=None, dynamic_log=True,
          socket="ws://67.205.155.37:8000/v1/nano", allow_gpu_growth=False):
 
     pbar = True
-    socket = "ws://67.205.155.37:80/v1/nano"
+    socket = "ws://67.205.155.37:8000/v1/nano"
 
     if allow_gpu_growth:
         tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()

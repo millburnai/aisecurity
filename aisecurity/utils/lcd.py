@@ -63,7 +63,9 @@ class LCD:
             cprint(self.message, attrs=["bold"])
 
     def clear(self):
-        self.set_message("<Message cleared>")
+
+        if self.mode == "sim": self.set_message("<Message cleared>")
+        else: pass
 
 
 # LCD PROGRESS BAR
@@ -103,8 +105,7 @@ class LCDProgressBar:
     def update(self, amt=1, previous_msg=None):
         if amt > self.total:
             amt = self.total
-        elif amt < 0:
-            raise ValueError("amt cannot be negative")
+            
         self._update(amt / self.total, previous_msg)
 
 
