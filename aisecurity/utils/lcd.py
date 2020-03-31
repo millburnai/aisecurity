@@ -25,7 +25,7 @@ PROGRESS_BAR = None
 def init():
     global PROGRESS_BAR
 
-    PROGRESS_BAR = LCDProgressBar(mode="sim", total=log.THRESHOLDS["num_recognized"])
+    PROGRESS_BAR = LCDProgressBar(mode="pi" if connection.SOCKET else "sim", total=log.THRESHOLDS["num_recognized"])
     PROGRESS_BAR.set_message("Loading...\n[ Initializing ]")
 
 
@@ -59,21 +59,21 @@ class LCDProgressBar:
         elif self.mode == "sim":
             cprint(message, attrs=["bold"])
 
-    def reset(self, previous_msg=None):
+    def reset(self, message=None):
         self.progress = 0.
 
-        if previous_msg:
-            self.set_message("{}\n[{}]".format(previous_msg, " " * self.bar_length))
+        if message:
+            self.set_message("{}\n[{}]".format(message, " " * self.bar_length))
 
-    def update(self, previous_msg=None):
-        self.progress += 1. / self.total
+    def update(self, amt=1., message=None):
+        self.progress += amt / self.total
 
         if self.progress > 1.:
             self.progress = 1.
 
         done = (self.marker * round(self.progress * self.bar_length) + self.empty)[:self.bar_length]
 
-        self.set_message("{}\n[{}]".format(previous_msg, done))
+        self.set_message("{}\n[{}]".format(message, done))
 
         if self.progress == 1.:
             self.progress = 0.
@@ -95,6 +95,6 @@ def update_progress(update_recognized):
     global PROGRESS_BAR
 
     if update_recognized:
-        PROGRESS_BAR.update(previous_msg="Recognizing...")
-    elif not 1. / PROGRESS_BAR.total + PROGRESS_BAR.progress >= 1.:
-        PROGRESS_BAR.update(previous_msg="Recognizing...")
+        PROGRESS_BAR.update(amt=PROGRESS_BAR.total, message="Recognizing...")
+    elif 1. / PROGRESS_BAR.total + PROGRESS_BAR.progress < 1.:
+        PROGRESS_BAR.update(message="Recognizing...")

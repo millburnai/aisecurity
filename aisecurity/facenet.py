@@ -551,13 +551,13 @@ class FaceNet:
             log.log_unknown(logging, "<DEPRECATED>")
 
             if pbar:
-                lcd.PROGRESS_BAR.reset(previous_msg="Recognizing...")
+                lcd.PROGRESS_BAR.reset(message="Recognizing...")
 
             if dynamic_log:
                 visitor_num = len([person for person in self._db if "visitor" in person]) + 1
                 self.update_data("visitor_{}".format(visitor_num), [embedding])
 
-                lcd.PROGRESS_BAR.update(amt=np.inf, previous_msg="Visitor {} created".format(visitor_num))
+                lcd.PROGRESS_BAR.update(amt=np.inf, message="Visitor {} created".format(visitor_num))
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
         if data_mutable and (update_recognized or update_unrecognized):
