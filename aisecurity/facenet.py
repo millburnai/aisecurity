@@ -456,7 +456,7 @@ class FaceNet:
         if socket:
             connection.init(socket)
         if pbar:
-            lcd.init()
+            self.progress_bar = lcd.LCDProgressBar()
         if resize:
             face_width, face_height = width * resize, height * resize
         else:
@@ -501,7 +501,7 @@ class FaceNet:
                 print("No face detected")
 
             if pbar:
-                lcd.check_clear()
+                self.progress_bar.check_clear()
 
             if graphics:
                 cv2.imshow("AI Security v0.9a", original_frame)
@@ -537,7 +537,7 @@ class FaceNet:
         update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
 
         if pbar and update_progress:
-            lcd.update_progress(update_recognized)
+            self.progress_bar.update_progress(update_recognized)
 
         if update_recognized:
             person = log.get_mode(log.CURRENT_LOG)
@@ -551,13 +551,13 @@ class FaceNet:
             log.log_unknown(logging, "<DEPRECATED>")
 
             if pbar:
-                lcd.PROGRESS_BAR.reset(message="Recognizing...")
+                self.progress_bar.reset(message="Recognizing...")
 
             if dynamic_log:
                 visitor_num = len([person for person in self._db if "visitor" in person]) + 1
                 self.update_data("visitor_{}".format(visitor_num), [embedding])
 
-                lcd.PROGRESS_BAR.update(amt=np.inf, message="Visitor {} created".format(visitor_num))
+                self.progress_bar.update(amt=np.inf, message="Visitor {} created".format(visitor_num))
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
         if data_mutable and (update_recognized or update_unrecognized):
