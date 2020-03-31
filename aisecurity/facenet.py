@@ -3,6 +3,7 @@
 "aisecurity.facenet"
 
 Facial recognition with FaceNet in Keras, TensorFlow, or TensorRT.
+
 Reference paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
@@ -34,7 +35,7 @@ from aisecurity.face.detection import detector_init
 from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_face
 
 
-#h############################### FaceNet ###############################
+################################ FaceNet ###############################
 class FaceNet:
     """Class implementation of FaceNet"""
 
@@ -533,7 +534,6 @@ class FaceNet:
 
         """
 
-        use_socket = bool(connection.SOCKET)
         update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
 
         if pbar and update_progress:
@@ -543,8 +543,9 @@ class FaceNet:
             person = log.get_mode(log.CURRENT_LOG)
             log.log_person(logging, person, times=log.CURRENT_LOG[person])
 
-            if use_socket:
-                connection.send({"best_match":best_match})
+            if connection.SOCKET:
+                connection.send(best_match=best_match)
+                connection.receive()
 
         elif update_unrecognized:
             log.log_unknown(logging, "<DEPRECATED>")
@@ -560,7 +561,7 @@ class FaceNet:
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
         if data_mutable and (update_recognized or update_unrecognized):
-            if use_socket:
+            if connection.SOCKET:
                 is_correct = not bool(connection.RECV)
             else:
                 user_input = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
@@ -569,8 +570,10 @@ class FaceNet:
             if is_correct:
                 self.update_data(best_match, [embedding])
             else:
-                name = connection.RECV if use_socket else input("Who are you? ").lower().replace(" ", "_")
-                connection.reset()
+                if connection.SOCKET:
+                    name, connection.RECV = connection.RECV, None
+                else:
+                    name = input("Who are you? ").lower().replace(" ", "_")
 
                 if name in self.data:
                     self.update_data(name, [embedding])

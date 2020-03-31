@@ -13,7 +13,7 @@ import json
 import websocket
 
 
-################################ Setup and helpers###############################
+################################ Setup and helpers ###############################
 
 # GLOBALS
 FAIL_THRESHOLD = 3
@@ -25,69 +25,63 @@ RECV = None
 
 
 # DECORATORS
-def check_fail(threshold):
-    def _check_fail(func):
-        @functools.wraps(func)
-        def _func(*args, **kwargs):
-            failures = 0
-            while failures < threshold:
-                if func(*args, **kwargs):
-                    return True
+def check_fail(func):
+    @functools.wraps(func)
+    def _func(*args, **kwargs):
+        failures = 0
+        while failures < FAIL_THRESHOLD:
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                print("[ERROR] {} ({})".format(e, failures))
+                _connect(SOCKET_ADDRESS)
                 failures += 1
-            return False
 
-        return _func
+        print("[ERROR] fail threshold passed".format(func))
+        return False
 
-    return _check_fail
+    return _func
 
 
 ################################ Websocket ###############################
-@check_fail(FAIL_THRESHOLD)
-def init(socket):
+
+# CONNECT TO WEBSOCKET
+def _connect(socket):
     global SOCKET, SOCKET_ADDRESS
 
-    gc.collect()
-
     try:
+        gc.collect()
         websocket.enableTrace(True)
 
         SOCKET_ADDRESS = socket
-
         SOCKET = websocket.create_connection(socket)
-        SOCKET.send(json.dumps({"id": "1"}))
+        send(id="1")
 
+        return True
+
+    except Exception:
+        return False
+
+
+# DECORATED FUNCS
+@check_fail
+def init(socket):
+    if not _connect(socket):
+        raise ConnectionError("websocket connection failed")
+    else:
         print("[DEBUG] Connected to server")
 
-        return True
 
-    except Exception as e:
-        print("[DEBUG]", e)
-        init(socket)
-
-        return False
-
-
-@check_fail(FAIL_THRESHOLD)
-def send(obj):
+@check_fail
+def send(**kwargs):
     global SOCKET, RECV
 
-    try:
-        SOCKET.send(json.dumps(obj))
-        print("[DEBUG] Sending via websocket...")
-
-        if "best_match" in obj: RECV = json.loads(SOCKET.recv())
-
-        return True
-
-    except Exception as e:
-        print("[DEBUG]", e)
-        init(SOCKET_ADDRESS)
-        send(obj)
-
-        return False
+    SOCKET.send(json.dumps(**kwargs))
+    print("[DEBUG] Sending via websocket...")
 
 
-def reset():
+@check_fail
+def receive():
     global RECV
 
-    RECV = None
+    RECV = json.loads(SOCKET.recv())
