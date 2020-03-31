@@ -76,7 +76,7 @@ def init(socket):
 def send(**kwargs):
     global SOCKET, RECV
 
-    SOCKET.send(json.dumps(**kwargs))
+    SOCKET.send(json.dumps(kwargs))
     print("[DEBUG] Sending via websocket...")
 
 

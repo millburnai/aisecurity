@@ -51,7 +51,7 @@ class LCDProgressBar:
         self.bar_length = length - 2  # compensate for [] at beginning and end
         self.marker = marker
         self.progress = 0.
-        self.empty = " " * self.bar_length
+        self.blank = " " * self.bar_length
 
     def set_message(self, message):
         if self.mode == "pi":
@@ -63,19 +63,16 @@ class LCDProgressBar:
         self.progress = 0.
 
         if message:
-            self.set_message("{}\n[{}]".format(message, " " * self.bar_length))
+            self.set_message("{}\n[{}]".format(message, self.blank))
 
     def update(self, amt=1., message=None):
         self.progress += amt / self.total
 
-        if self.progress > 1.:
-            self.progress = 1.
-
-        done = (self.marker * round(self.progress * self.bar_length) + self.empty)[:self.bar_length]
+        done = (self.marker * min(1, round(self.progress * self.bar_length)) + self.blank)[:self.bar_length]
 
         self.set_message("{}\n[{}]".format(message, done))
 
-        if self.progress == 1.:
+        if self.progress >= 1.:
             self.progress = 0.
 
 
