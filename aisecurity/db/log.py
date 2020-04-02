@@ -40,7 +40,7 @@ LAST_STUDENT = None
 
 
 
-# LOGGIN G INIT AND HELPERS
+# LOGGING INIT AND HELPERS
 def init(logging, flush=False, thresholds=None):
     global NUM_RECOGNIZED, NUM_UNKNOWN, LAST_LOGGED, UNK_LAST_LOGGED, CURRENT_LOG, DISTS, THRESHOLDS
     global MODE, DATABASE, CURSOR, FIREBASE
@@ -157,7 +157,7 @@ def update_current_logs(is_recognized, best_match):
 def cooldown_ok(elapsed, best_match=None):
     global LAST_STUDENT
 
-    if best_match == LAST_STUDENT:
+    if best_match and best_match == LAST_STUDENT:
         return timer() - elapsed > THRESHOLDS["cooldown"]
     else:
         return True
