@@ -40,7 +40,7 @@ LAST_STUDENT = None
 
 
 
-# LOGGING INIT AND HELPERS
+# LOGGIN G INIT AND HELPERS
 def init(logging, flush=False, thresholds=None):
     global NUM_RECOGNIZED, NUM_UNKNOWN, LAST_LOGGED, UNK_LAST_LOGGED, CURRENT_LOG, DISTS, THRESHOLDS
     global MODE, DATABASE, CURSOR, FIREBASE
@@ -149,18 +149,15 @@ def update_current_logs(is_recognized, best_match):
 
     update_recognized = NUM_RECOGNIZED >= THRESHOLDS["num_recognized"] and cooldown_ok(LAST_LOGGED, best_match) \
                         and get_percent_diff(best_match, CURRENT_LOG) <= THRESHOLDS["percent_diff"]
-    update_unrecognized = NUM_UNKNOWN >= THRESHOLDS["num_unknown"] and cooldown_ok(UNK_LAST_LOGGED, best_match)
+    update_unrecognized = NUM_UNKNOWN >= THRESHOLDS["num_unknown"] and cooldown_ok(UNK_LAST_LOGGED)
 
     return update_progress, update_recognized, update_unrecognized
 
 
-def cooldown_ok(elapsed, best_match):
+def cooldown_ok(elapsed, best_match=None):
     global LAST_STUDENT
 
     if best_match == LAST_STUDENT:
-        print(elapsed)
-        print(timer())
-        print(timer()-elapsed)
         return timer() - elapsed > THRESHOLDS["cooldown"]
     else:
         return True
