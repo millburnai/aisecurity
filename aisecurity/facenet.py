@@ -1,11 +1,7 @@
 """
-
 "aisecurity.facenet"
-
 Facial recognition with FaceNet in Keras, TensorFlow, or TensorRT.
-
 Reference paper: https://arxiv.org/pdf/1503.03832.pdf
-
 """
 
 import itertools
@@ -54,7 +50,6 @@ class FaceNet:
     def __init__(self, model_path=DEFAULT_MODEL, data_path=DATABASE, sess=None, input_name=None, output_name=None,
                  input_shape=None, **hyperparams):
         """Initializes FaceNet object
-
         :param model_path: path to model (default: aisecurity.utils.paths.DEFAULT_MODEL)
         :param data_path: path to data(default: aisecurity.utils.paths.DATABASE)
         :param sess: tf.Session to use (default: None)
@@ -62,7 +57,6 @@ class FaceNet:
         :param output_name: name of output tensor-- only required if using (TF)TRT non-default model (default: None)
         :param input_shape: input shape-- only required if using (TF)TRT non-default model (default: None)
         :param hyperparams: hyperparameters to override FaceNet.HYPERPARAMS
-
         """
 
         assert os.path.exists(model_path), "{} not found".format(model_path)
@@ -105,13 +99,11 @@ class FaceNet:
     # TF-TRT INIT
     def _tf_trt_init(self, filepath, input_name, output_name, sess, input_shape):
         """Initializes a TF-TRT model
-
         :param filepath: path to model (.pb)
         :param input_name: name of input tensor
         :param output_name: name of output tensor
         :param sess: tf.Session to enter
         :param input_shape: input shape for facenet
-
         """
 
         self.MODE = "tf-trt"
@@ -142,11 +134,9 @@ class FaceNet:
 
     def _tensor_init(self, model_name, input_name, output_name):
         """Initializes tensors (TF-TRT or TRT modes only)
-
         :param model_name: name of model
         :param input_name: input tensor name
         :param output_name: output tensor name
-
         """
 
         self.model_config = self.MODELS["_default"]
@@ -170,12 +160,10 @@ class FaceNet:
     # TRT INIT
     def _trt_init(self, filepath, input_name, output_name, input_shape):
         """TensorRT initialization
-
         :param filepath: path to serialized engine (not portable across GPUs or platforms)
         :param input_name: name of input to network
         :param output_name: name of output to network
         :param input_shape: input shape (channels first)
-
         """
 
         assert engine.INIT_SUCCESS, "tensorrt or pycuda import failed: trt mode not available"
@@ -195,10 +183,8 @@ class FaceNet:
     @staticmethod
     def _screen_data(key, value):
         """Checks if key-value pair is valid for data dict
-
         :param key: new key
         :param value: new value
-
         """
 
         assert isinstance(key, str), "data keys must be person names"
@@ -212,11 +198,9 @@ class FaceNet:
 
     def update_data(self, person, embeddings, train_knn=True):
         """Updates data property
-
         :param person: new entry
         :param embeddings: new entry's list of embeddings
         :param train_knn: whether or not to train K-NN (default: True)
-
         """
 
         person, embeddings = self._screen_data(person, embeddings)
@@ -232,10 +216,8 @@ class FaceNet:
 
     def set_data(self, data, config=None):
         """Sets data property
-
         :param data: new data in form {name: embedding vector, ...}
         :param config: data config dict with the entry "metric": <DistMetric str constructor> (default: None)
-
         """
 
         assert data, "data must be provided"
@@ -252,9 +234,7 @@ class FaceNet:
 
     def set_dist_metric(self, dist_metric):
         """Sets distance metric for FaceNet
-
         :param dist_metric: DistMetric object or str constructor, or "auto+{whatever}" to detect from self.data_config
-
         """
 
         # set distance metric
@@ -308,9 +288,7 @@ class FaceNet:
     @property
     def data(self):
         """Property for static database
-
         :returns: self._db
-
         """
 
         return self._db
@@ -318,10 +296,8 @@ class FaceNet:
     @staticmethod
     def get_frozen_graph(path):
         """Gets frozen graph from .pb file (TF-TRT only)
-
         :param path: path to .pb frozen graph file
         :returns: tf.GraphDef object
-
         """
 
         with tf.gfile.FastGFile(path, "rb") as graph_file:
@@ -331,10 +307,8 @@ class FaceNet:
 
     def _make_feed_dict(self, img):
         """Makes feed dict for sess.run (TF-TRT only)
-
         :param img: image input
         :returns: feed dict
-
         """
 
         feed_dict = {self.input_name: np.expand_dims(img, axis=0)}
@@ -345,10 +319,8 @@ class FaceNet:
     @print_time("Embedding time")
     def embed(self, img):
         """Embeds cropped face
-
         :param img: img as a cropped face with shape (h, w, 3)
         :returns: embedding as array with shape (1, -1)
-
         """
 
         if self.MODE == "keras":
@@ -361,12 +333,10 @@ class FaceNet:
 
     def predict(self, path_or_img, detector="both", margin=IMG_CONSTANTS["margin"]):
         """Embeds and normalizes an image from path or array
-
         :param path_or_img: path or image to predict on
         :param detector: face detector (either mtcnn, haarcascade, or None) (default: "both")
         :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
         :returns: normalized embeddings, facial coordinates
-
         """
 
         cropped_face, face_coords = crop_face(path_or_img, margin, detector, alpha=self.HYPERPARAMS["mtcnn_alpha"])
@@ -384,11 +354,9 @@ class FaceNet:
     # FACIAL RECOGNITION HELPER
     def recognize(self, img, **kwargs):
         """Facial recognition
-
         :param img: image array
         :param kwargs: named arguments to self.get_embeds (will be passed to self.predict)
         :returns: embedding, is recognized (bool), best match from database(s), distance
-
         """
 
         exit_failure = itertools.repeat(-1, 6)
@@ -430,7 +398,6 @@ class FaceNet:
                             graphics=True, pbar=False, framerate=20, resize=None, flip=0, device=0, detector="mtcnn",
                             data_mutable=False, socket=None):
         """Real-time facial recognition
-
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
         :param dist_metric: DistMetric object or str distance metric (default: this.dist_metric)
@@ -446,7 +413,6 @@ class FaceNet:
         :param detector: face detector type ("mtcnn" or "haarcascade") (default: "mtcnn")
         :param data_mutable: if true, prompt for verification on recognition and update database (default: False)
         :param socket: in dev
-
         """
 
         # INITS
@@ -456,7 +422,7 @@ class FaceNet:
         if socket:
             connection.init(socket)
         if pbar:
-            self.progress_bar = lcd.LCDProgressBar()
+            lcd.init()
         if resize:
             face_width, face_height = width * resize, height * resize
         else:
@@ -501,7 +467,7 @@ class FaceNet:
                 print("No face detected")
 
             if pbar:
-                self.progress_bar.check_clear()
+                lcd.check_clear()
 
             if graphics:
                 cv2.imshow("AI Security v0.9a", original_frame)
@@ -521,7 +487,6 @@ class FaceNet:
     # LOGGING
     def log_activity(self, logging, is_recognized, best_match, embedding, dynamic_log, data_mutable, pbar, dist):
         """Logs facial recognition activity
-
         :param logging: logging type-- None, "firebase", or "mysql"
         :param is_recognized: whether face was recognized or not
         :param best_match: best match from database
@@ -531,13 +496,12 @@ class FaceNet:
         :param data_mutable: static data mutability or not
         :param pbar: use pbar or not
         :param dist: distance between best match and current frame
-
         """
 
         update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
 
         if pbar and update_progress:
-            self.progress_bar.update_progress(update_recognized)
+            lcd.update_progress(update_recognized)
 
         if update_recognized:
             person = log.get_mode(log.CURRENT_LOG)
@@ -551,13 +515,13 @@ class FaceNet:
             log.log_unknown(logging, "<DEPRECATED>")
 
             if pbar:
-                self.progress_bar.reset(message="Recognizing...")
+                lcd.PROGRESS_BAR.reset(message="Recognizing...")
 
             if dynamic_log:
                 visitor_num = len([person for person in self._db if "visitor" in person]) + 1
                 self.update_data("visitor_{}".format(visitor_num), [embedding])
 
-                self.progress_bar.update(amt=np.inf, message="Visitor {} created".format(visitor_num))
+                lcd.PROGRESS_BAR.update(amt=np.inf, message="Visitor {} created".format(visitor_num))
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
         if data_mutable and (update_recognized or update_unrecognized):
