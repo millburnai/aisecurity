@@ -23,7 +23,7 @@ THRESHOLDS = {
     "num_recognized": 3,
     "num_unknown": 3,
     "percent_diff": 0.2,
-    "cooldown": 0.,
+    "cooldown": 5.,
     "missed_frames": 10,
 }
 
@@ -36,6 +36,8 @@ FIREBASE = None
 NUM_RECOGNIZED, NUM_UNKNOWN = None, None
 LAST_LOGGED, UNK_LAST_LOGGED = None, None
 CURRENT_LOG, DISTS = None, None
+LAST_STUDENT = None
+
 
 
 # LOGGING INIT AND HELPERS
@@ -118,7 +120,7 @@ def update_current_logs(is_recognized, best_match):
     update_progress = False
 
     if len(DISTS) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
-        flush_current(mode="unknown+known")
+        flush_current(mode="unknown+known", flush_times=False)
         flushed = True
     else:
         flushed = False
@@ -145,15 +147,23 @@ def update_current_logs(is_recognized, best_match):
         if NUM_UNKNOWN >= THRESHOLDS["num_unknown"]:
             NUM_RECOGNIZED = 0
 
-    update_recognized = NUM_RECOGNIZED >= THRESHOLDS["num_recognized"] and cooldown_ok(LAST_LOGGED) \
+    update_recognized = NUM_RECOGNIZED >= THRESHOLDS["num_recognized"] and cooldown_ok(LAST_LOGGED, best_match) \
                         and get_percent_diff(best_match, CURRENT_LOG) <= THRESHOLDS["percent_diff"]
-    update_unrecognized = NUM_UNKNOWN >= THRESHOLDS["num_unknown"] and cooldown_ok(UNK_LAST_LOGGED)
+    update_unrecognized = NUM_UNKNOWN >= THRESHOLDS["num_unknown"] and cooldown_ok(UNK_LAST_LOGGED, best_match)
 
     return update_progress, update_recognized, update_unrecognized
 
 
-def cooldown_ok(elapsed):
-    return timer() - elapsed > THRESHOLDS["cooldown"]
+def cooldown_ok(elapsed, best_match):
+    global LAST_STUDENT
+
+    if best_match == LAST_STUDENT:
+        print(elapsed)
+        print(timer())
+        print(timer()-elapsed)
+        return timer() - elapsed > THRESHOLDS["cooldown"]
+    else:
+        return True
 
 
 def get_mode(log):
@@ -162,6 +172,8 @@ def get_mode(log):
 
 # LOGGING FUNCTIONS
 def log_person(logging, student_name, times):
+    global LAST_STUDENT
+
     now = get_now(sum(times) / len(times))
 
     if logging == "mysql" and MODE == "mysql":
@@ -180,6 +192,8 @@ def log_person(logging, student_name, times):
         DATABASE.child("known").child(*get_now(timer())).set(data)
 
     flush_current(mode="known")
+
+    LAST_STUDENT = student_name
 
     cprint("Regular activity ({}) logged with {}".format(student_name, MODE), color="green", attrs=["bold"])
 
@@ -215,6 +229,7 @@ def flush_current(mode="known", flush_times=True):
 
         if flush_times:
             LAST_LOGGED = timer()
+            print("nigger")
 
     if "unknown" in mode:
         DISTS = []
