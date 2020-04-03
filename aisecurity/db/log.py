@@ -226,7 +226,6 @@ def flush_current(mode="known", flush_times=True):
 
         if flush_times:
             LAST_LOGGED = timer()
-            print("nigger")
 
     if "unknown" in mode:
         DISTS = []
