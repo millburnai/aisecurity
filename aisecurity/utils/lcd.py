@@ -1,6 +1,9 @@
 """
+
 "aisecurity.hardware.lcd"
+
 LCD utils.
+
 """
 
 from timeit import default_timer as timer

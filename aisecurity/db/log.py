@@ -33,11 +33,10 @@ DATABASE = None
 CURSOR = None
 FIREBASE = None
 
-NUM_RECOGNIZED, NUM_UNKNOWN = None, None
+NUM_RECOGNIZED, NUM_UNKNOWN = 0, 0
 LAST_LOGGED, UNK_LAST_LOGGED = None, None
-CURRENT_LOG, DISTS = None, None
+CURRENT_LOG, DISTS = {}, []
 LAST_STUDENT = None
-
 
 
 # LOGGING INIT AND HELPERS
@@ -47,9 +46,7 @@ def init(logging, flush=False, thresholds=None):
 
     MODE = logging
 
-    NUM_RECOGNIZED, NUM_UNKNOWN = 0, 0
     LAST_LOGGED, UNK_LAST_LOGGED = timer(), timer()
-    CURRENT_LOG, DISTS = {}, []
 
     if logging == "mysql":
         try:
@@ -221,6 +218,7 @@ def flush_current(mode="known", flush_times=True):
     global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN, DISTS, LAST_LOGGED, UNK_LAST_LOGGED
 
     if "known" in mode:
+        DISTS = []
         CURRENT_LOG = {}
         NUM_RECOGNIZED = 0
 

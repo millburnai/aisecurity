@@ -1,7 +1,11 @@
 """
+
 "aisecurity.facenet"
+
 Facial recognition with FaceNet in Keras, TensorFlow, or TensorRT.
+
 Reference paper: https://arxiv.org/pdf/1503.03832.pdf
+
 """
 
 import itertools
@@ -442,7 +446,6 @@ class FaceNet:
 
             _, frame = cap.read()
             original_frame = frame.copy()
-            # exception here should be caught by script using aisecurity, not aisecurity itself
 
             if resize:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
