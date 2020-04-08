@@ -398,7 +398,7 @@ class FaceNet:
 
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, dist_metric=None, logging=None, dynamic_log=False, picam=False,
+    def real_time_recognize(self, width=640, height=360, dist_metric="zero", logging=None, dynamic_log=False, picam=False,
                             graphics=True, pbar=False, framerate=20, resize=None, flip=0, device=0, detector="mtcnn",
                             data_mutable=False, socket=None):
         """Real-time facial recognition

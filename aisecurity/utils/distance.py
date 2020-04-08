@@ -70,6 +70,10 @@ class DistMetric:
             # (https://stackoverflow.com/questions/34144632/using-cosine-distance-with-scikit-learn-kneighborsclassifier)
             norm=lambda x: x / np.linalg.norm(x),
             calc=lambda a, b: cosine(a.flatten(), b.flatten())
+        ),
+        "zero": construct_dist(
+            norm=lambda x:x,
+            calc=lambda a,b: 0
         )
     }
 
