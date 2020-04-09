@@ -32,9 +32,6 @@ except (ModuleNotFoundError, ImportError) as e:  # don't know which exception
     warnings.warn("cannot import tensorrt: '{}'".format(e))
     INIT_SUCCESS = False
 
-if not INIT_SUCCESS:
-    warnings.warn("tensorrt mode cannot be used: library import failed")
-
 
 ################################ CUDA Engine Manager ################################
 class CudaEngineManager:

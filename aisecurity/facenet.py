@@ -24,9 +24,8 @@ import tensorflow as tf
 from termcolor import cprint
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
-from aisecurity.db import log
+from aisecurity.db import log, connection
 from aisecurity.optim import engine
-from aisecurity.utils import connection
 from aisecurity.utils import lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
@@ -457,7 +456,7 @@ class FaceNet:
                 print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
 
                 # add graphics, lcd, logging
-                self.log_activity(logging, is_recognized, best_match, embedding, dynamic_log, data_mutable, pbar, dist)
+                self.log_activity(is_recognized, best_match, embedding, dynamic_log, data_mutable, pbar, dist)
 
                 if graphics:
                     add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
@@ -488,9 +487,8 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, logging, is_recognized, best_match, embedding, dynamic_log, data_mutable, pbar, dist):
+    def log_activity(self, is_recognized, best_match, embedding, dynamic_log, data_mutable, pbar, dist):
         """Logs facial recognition activity
-        :param logging: logging type-- None, "firebase", or "mysql"
         :param is_recognized: whether face was recognized or not
         :param best_match: best match from database
         :param mode: logging type: "firebase" or "mysql"

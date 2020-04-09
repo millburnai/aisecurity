@@ -1,6 +1,6 @@
 """
 
-"aisecurity.utils.connection"
+"aisecurity.db.connection"
 
 Handles connection to websocket.
 

@@ -11,9 +11,7 @@ import warnings
 
 from termcolor import cprint
 
-from aisecurity.db import log
-from aisecurity.utils import connection
-
+from aisecurity.db import connection, log
 
 ################################ Inits ################################
 
