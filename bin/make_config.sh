@@ -37,7 +37,7 @@ fi
 # database
 if [ ! -d "$config_path/database" ] ; then
   echo -e "\033[0;95mCreating database and unknown directories\033[0m"
-  mkdir $config_path/database
+  mkdir "$config_path"/database
 fi
 
 if [ ! -f "$config_path/database/test.json" ] ; then
@@ -75,7 +75,7 @@ fi
 # keys
 if [ ! -d "$config_path/keys" ] ; then
   echo -e "\033[0;95mCreating keys directory\033[0m"
-  mkdir $config_path/keys
+  mkdir "$config_path"/keys
 fi
 
 if [ ! -f "$config_path/keys/test_name_keys.txt" ] ; then
@@ -95,16 +95,16 @@ fi
 # logging
 if [ ! -d "$config_path/logging" ] ; then
   echo -e "\033[0;95mCreating logging directory\033[0m"
-  mkdir $config_path/logging
+  mkdir "$config_path"/logging
   touch "$config_path/logging/firebase.json"
   echo -e "\033[0;31mFill in '$config_path/logging/firebase.json' and a key file in the same directory to use firebase logging\033[0m"
-  mkdir $config_path/logging/unknown
+  mkdir "$config_path"/logging/unknown
 fi
 
 # config
 if [ ! -d "$config_path/config" ] ; then
   echo -e "\033[0;95mCreating config directory\033[0m"
-  mkdir $config_path/config
+  mkdir "$config_path"/config
 fi
 
 if [ ! -f "$config_path/config/models.json" ] ; then
