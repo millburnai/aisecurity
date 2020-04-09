@@ -8,12 +8,11 @@ MySQL and Firebase database handling.
 
 import json
 import time
+from timeit import default_timer as timer
 import warnings
 
 import mysql.connector
 import pyrebase
-from pyrebase import *
-import requests
 from termcolor import cprint
 
 from aisecurity.utils.paths import CONFIG_HOME, CONFIG
@@ -24,7 +23,7 @@ THRESHOLDS = {
     "num_recognized": 3,
     "num_unknown": 3,
     "percent_diff": 0.2,
-    "cooldown": 0.,
+    "cooldown": 5.,
     "missed_frames": 10,
 }
 
@@ -34,23 +33,19 @@ DATABASE = None
 CURSOR = None
 FIREBASE = None
 
-NUM_RECOGNIZED, NUM_UNKNOWN = None, None
+NUM_RECOGNIZED, NUM_UNKNOWN = 0, 0
 LAST_LOGGED, UNK_LAST_LOGGED = None, None
-CURRENT_LOG, DISTS = None, None
-
-USE_SERVER = None
+LOG, DISTS = {"current": {}, "logged": {}}, []
 
 
 # LOGGING INIT AND HELPERS
 def init(logging, flush=False, thresholds=None):
-    global NUM_RECOGNIZED, NUM_UNKNOWN, LAST_LOGGED, UNK_LAST_LOGGED, CURRENT_LOG, DISTS, THRESHOLDS
+    global NUM_RECOGNIZED, NUM_UNKNOWN, LAST_LOGGED, UNK_LAST_LOGGED, LOG, DISTS, THRESHOLDS
     global MODE, DATABASE, CURSOR, FIREBASE
 
     MODE = logging
 
-    NUM_RECOGNIZED, NUM_UNKNOWN = 0, 0
-    LAST_LOGGED, UNK_LAST_LOGGED = time.time(), time.time()
-    CURRENT_LOG, DISTS = {}, []
+    LAST_LOGGED, UNK_LAST_LOGGED = timer(), timer()
 
     if logging == "mysql":
         try:
@@ -66,7 +61,7 @@ def init(logging, flush=False, thresholds=None):
             DATABASE.commit()
 
             if flush:
-                instructions = open(CONFIG_HOME + "/bin/drop.sql")
+                instructions = open(CONFIG_HOME + "/bin/drop.sql", encoding="utf-8")
                 for cmd in instructions:
                     if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"):
                         CURSOR.execute(cmd)
@@ -78,17 +73,14 @@ def init(logging, flush=False, thresholds=None):
 
     elif logging == "firebase":
         try:
-            FIREBASE = pyrebase.initialize_app(json.load(open(CONFIG_HOME + "/logging/firebase.json")))
+            FIREBASE = pyrebase.initialize_app(
+                json.load(open(CONFIG_HOME + "/logging/firebase.json", encoding="utf-8"))
+            )
             DATABASE = FIREBASE.database()
 
         except (FileNotFoundError, json.JSONDecodeError):
             MODE = "<no database>"
             warnings.warn(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
-
-    elif logging == "django":
-        # TODO: fill in init for django logging
-        MODE = "<no database>"
-        warnings.warn("django logging supported yet")
 
     else:
         MODE = "<no database>"
@@ -96,23 +88,6 @@ def init(logging, flush=False, thresholds=None):
 
     if thresholds:
         THRESHOLDS = {**THRESHOLDS, **thresholds}
-
-
-def server_init():
-    global USE_SERVER
-
-    try:
-        print("Connecting to server...")
-        requests.get(CONFIG["server_address"], timeout=1.)
-        USE_SERVER = True
-    except (requests.exceptions.Timeout, requests.exceptions.MissingSchema, KeyError) as error:
-        if isinstance(error, requests.exceptions.Timeout):
-            warnings.warn("ID server unreachable")
-        elif isinstance(error, requests.exceptions.MissingSchema):
-            warnings.warn("Invalid server address in config")
-        elif isinstance(error, KeyError):
-            warnings.warn("Server address missing in config")
-        USE_SERVER = False
 
 
 def get_now(seconds):
@@ -135,93 +110,108 @@ def get_percent_diff(item, log):
         return 1.0
 
 
-def update_current_logs(is_recognized, best_match):
-    global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN
+def update(is_recognized, best_match):
+    global LOG, NUM_RECOGNIZED, NUM_UNKNOWN
+
+    update_progress = False
+    now = timer()
 
     if len(DISTS) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
-        flush_current(mode="unknown+known")
+        flush_current(mode="unknown+known", flush_times=False)
+        flushed = True
+    else:
+        flushed = False
 
     if is_recognized:
-        now = time.time()
-
-        if best_match not in CURRENT_LOG:
-            CURRENT_LOG[best_match] = [now]
+        if best_match not in LOG["current"]:
+            LOG["current"][best_match] = [now]
         else:
-            CURRENT_LOG[best_match].append(now)
+            LOG["current"][best_match].append(now)
 
-        if len(CURRENT_LOG[best_match]) == 1 or get_percent_diff(best_match, CURRENT_LOG) <= THRESHOLDS["percent_diff"]:
+        percent_diff_ok = get_percent_diff(best_match, LOG["current"]) <= THRESHOLDS["percent_diff"]
+
+        if percent_diff_ok or flushed:
             NUM_RECOGNIZED += 1
             NUM_UNKNOWN = 0
+
+            if percent_diff_ok and not flushed:
+                update_progress = True
 
     else:
         NUM_UNKNOWN += 1
         if NUM_UNKNOWN >= THRESHOLDS["num_unknown"]:
             NUM_RECOGNIZED = 0
 
-def cooldown_ok(t):
-    return time.time() - t > THRESHOLDS["cooldown"]
+    update_recognized = NUM_RECOGNIZED >= THRESHOLDS["num_recognized"] and cooldown_ok(LAST_LOGGED, best_match) \
+                        and get_percent_diff(best_match, LOG["current"]) <= THRESHOLDS["percent_diff"]
+    update_unrecognized = NUM_UNKNOWN >= THRESHOLDS["num_unknown"] and cooldown_ok(UNK_LAST_LOGGED)
 
-def get_mode(d):
-    return max(d.keys(), key=lambda key: len(d[key]))
+    if update_recognized:
+        LOG["logged"][log_person()] = now
+    elif update_unrecognized:
+        log_unknown()
+
+    return update_progress, update_recognized, update_unrecognized
+
+
+def cooldown_ok(elapsed, best_match=None):
+    try:
+        last_student = max(LOG["logged"], key=lambda person: LOG["logged"][person])
+        if best_match == last_student:
+            return timer() - elapsed > THRESHOLDS["cooldown"]
+        else:
+            return True
+
+    except ValueError:
+        return True
 
 
 # LOGGING FUNCTIONS
-def log_person(logging, student_name, times):
+def log_person():
+    student_name = max(LOG["current"], key=lambda person: len(LOG["current"][person]))
+    times = LOG["current"][student_name]
     now = get_now(sum(times) / len(times))
 
-    if logging == "mysql" and MODE == "mysql":
+    if MODE == "mysql":
         add = "INSERT INTO Activity (id, name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
             get_id(student_name), student_name.replace("_", " ").title(), *now)
         CURSOR.execute(add)
         DATABASE.commit()
 
-    elif logging == "firebase" and MODE == "firebase":
+    elif MODE == "firebase":
         data = {
             "id": get_id(student_name),
             "name": student_name.replace("_", " ").title(),
             "date": now[0],
             "time": now[1]
         }
-        DATABASE.child("known").child(*get_now(time.time())).set(data)
-
-    elif logging == "django" and MODE == "django":
-        student_id = get_id(student_name)
-        student_name = student_name.replace("_", " ").title()
-        # TODO: log {*now: student_id, student_name} in django db
-            # DJANGO: s = StudentLog(student_id=student_id, name=student_name, time=datetime.datetime.now()) 
-            #         s.save()
-            # from models.py; import studentlog, datetime
-        
-        pass
+        DATABASE.child("known").child(*get_now(timer())).set(data)
 
     flush_current(mode="known")
 
     cprint("Regular activity ({}) logged with {}".format(student_name, MODE), color="green", attrs=["bold"])
 
+    return student_name
 
-def log_unknown(logging, path_to_img):
-    now = get_now(time.time())
 
-    if logging == "mysql" and MODE == "mysql":
+def log_unknown():
+    now = get_now(timer())
+
+    path_to_img = "<DEPRECATED>"
+
+    if MODE == "mysql":
         add = "INSERT INTO Unknown (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
             path_to_img, *now)
         CURSOR.execute(add)
         DATABASE.commit()
 
-    elif logging == "firebase" and MODE == "firebase":
+    elif MODE == "firebase":
         data = {
             "path_to_img": path_to_img,
             "date": now[0],
             "time": now[1]
         }
-        DATABASE.child("unknown").child(*get_now(time.time())).set(data)
-
-    elif logging == "django" and MODE == "django":
-        # TODO: log {*get_now(time.time()): path_to_img} in django db
-            # DJANGO: u = UnknownLog(time=datetime.datetime.now(), path_to_img=path_to_img)
-            #         u.save()
-            # from models.py; import datetime, unknownlog
-        pass
+        DATABASE.child("unknown").child(*get_now(timer())).set(data)
 
     flush_current(mode="unknown")
 
@@ -229,18 +219,19 @@ def log_unknown(logging, path_to_img):
 
 
 def flush_current(mode="known", flush_times=True):
-    global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN, DISTS, LAST_LOGGED, UNK_LAST_LOGGED
+    global LOG, NUM_RECOGNIZED, NUM_UNKNOWN, DISTS, LAST_LOGGED, UNK_LAST_LOGGED
 
     if "known" in mode:
-        CURRENT_LOG = {}
+        DISTS = []
+        LOG["current"] = {}
         NUM_RECOGNIZED = 0
 
         if flush_times:
-            LAST_LOGGED = time.time()
+            LAST_LOGGED = timer()
 
     if "unknown" in mode:
         DISTS = []
         NUM_UNKNOWN = 0
 
         if flush_times:
-            UNK_LAST_LOGGED = time.time()
+            UNK_LAST_LOGGED = timer()

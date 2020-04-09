@@ -7,26 +7,16 @@ AES encryption for the image database.
 """
 
 import functools
-import json
-import os
 import struct
-import subprocess
 
 import numpy as np
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-from aisecurity.utils.paths import KEY_DIR, KEY_FILE
+from aisecurity.utils.paths import NAME_KEYS, EMBEDDING_KEYS
 
 
 # CONSTANTS
-try:
-    _KEY_FILES = json.load(open(KEY_FILE))
-    assert os.path.exists(_KEY_FILES["names"]) and os.path.exists(_KEY_FILES["embeddings"])
-except (FileNotFoundError, AssertionError):
-    subprocess.call(["make_keys.sh", KEY_DIR, KEY_FILE])
-    _KEY_FILES = json.load(open(KEY_FILE))
-
 _BIT_ENCRYPTION = 16
 
 
@@ -79,7 +69,7 @@ def get_nonce(key_file, position):
 
 # ENCRYPT AND DECRYPT
 def encrypt(data, cipher):
-    cipher_text, tag = cipher.encrypt_and_digest(data)
+    cipher_text, __ = cipher.encrypt_and_digest(data)
     return cipher_text
 
 
@@ -92,8 +82,7 @@ def decrypt(cipher_text, position, key_file):
 class DataEncryption:
 
     @staticmethod
-    def encrypt_data(data, ignore=None, decryptable=True, name_key_file=_KEY_FILES["names"],
-                     embeddings_key_file=_KEY_FILES["embeddings"]):
+    def encrypt_data(data, ignore=None, decryptable=True, name_key_file=NAME_KEYS, embeddings_key_file=EMBEDDING_KEYS):
         if ignore is None:
             ignore = []
         if decryptable:
@@ -111,7 +100,7 @@ class DataEncryption:
                 encrypted_embed = encrypted_embed.reshape(-1,).tolist()
 
             if "names" not in ignore:
-                encrypted_name = [chr(c) for c in list(encrypt(person.encode("utf8"), name_cipher))]
+                encrypted_name = [chr(c) for c in list(encrypt(person.encode("utf-8"), name_cipher))]
                 encrypted_name = "".join(encrypted_name)
                 # bytes are not json-serializable
             if "embeddings" not in ignore:
@@ -123,7 +112,7 @@ class DataEncryption:
         return encrypted
 
     @staticmethod
-    def decrypt_data(data, ignore=None, name_keys=_KEY_FILES["names"], embedding_keys=_KEY_FILES["embeddings"]):
+    def decrypt_data(data, ignore=None, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS):
         if ignore is None:
             ignore = []
 
@@ -132,7 +121,7 @@ class DataEncryption:
             name, embed = encrypted_name, data[encrypted_name]
             if "names" not in ignore:
                 name = decrypt(bytes([ord(c) for c in encrypted_name]), nonce_pos, name_keys)
-                name = name.decode("utf8")
+                name = name.decode("utf-8")
             if "embeddings" not in ignore:
                 byte_embed = decrypt(bytes(data[encrypted_name]), nonce_pos, embedding_keys)
                 embed = np.array(list(struct.unpack("%sd" % (len(byte_embed) // 8), byte_embed)), dtype=np.float32)

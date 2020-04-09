@@ -6,66 +6,48 @@ Haarcascade or MTCNN face detection.
 
 """
 
-from aisecurity.utils.paths import CONFIG_HOME
-
 import cv2
-from mtcnn.mtcnn import MTCNN
+from mtcnn import MTCNN as MTCNNBackend
+
+from aisecurity.utils.paths import CONFIG_HOME
 
 
 # GLOBALS ALLOC
-FACE_DETECTORS = {
-    "mtcnn": None,
-    "haarcascade": None
-}
+MTCNN = None
+HAARCASCADE = None
 
-
-# FACE DETECTOR
-class FaceDetector:
-
-    MODES = ("mtcnn", "haarcascade")
-
-    def __init__(self, mode, filepath=CONFIG_HOME+"/models/haarcascade_frontalface_default.xml", min_face_size=20):
-        assert mode in self.MODES, "supported modes are {}".format(self.MODES)
-
-        self.mode = mode
-        self.min_face_size = min_face_size
-
-        if self.mode == "mtcnn":
-            self.detector = MTCNN(min_face_size=self.min_face_size)
-        elif self.mode == "haarcascade":
-            self.detector = cv2.CascadeClassifier(filepath)
-
-    def detect_faces(self, img):
-        if self.mode == "mtcnn":
-            result = self.detector.detect_faces(img)
-
-        elif self.mode == "haarcascade":
-            result = []
-
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-            img = cv2.equalizeHist(img)
-
-            faces = self.detector.detectMultiScale(
-                img, scaleFactor=1.1, minSize=(self.min_face_size, self.min_face_size)
-            )
-
-            for (x, y, width, height) in faces:
-                result.append({
-                    "box": [x, y, width, height],
-                    "keypoints": None,
-                    "confidence": 1.0
-                })
-
-        return result
+PARAMS = {}
 
 
 # FUNCS
-def detector_init(**kwargs):
-    global FACE_DETECTORS
+def detector_init(min_face_size=20, filepath=CONFIG_HOME+"/models/haarcascae_frontalface_default.xml", **kwargs):
+    global MTCNN, HAARCASCADE, PARAMS
 
-    FACE_DETECTORS["mtcnn"] = FaceDetector("mtcnn", **kwargs)
-    FACE_DETECTORS["haarcascade"] = FaceDetector("haarcascade", **kwargs)
+    MTCNN = MTCNNBackend(min_face_size=min_face_size, **kwargs)
+    HAARCASCADE = cv2.CascadeClassifier(filepath)
+
+    PARAMS["min_face_size"] = min_face_size
+    PARAMS.update(kwargs)
 
 
 def detect_faces(img, mode="mtcnn"):
-    return FACE_DETECTORS[mode].detect_faces(img)
+    assert mode in ("both", "mtcnn", "haarcascade"), "supported modes are 'both', 'mtcnn', 'haarcascade')"
+    assert MTCNN and HAARCASCADE, "call detector_init() before using detect_faces()"
+
+    result = []
+
+    if mode == "mtcnn":
+        result = MTCNN.detect_faces(img)
+
+    if mode == "haarcascade" or (mode == "both" and not result):
+        min_face_size = PARAMS["min_face_size"]
+        faces = HAARCASCADE.detectMultiScale(img, scaleFactor=1.1, minSize=(min_face_size, min_face_size))
+
+        for (x, y, width, height) in faces:
+            result.append({
+                "box": [x, y, width, height],
+                "keypoints": None,
+                "confidence": 1.0
+            })
+
+    return result

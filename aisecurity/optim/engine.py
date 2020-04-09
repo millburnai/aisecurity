@@ -10,10 +10,9 @@ import json
 import warnings
 
 import numpy as np
+
+from aisecurity.dataflow.loader import print_time
 from aisecurity.utils.paths import CONFIG_HOME
-
-from aisecurity.utils.events import timer
-
 
 ################################ Setup ################################
 
@@ -23,18 +22,15 @@ INIT_SUCCESS = True
 try:
     import pycuda.autoinit
     import pycuda.driver as cuda
-except Exception as e:  # don't know which exception
+except (ModuleNotFoundError, ImportError) as e:  # don't know which exception
     warnings.warn("cannot import pycuda.autoinit or pycuda.driver: '{}'".format(e))
     INIT_SUCCESS = False
 
 try:
     import tensorrt as trt
-except Exception as e:  # don't know which exception
+except (ModuleNotFoundError, ImportError) as e:  # don't know which exception
     warnings.warn("cannot import tensorrt: '{}'".format(e))
     INIT_SUCCESS = False
-
-if not INIT_SUCCESS:
-    warnings.warn("tensorrt mode cannot be used: library import failed")
 
 
 ################################ CUDA Engine Manager ################################
@@ -141,12 +137,12 @@ class CudaEngineManager:
         with open(engine_file, "rb") as file, trt.Runtime(self.CONSTANTS["logger"]) as runtime:
             self.engine = runtime.deserialize_cuda_engine(file.read())
 
-    @timer("Engine building and serializing time")
+    @print_time("Engine building and serializing time")
     def build_and_serialize_engine(self):
         """Builds and serializes a cuda engine"""
         self.engine = self.builder.build_cuda_engine(self.network).serialize()
 
-    @timer("uff model parsing time")
+    @print_time("uff model parsing time")
     def parse_uff(self, uff_file, input_name, input_shape, output_name):
         """Parses .uff file and prepares for serialization
 
@@ -167,7 +163,7 @@ class CudaEngineManager:
 
         self.parser = parser
 
-    @timer("caffe model parsing time")
+    @print_time("caffe model parsing time")
     def parse_caffe(self, caffe_model_file, caffe_deploy_file, output_name="prob1"):
         """Parses caffe model file and prepares for serialization
 
@@ -248,7 +244,7 @@ class CudaEngine:
     """Class-oriented cuda engine manager wrapper"""
 
     # PREBUILT MODELS
-    MODELS = json.load(open(CONFIG_HOME + "/config/cuda_models.json"))
+    MODELS = json.load(open(CONFIG_HOME + "/config/cuda_models.json", encoding="utf-8"))
 
 
     # INITS

@@ -13,22 +13,18 @@ import subprocess
 import aisecurity
 
 # download stuff and set up stuff
-subprocess.call(["make_config.sh"])
-subprocess.call(["make_keys.sh"])
+subprocess.call(["make_config.sh"], shell=True)
 
 # paths
 CONFIG_HOME = os.path.expanduser("~") + "/.aisecurity"
 HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
 
-CONFIG = json.load(open(CONFIG_HOME + "/aisecurity.json"))
+CONFIG = json.load(open(CONFIG_HOME + "/aisecurity.json", encoding="utf-8"))
 
 DATABASE = CONFIG["database_location"]
-DATABASE_INFO = json.load(open(CONFIG["database_info"]))
+DATABASE_INFO = json.load(open(CONFIG["database_info"], encoding="utf-8"))
 
-KEY_DIR = CONFIG["key_directory"]
-KEY_FILE = CONFIG["key_location"]
-
-NAME_KEYS = json.load(open(KEY_FILE))["names"]
-EMBEDDING_KEYS = json.load(open(KEY_FILE))["embeddings"]
+NAME_KEYS = CONFIG["name_keys"]
+EMBEDDING_KEYS = CONFIG["embedding_keys"]
 
 DEFAULT_MODEL = CONFIG["default_model"]

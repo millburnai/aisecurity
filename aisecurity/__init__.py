@@ -1,10 +1,10 @@
-# paths-- must be imported before anything else
 from aisecurity.utils.paths import *
+# paths-- must be imported before anything else
 
 from . import dataflow
 from . import db
 from . import facenet
-from . import hardware
+from . import face
 from . import optim
 from . import privacy
 from . import samples

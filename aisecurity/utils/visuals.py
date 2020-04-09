@@ -7,6 +7,7 @@ Graphics utils.
 """
 
 import cv2
+import numpy as np
 
 from aisecurity.face.preprocessing import IMG_CONSTANTS
 
@@ -46,7 +47,7 @@ def get_video_cap(width, height, picamera, framerate, flip, device=0):
 
 
 ################################ Graphics ###############################
-def add_graphics(frame, person, width, height, is_recognized, best_match, resize):
+def add_graphics(frame, person, width, height, is_recognized, best_match, resize, elapsed):
     """Adds graphics to a frame
 
     :param frame: frame as array
@@ -56,6 +57,7 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
     :param is_recognized: whether face was recognized or not
     :param best_match: best match from database
     :param resize: resize scale factor, from 0. to 1.
+    :param elapsed: time it took to run face detection and recognition
 
     """
 
@@ -101,6 +103,14 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
         cv2.line(overlay, features["mouth_left"], features["nose"], color, radius)
         cv2.line(overlay, features["mouth_right"], features["nose"], color, radius)
 
+    def add_fps(frame, elapsed, font_size, thickness):
+        x, y = 10, 20
+        text = "FPS: {}".format(round(1. / elapsed, 2))
+        font = cv2.FONT_HERSHEY_DUPLEX
+        color = (255. - np.mean(frame[:x, :y], axis=(0, 1))).flatten().tolist()
+
+        cv2.putText(frame, text, (x, y), font, font_size, color, thickness)
+
     features = person["keypoints"]
     x, y, height, width = person["box"]
 
@@ -126,3 +136,5 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
 
     text = best_match if is_recognized else ""
     add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
+
+    add_fps(frame, elapsed, font_size, thickness=2)
