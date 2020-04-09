@@ -115,6 +115,7 @@ def update(is_recognized, best_match):
 
     update_progress = False
     now = timer()
+    cooled = cooldown_ok(LAST_LOGGED, best_match)
 
     if len(DISTS) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
         flush_current(mode="unknown+known", flush_times=False)
@@ -122,7 +123,7 @@ def update(is_recognized, best_match):
     else:
         flushed = False
 
-    if is_recognized:
+    if is_recognized and cooled:
         if best_match not in LOG["current"]:
             LOG["current"][best_match] = [now]
         else:
@@ -137,12 +138,12 @@ def update(is_recognized, best_match):
             if percent_diff_ok and not flushed:
                 update_progress = True
 
-    else:
+    elif not is_recognized:
         NUM_UNKNOWN += 1
         if NUM_UNKNOWN >= THRESHOLDS["num_unknown"]:
             NUM_RECOGNIZED = 0
 
-    update_recognized = NUM_RECOGNIZED >= THRESHOLDS["num_recognized"] and cooldown_ok(LAST_LOGGED, best_match) \
+    update_recognized = NUM_RECOGNIZED >= THRESHOLDS["num_recognized"] and cooled \
                         and get_percent_diff(best_match, LOG["current"]) <= THRESHOLDS["percent_diff"]
     update_unrecognized = NUM_UNKNOWN >= THRESHOLDS["num_unknown"] and cooldown_ok(UNK_LAST_LOGGED)
 
