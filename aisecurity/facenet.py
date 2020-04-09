@@ -501,22 +501,16 @@ class FaceNet:
         :param dist: distance between best match and current frame
         """
 
-        update_progress, update_recognized, update_unrecognized = log.update_current_logs(is_recognized, best_match)
+        update_progress, update_recognized, update_unrecognized = log.update(is_recognized, best_match)
 
         if pbar and update_progress:
             lcd.update_progress(update_recognized)
 
-        if update_recognized:
-            person = log.get_mode(log.CURRENT_LOG)
-            log.log_person(logging, person, times=log.CURRENT_LOG[person])
-
-            if connection.SOCKET:
-                connection.send(best_match=best_match)
-                connection.receive()
+        if update_recognized and connection.SOCKET:
+            connection.send(best_match=best_match)
+            connection.receive()
 
         elif update_unrecognized:
-            log.log_unknown(logging, "<DEPRECATED>")
-
             if pbar:
                 lcd.PROGRESS_BAR.reset(message="Recognizing...")
 

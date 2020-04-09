@@ -35,13 +35,12 @@ FIREBASE = None
 
 NUM_RECOGNIZED, NUM_UNKNOWN = 0, 0
 LAST_LOGGED, UNK_LAST_LOGGED = None, None
-CURRENT_LOG, DISTS = {}, []
-LAST_STUDENT = None
+LOG, DISTS = {"current": {}, "logged": {}}, []
 
 
 # LOGGING INIT AND HELPERS
 def init(logging, flush=False, thresholds=None):
-    global NUM_RECOGNIZED, NUM_UNKNOWN, LAST_LOGGED, UNK_LAST_LOGGED, CURRENT_LOG, DISTS, THRESHOLDS
+    global NUM_RECOGNIZED, NUM_UNKNOWN, LAST_LOGGED, UNK_LAST_LOGGED, LOG, DISTS, THRESHOLDS
     global MODE, DATABASE, CURSOR, FIREBASE
 
     MODE = logging
@@ -111,10 +110,11 @@ def get_percent_diff(item, log):
         return 1.0
 
 
-def update_current_logs(is_recognized, best_match):
-    global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN
+def update(is_recognized, best_match):
+    global LOG, NUM_RECOGNIZED, NUM_UNKNOWN
 
     update_progress = False
+    now = timer()
 
     if len(DISTS) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
         flush_current(mode="unknown+known", flush_times=False)
@@ -123,14 +123,12 @@ def update_current_logs(is_recognized, best_match):
         flushed = False
 
     if is_recognized:
-        now = timer()
-
-        if best_match not in CURRENT_LOG:
-            CURRENT_LOG[best_match] = [now]
+        if best_match not in LOG["current"]:
+            LOG["current"][best_match] = [now]
         else:
-            CURRENT_LOG[best_match].append(now)
+            LOG["current"][best_match].append(now)
 
-        percent_diff_ok = get_percent_diff(best_match, CURRENT_LOG) <= THRESHOLDS["percent_diff"]
+        percent_diff_ok = get_percent_diff(best_match, LOG["current"]) <= THRESHOLDS["percent_diff"]
 
         if percent_diff_ok or flushed:
             NUM_RECOGNIZED += 1
@@ -145,38 +143,42 @@ def update_current_logs(is_recognized, best_match):
             NUM_RECOGNIZED = 0
 
     update_recognized = NUM_RECOGNIZED >= THRESHOLDS["num_recognized"] and cooldown_ok(LAST_LOGGED, best_match) \
-                        and get_percent_diff(best_match, CURRENT_LOG) <= THRESHOLDS["percent_diff"]
+                        and get_percent_diff(best_match, LOG["current"]) <= THRESHOLDS["percent_diff"]
     update_unrecognized = NUM_UNKNOWN >= THRESHOLDS["num_unknown"] and cooldown_ok(UNK_LAST_LOGGED)
+
+    if update_recognized:
+        LOG["logged"][log_person()] = now
+    elif update_unrecognized:
+        log_unknown()
 
     return update_progress, update_recognized, update_unrecognized
 
 
 def cooldown_ok(elapsed, best_match=None):
-    global LAST_STUDENT
+    try:
+        last_student = max(LOG["logged"], key=lambda person: LOG["logged"][person])
+        if best_match == last_student:
+            return timer() - elapsed > THRESHOLDS["cooldown"]
+        else:
+            return True
 
-    if best_match and best_match == LAST_STUDENT:
-        return timer() - elapsed > THRESHOLDS["cooldown"]
-    else:
+    except ValueError:
         return True
 
 
-def get_mode(log):
-    return max(log.keys(), key=lambda person: len(log[person]))
-
-
 # LOGGING FUNCTIONS
-def log_person(logging, student_name, times):
-    global LAST_STUDENT
-
+def log_person():
+    student_name = max(LOG["current"], key=lambda person: len(LOG["current"][person]))
+    times = LOG["current"][student_name]
     now = get_now(sum(times) / len(times))
 
-    if logging == "mysql" and MODE == "mysql":
+    if MODE == "mysql":
         add = "INSERT INTO Activity (id, name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
             get_id(student_name), student_name.replace("_", " ").title(), *now)
         CURSOR.execute(add)
         DATABASE.commit()
 
-    elif logging == "firebase" and MODE == "firebase":
+    elif MODE == "firebase":
         data = {
             "id": get_id(student_name),
             "name": student_name.replace("_", " ").title(),
@@ -187,21 +189,23 @@ def log_person(logging, student_name, times):
 
     flush_current(mode="known")
 
-    LAST_STUDENT = student_name
-
     cprint("Regular activity ({}) logged with {}".format(student_name, MODE), color="green", attrs=["bold"])
 
+    return student_name
 
-def log_unknown(logging, path_to_img):
+
+def log_unknown():
     now = get_now(timer())
 
-    if logging == "mysql" and MODE == "mysql":
+    path_to_img = "<DEPRECATED>"
+
+    if MODE == "mysql":
         add = "INSERT INTO Unknown (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
             path_to_img, *now)
         CURSOR.execute(add)
         DATABASE.commit()
 
-    elif logging == "firebase" and MODE == "firebase":
+    elif MODE == "firebase":
         data = {
             "path_to_img": path_to_img,
             "date": now[0],
@@ -215,11 +219,11 @@ def log_unknown(logging, path_to_img):
 
 
 def flush_current(mode="known", flush_times=True):
-    global CURRENT_LOG, NUM_RECOGNIZED, NUM_UNKNOWN, DISTS, LAST_LOGGED, UNK_LAST_LOGGED
+    global LOG, NUM_RECOGNIZED, NUM_UNKNOWN, DISTS, LAST_LOGGED, UNK_LAST_LOGGED
 
     if "known" in mode:
         DISTS = []
-        CURRENT_LOG = {}
+        LOG["current"] = {}
         NUM_RECOGNIZED = 0
 
         if flush_times:
