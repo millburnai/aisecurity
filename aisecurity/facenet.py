@@ -22,6 +22,8 @@ import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
+import collections
+import imutils
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
 from aisecurity.db import log, connection
@@ -355,7 +357,7 @@ class FaceNet:
 
 
     # FACIAL RECOGNITION HELPER
-    def recognize(self, img, **kwargs):
+    def recognize(self, img, rotations=None, **kwargs):
         """Facial recognition
         :param img: image array
         :param kwargs: named arguments to self.get_embeds (will be passed to self.predict)
@@ -368,6 +370,31 @@ class FaceNet:
             assert self._db, "data must be provided"
 
             start = timer()
+
+            try:
+                img = cv2.imread(img).astype(np.uint8)[:, :, ::-1]
+
+            except (SystemError, TypeError):  # if img is actually image
+                try:
+                    img = img.astype(np.uint8)
+                except AttributeError:
+                    return exit_failure
+
+            if rotations:
+
+                results = [self.predict(imutils.rotate(img, degrees), **kwargs) for degrees in [0]+rotations]
+
+                best_matches = [self._knn.predict(result[0])[0] for result in results]
+                print(best_matches)
+                best_embeds = [self.expanded_embeds[self.expanded_names.index(best_match)] for best_match in best_matches]
+
+                dist = np.mean([self.dist_metric.distance(result[0], best_embed, ignore_norms=self.ignore_norms) for result, best_embed in zip(results, best_embeds)])
+                is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
+
+
+                elapsed = round(timer() - start, 4)
+
+                return results[0][0], is_recognized, best_matches[0], dist, results[0][1], elapsed
 
             embedding, face = self.predict(img, **kwargs)
             if face == -1:  # no face detected
@@ -399,7 +426,7 @@ class FaceNet:
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric="zero", logging=None, dynamic_log=False, picam=False,
                             graphics=True, pbar=False, framerate=20, resize=None, flip=0, device=0, detector="mtcnn",
-                            data_mutable=False, socket=None):
+                            data_mutable=False, socket=None, rotations=None):
         """Real-time facial recognition
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
@@ -450,7 +477,7 @@ class FaceNet:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
             # facial detection and recognition
-            embedding, is_recognized, best_match, dist, face, elapsed = self.recognize(frame, detector=detector)
+            embedding, is_recognized, best_match, dist, face, elapsed = self.recognize(frame, detector=detector, rotations=rotations)
 
             if face != -1:
                 print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))

@@ -9,6 +9,7 @@ Preprocessing for FaceNet.
 import itertools
 
 import cv2
+import imutils
 import numpy as np
 
 from aisecurity.dataflow.loader import print_time
@@ -38,16 +39,22 @@ def normalize(x, mode="per_image"):
 
 
 @print_time("Detection time")
-def crop_face(path_or_img, margin, detector="mtcnn", alpha=0.9):
+def crop_face(img, margin, detector="mtcnn", alpha=0.9):
     exit_failure = itertools.repeat(-1, 2)
-
+    
+    '''
     try:
         img = cv2.imread(path_or_img).astype(np.uint8)[:, :, ::-1]
+
+        if rotate:
+            rotated = [imutils.rotate_bound(img, degrees) for degrees in rotate]
+
     except (SystemError, TypeError):  # if img is actually image
         try:
             img = path_or_img.astype(np.uint8)
         except AttributeError:
             return exit_failure
+    '''
 
     if detector:
         result = detect_faces(img, mode=detector)
