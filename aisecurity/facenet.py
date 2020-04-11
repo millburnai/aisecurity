@@ -381,11 +381,9 @@ class FaceNet:
                     return exit_failure
 
             if rotations:
-
+            
                 results = [self.predict(imutils.rotate(img, degrees), **kwargs) for degrees in [0]+rotations]
-                print(type(results[0]))
                 results = list(filter(lambda x: not isinstance(x, itertools.repeat), results))
-                print(results)
                 if results == []:
                     return exit_failure
 

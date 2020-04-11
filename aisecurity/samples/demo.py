@@ -15,7 +15,7 @@ from aisecurity.utils.paths import DEFAULT_MODEL
 
 def demo(path=DEFAULT_MODEL, dist_metric="zero", logging=None, dynamic_log=True, picam=True, graphics=True,
          pbar=False, resize=None, flip=0, device=0, detector="mtcnn", data_mutable=True,
-         socket="ws://67.205.155.37:8000/v1/nano", allow_gpu_growth=False):
+         socket="ws://67.205.155.37:8000/v1/nano", allow_gpu_growth=False, rotations=None):
 
     if allow_gpu_growth:
         tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
@@ -70,6 +70,7 @@ if __name__ == "__main__":
     parser.add_argument("--data_mutable", help="use this flag to allow a mutable db", action="store_true")
     parser.add_argument("--allow_gpu_growth", help="use this flag to use GPU growth", action="store_true")
     parser.add_argument("--socket", help="websocket address (default: None)", type=str, default=None)
+    parser.add_argument("--rotations", help="array containing degrees of rotations to be applied to image during recognition", type=list, default=None)
     args = parser.parse_args()
 
 
@@ -78,5 +79,5 @@ if __name__ == "__main__":
         path=args.path_to_model, dist_metric=args.dist_metric, logging=args.logging, dynamic_log=args.dynamic_log,
         picam=args.picam, graphics=not args.no_graphics, pbar=args.pbar,  flip=args.flip, resize=args.resize,
         device=args.device, detector=args.detector, data_mutable=args.data_mutable,
-        allow_gpu_growth=args.allow_gpu_growth, socket=args.socket
+        allow_gpu_growth=args.allow_gpu_growth, socket=args.socket, rotations=args.rotations,
     )
