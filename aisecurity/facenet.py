@@ -336,15 +336,15 @@ class FaceNet:
         elif self.MODE == "trt":
             return self.facenet.inference(np.expand_dims(img, axis=0), output_shape=(1, -1))
 
-    def predict(self, path_or_img, detector="both", margin=IMG_CONSTANTS["margin"]):
+    def predict(self, img, detector="both", margin=IMG_CONSTANTS["margin"]):
         """Embeds and normalizes an image from path or array
-        :param path_or_img: path or image to predict on
+        :param img: image to be predicted on
         :param detector: face detector (either mtcnn, haarcascade, or None) (default: "both")
         :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
         :returns: normalized embeddings, facial coordinates
         """
 
-        cropped_face, face_coords = crop_face(path_or_img, margin, detector, alpha=self.HYPERPARAMS["mtcnn_alpha"])
+        cropped_face, face_coords = crop_face(img, margin, detector, alpha=self.HYPERPARAMS["mtcnn_alpha"])
         if face_coords == -1:
             return itertools.repeat(-1, 2)  # exit code: failure to detect face
 
@@ -359,7 +359,8 @@ class FaceNet:
     # FACIAL RECOGNITION HELPER
     def recognize(self, img, rotations=None, **kwargs):
         """Facial recognition
-        :param img: image array
+        :param img: image array or path to image
+        :param rotations: array of rotations to be applied to image before recognition
         :param kwargs: named arguments to self.get_embeds (will be passed to self.predict)
         :returns: embedding, is recognized (bool), best match from database(s), distance
         """
@@ -381,7 +382,7 @@ class FaceNet:
                     return exit_failure
 
             if rotations:
-            
+
                 results = [self.predict(imutils.rotate(img, degrees), **kwargs) for degrees in [0]+rotations]
                 results = list(filter(lambda x: not isinstance(x, itertools.repeat), results))
                 if results == []:
@@ -391,7 +392,9 @@ class FaceNet:
                 best_embeds = [self.expanded_embeds[self.expanded_names.index(best_match)] for best_match in best_matches]
 
                 dist = np.mean([self.dist_metric.distance(result[0], best_embed, ignore_norms=self.ignore_norms) for result, best_embed in zip(results, best_embeds)])
-                is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
+                frequencies = collections.Counter(best_matches)
+                best_match = max(best_matches, key=best_matches.count)
+                is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"] and frequencies["best_match"]/len(best_matches) > 0.5
 
 
                 elapsed = round(timer() - start, 4)
