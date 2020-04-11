@@ -17,10 +17,6 @@ def demo(path=DEFAULT_MODEL, dist_metric="zero", logging=None, dynamic_log=True,
          pbar=False, resize=None, flip=0, device=0, detector="mtcnn", data_mutable=True,
          socket="ws://67.205.155.37:8000/v1/nano", allow_gpu_growth=False):
 
-    dist_metric="cosine"
-    #device="/Users/michaelpilarski/Desktop/Liam.mov"
-    rotations=[15, -15]
-
     if allow_gpu_growth:
         tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
 

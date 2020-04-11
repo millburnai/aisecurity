@@ -382,24 +382,23 @@ class FaceNet:
 
             if rotations:
 
-                try:
+                results = [self.predict(imutils.rotate(img, degrees), **kwargs) for degrees in [0]+rotations]
+                print(type(results[0]))
+                results = list(filter(lambda x: not isinstance(x, itertools.repeat), results))
+                print(results)
+                if results == []:
+                    return exit_failure
 
-                    results = [self.predict(imutils.rotate(img, degrees), **kwargs) for degrees in [0]+rotations]
+                best_matches = [self._knn.predict(result[0])[0] for result in results]
+                best_embeds = [self.expanded_embeds[self.expanded_names.index(best_match)] for best_match in best_matches]
 
-                    best_matches = [self._knn.predict(result[0])[0] for result in results]
-                    print(best_matches)
-                    best_embeds = [self.expanded_embeds[self.expanded_names.index(best_match)] for best_match in best_matches]
-
-                    dist = np.mean([self.dist_metric.distance(result[0], best_embed, ignore_norms=self.ignore_norms) for result, best_embed in zip(results, best_embeds)])
-                    is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
+                dist = np.mean([self.dist_metric.distance(result[0], best_embed, ignore_norms=self.ignore_norms) for result, best_embed in zip(results, best_embeds)])
+                is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
 
 
-                    elapsed = round(timer() - start, 4)
+                elapsed = round(timer() - start, 4)
 
-                    return results[0][0], is_recognized, best_matches[0], dist, results[0][1], elapsed
-
-                except Exception as e: #'itertools.repeat' object is not subscriptable
-                    print(e)
+                return results[0][0], is_recognized, max(best_matches, key=best_matches.count), dist, results[0][1], elapsed
 
             embedding, face = self.predict(img, **kwargs)
             if face == -1:  # no face detected
