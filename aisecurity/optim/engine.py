@@ -77,12 +77,10 @@ class CudaEngineManager:
 
         # determine dimensions and create page-locked memory buffers (i.e. won't be swapped to disk) to hold host i/o
         self.h_input = cuda.pagelocked_empty(
-            trt.volume(self.engine.get_binding_shape(0)),
-            dtype=trt.nptype(self.CONSTANTS["dtype"])
+            trt.volume(self.engine.get_binding_shape(0)), dtype=trt.nptype(self.CONSTANTS["dtype"])
         )
         self.h_output = cuda.pagelocked_empty(
-            trt.volume(self.engine.get_binding_shape(1)),
-            dtype=trt.nptype(self.CONSTANTS["dtype"])
+            trt.volume(self.engine.get_binding_shape(1)), dtype=trt.nptype(self.CONSTANTS["dtype"])
         )
 
         # allocate device memory for inputs and outputs
@@ -93,11 +91,10 @@ class CudaEngineManager:
 
 
     # INFERENCE
-    def inference(self, img, output_shape=None):
-        """Run inference on given image
+    def inference(self, imgs):
+        """Run inference on given images
 
-        :param img: input image array
-        :param output_shape: shape to which to reshape the output array (default: None)
+        :param imgs: input image arrays
         :returns: output array
 
         """
@@ -107,23 +104,23 @@ class CudaEngineManager:
             arr = arr.transpose(0, 3, 1, 2).ravel()
             return arr
 
-        np.copyto(self.h_input, buffer_ready(img))
+        outputs = np.empty((len(imgs), *self.h_output.shape))
+        for idx, img in enumerate(np.expand_dims(imgs, axis=1)):
+            np.copyto(self.h_input, buffer_ready(img))
 
-        with self.engine.create_execution_context() as context:
-            cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
-            context.execute_async(
-                batch_size=1,
-                bindings=[int(self.d_input), int(self.d_output)],
-                stream_handle=self.stream.handle
-            )
-            cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
-            self.stream.synchronize()
+            # TODO: if possible, only create one context per batch / object to reduce handle overhead
+            #   (takes ~15% of inference time per embedding to create context)
+            with self.engine.create_execution_context() as context:
+                cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
+                context.execute_async(
+                    batch_size=1, bindings=[int(self.d_input), int(self.d_output)],stream_handle=self.stream.handle
+                )
+                cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
+                self.stream.synchronize()
 
-        output = np.copy(self.h_output)
-        if output_shape is not None:
-            output = output.reshape(output_shape)
+            np.copyto(outputs[idx], self.h_output)
 
-        return output
+        return outputs
 
 
     # CUDA ENGINE READ/WRITE

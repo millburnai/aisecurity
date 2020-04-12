@@ -331,9 +331,6 @@ class FaceNet:
             embeds = self.sess.run(output_tensor, feed_dict=self._make_feed_dict(imgs))
         elif self.MODE == "trt":
             embeds = self.facenet.inference(imgs)
-            # TODO: make inference work in batches
-            if len(embeds) > 1:
-                raise NotImplementedError("CUDA inference with batch_size>1 not supported yet")
 
         return embeds.reshape(len(imgs), -1)
 
@@ -350,7 +347,7 @@ class FaceNet:
 
         start = timer()
 
-        # this line will raise AttributeError if no faces are found
+        # this line will raise an IndexError if no faces are found
         raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
         normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
 
