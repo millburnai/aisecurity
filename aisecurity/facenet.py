@@ -8,7 +8,6 @@ Reference paper: https://arxiv.org/pdf/1503.03832.pdf
 
 """
 
-import itertools
 import json
 import os
 import time
@@ -23,7 +22,6 @@ from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
 import collections
-import imutils
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
 from aisecurity.db import log, connection
@@ -336,102 +334,81 @@ class FaceNet:
         elif self.MODE == "trt":
             return self.facenet.inference(np.expand_dims(img, axis=0), output_shape=(1, -1))
 
-    def predict(self, img, detector="both", margin=IMG_CONSTANTS["margin"]):
+    def predict(self, img, detector="both", margin=IMG_CONSTANTS["margin"], rotations=None):
         """Embeds and normalizes an image from path or array
         :param img: image to be predicted on
         :param detector: face detector (either mtcnn, haarcascade, or None) (default: "both")
         :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
+        :param rotations: array of rotations to be applied to face (default: None)
         :returns: normalized embeddings, facial coordinates
         """
 
-        cropped_face, face_coords = crop_face(img, margin, detector, alpha=self.HYPERPARAMS["mtcnn_alpha"])
-        if face_coords == -1:
-            return itertools.repeat(-1, 2)  # exit code: failure to detect face
+        normalized_embeddings, face_coords = [], None
 
-        normalized_face = normalize(cropped_face, mode=self.img_norm)
+        cropped_faces, face_coords = crop_face(
+            img, margin, detector, alpha=self.HYPERPARAMS["mtcnn_alpha"], rotations=rotations
+        )
 
-        raw_embedding = self.embed(normalized_face)
-        normalized_embedding = self.dist_metric.apply_norms(raw_embedding).reshape(raw_embedding.shape)
+        for face in cropped_faces:
+            raw_embedding = self.embed(normalize(face, mode=self.img_norm))
+            normalized_embeddings.append(self.dist_metric.apply_norms(raw_embedding).reshape(raw_embedding.shape))
 
-        return normalized_embedding, face_coords
+        return normalized_embeddings, face_coords
 
 
     # FACIAL RECOGNITION HELPER
-    def recognize(self, img, rotations=None, **kwargs):
+    def recognize(self, img, **kwargs):
         """Facial recognition
-        :param img: image array or path to image
-        :param rotations: array of rotations to be applied to image before recognition
+        :param img: image array
         :param kwargs: named arguments to self.get_embeds (will be passed to self.predict)
         :returns: embedding, is recognized (bool), best match from database(s), distance
         """
 
-        exit_failure = itertools.repeat(-1, 6)
+        def analyze_embeds(embeds):
+            analysis = {"embeds": embeds, "best_match": [], "dists": [], "is_recognized": []}
+            for embed in embeds:
+                analysis["best_match"].append(self._knn.predict(embed)[0])
+                best_embed = self.expanded_embeds[self.expanded_names.index(analysis["best_match"][-1])]
+
+                analysis["dists"].append(self.dist_metric.distance(embed, best_embed, ignore_norms=self.ignore_norms))
+                analysis["is_recognized"].append(analysis["dists"][-1] <= FaceNet.HYPERPARAMS["alpha"])
+
+            return analysis
+
+        embed, is_recognized, best_match, dist, face, elapsed = None, None, None, None, None, None
 
         try:
             assert self._db, "data must be provided"
-
             start = timer()
 
-            try:
-                img = cv2.imread(img).astype(np.uint8)[:, :, ::-1]
+            embeds, face = self.predict(img, **kwargs)
+            if embeds:
+                analysis = analyze_embeds(embeds)
 
-            except (SystemError, TypeError):  # if img is actually image
-                try:
-                    img = img.astype(np.uint8)
-                except AttributeError:
-                    return exit_failure
-
-            if rotations:
-
-                results = [self.predict(imutils.rotate(img, degrees), **kwargs) for degrees in [0]+rotations]
-                results = list(filter(lambda x: not isinstance(x, itertools.repeat), results))
-                if results == []:
-                    return exit_failure
-
-                best_matches = [self._knn.predict(result[0])[0] for result in results]
-                best_embeds = [self.expanded_embeds[self.expanded_names.index(best_match)] for best_match in best_matches]
-
-                dist = np.mean([self.dist_metric.distance(result[0], best_embed, ignore_norms=self.ignore_norms) for result, best_embed in zip(results, best_embeds)])
-                frequencies = collections.Counter(best_matches)
-                best_match = max(best_matches, key=best_matches.count)
-                is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"] and frequencies["best_match"]/len(best_matches) > 0.5
-
+                embed = embeds[0]  # embed[0] is the embedding for 0° rotation of face
+                is_recognized = bool(round(sum(analysis["is_recognized"]) / len(analysis["is_recognized"])))
+                best_match = max(analysis["best_match"], key=analysis["best_match"].count)
+                dist = analysis["dists"][analysis["best_match"].index(best_match)]  # dist associated with best_match
 
                 elapsed = round(timer() - start, 4)
-
-                return results[0][0], is_recognized, max(best_matches, key=best_matches.count), dist, results[0][1], elapsed
-
-            embedding, face = self.predict(img, **kwargs)
-            if face == -1:  # no face detected
-                return exit_failure
-
-            best_match = self._knn.predict(embedding)[0]
-            best_embed = self.expanded_embeds[self.expanded_names.index(best_match)]
-
-            dist = self.dist_metric.distance(embedding, best_embed, ignore_norms=self.ignore_norms)
-            is_recognized = dist <= FaceNet.HYPERPARAMS["alpha"]
-
-            elapsed = round(timer() - start, 4)
-
-            return embedding, is_recognized, best_match, dist, face, elapsed
 
         except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
             if "query data dimension" in str(error):
                 raise ValueError("Current model incompatible with database")
             elif "empty" in str(error):
                 print("Image refresh rate too high")
-                return exit_failure
             elif "opencv" in str(error):
                 print("Failed to capture frame")
-                return exit_failure
             else:
                 raise error
 
+        return embed, is_recognized, best_match, dist, face, elapsed
+
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, dist_metric="zero", logging=None, dynamic_log=False, picam=False,
-                            graphics=True, pbar=False, framerate=20, resize=None, flip=0, device=0, detector="mtcnn",
-                            data_mutable=False, socket=None, rotations=None):
+    def real_time_recognize(self, width=640, height=360, dist_metric="zero", logging=None, dynamic_log=False,
+                            picam=False, graphics=True, pbar=False, framerate=20, resize=None, flip=0, device=0,
+                            detector="mtcnn", data_mutable=False, socket=None, rotations=None):
         """Real-time facial recognition
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
@@ -447,7 +424,8 @@ class FaceNet:
         :param device: camera device (/dev/video{device}) (default: 0)
         :param detector: face detector type ("mtcnn" or "haarcascade") (default: "mtcnn")
         :param data_mutable: if true, prompt for verification on recognition and update database (default: False)
-        :param socket: in dev
+        :param socket: socket address (dev only)
+        :param rotations: rotations to be applied to face
         """
 
         # INITS
@@ -459,6 +437,7 @@ class FaceNet:
         if pbar:
             lcd.init()
         if resize:
+            assert 0. <= resize <= 1.
             face_width, face_height = width * resize, height * resize
         else:
             face_width, face_height = width, height
@@ -474,7 +453,6 @@ class FaceNet:
 
         # CAM LOOP
         while True:
-
             _, frame = cap.read()
             original_frame = frame.copy()
 
@@ -482,13 +460,15 @@ class FaceNet:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
             # facial detection and recognition
-            embedding, is_recognized, best_match, dist, face, elapsed = self.recognize(frame, detector=detector, rotations=rotations)
+            embed, is_recognized, best_match, dist, face, elapsed = self.recognize(
+                frame, detector=detector, rotations=rotations
+            )
 
-            if face != -1:
+            if face:
                 print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
 
                 # add graphics, lcd, logging
-                self.log_activity(is_recognized, best_match, embedding, dynamic_log, data_mutable, pbar, dist)
+                self.log_activity(is_recognized, best_match, embed, dynamic_log, data_mutable, pbar, dist)
 
                 if graphics:
                     add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)

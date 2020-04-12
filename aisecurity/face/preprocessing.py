@@ -6,10 +6,7 @@ Preprocessing for FaceNet.
 
 """
 
-import itertools
-
 import cv2
-import imutils
 import numpy as np
 
 from aisecurity.dataflow.loader import print_time
@@ -39,24 +36,36 @@ def normalize(x, mode="per_image"):
 
 
 @print_time("Detection time")
-def crop_face(img, margin, detector="mtcnn", alpha=0.9):
-    exit_failure = itertools.repeat(-1, 2)
+def crop_face(img, margin, detector="mtcnn", alpha=0.9, rotations=None):
+    def crop_and_rotate(img, face_coords, rotation_angle):
+        x, y, width, height = face_coords
+        img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
+
+        resized = cv2.resize(img, IMG_CONSTANTS["img_size"])
+        if rotation_angle != 0.:
+            # https://stackoverflow.com/questions/9041681/opencv-python-rotate-image-by-x-degrees-around-specific-point
+            rotation_matrix = cv2.getRotationMatrix2D(tuple(np.array(resized.shape[1::-1]) / 2), rotation_angle, 1.)
+            return cv2.warpAffine(resized, rotation_matrix, resized.shape[1::-1], flags=cv2.INTER_LINEAR)
+        else:
+            return resized
+
+
+    resized_faces, face = [], None
+
+    if rotations is None:
+        rotations = [0.]
+    elif 0. not in rotations:
+        rotations.append(0.)
 
     if detector:
         result = detect_faces(img, mode=detector)
-        if len(result) == 0:
-            return exit_failure
 
-        face = max(result, key=lambda person: person["confidence"])
-        if face["confidence"] < alpha:
-            print("{}% face detection confidence is too low".format(round(face["confidence"] * 100, 2)))
-            return exit_failure
+        if len(result) != 0:
+            face = max(result, key=lambda person: person["confidence"])
 
-        x, y, width, height = face["box"]
-        img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
+            if face["confidence"] >= alpha:
+                resized_faces = [crop_and_rotate(img, face["box"], angle) for angle in sorted(rotations)]
+            else:
+                print("{}% face detection confidence is too low".format(round(face["confidence"] * 100, 2)))
 
-    else:
-        face = {"box": list(itertools.repeat(-1, 4)), "keypoints": {}, "confidence": 0.0}
-
-    resized = cv2.resize(img, IMG_CONSTANTS["img_size"])
-    return resized, face
+    return resized_faces, face
