@@ -6,22 +6,13 @@ Graph control and flow.
 
 """
 
-
 import subprocess
-import warnings
 
 from keras import backend as K
 import tensorflow as tf
 from tensorflow.python.framework import graph_io
 
 from aisecurity.dataflow.loader import print_time
-
-# AUTOINIT
-try:
-    import tensorflow.contrib.tensorrt as trt
-except ModuleNotFoundError:
-    # tf-trt not supported on windows and tensorflow>1.14
-    warnings.warn("tf-trt graph functions cannot be used")
 
 
 # MODEL CONVERSIONS
@@ -93,6 +84,12 @@ def frozen_to_uff(path_to_model):
 # frozen .pb -> trt-optimizer .pb
 @print_time("Inference graph creation time")
 def optimize_graph(path_to_graph_def, output_names, save_dir=".", save_name="trt_graph.pb"):
+    try:
+        import tensorflow.contrib.tensorrt as trt
+    except ModuleNotFoundError:
+        # tf-trt not supported on windows and tensorflow>1.14
+        raise ValueError("tensorflow.contrib.tensorrt not available - optimize_graph cannot be used")
+
     with tf.gfile.FastGFile(path_to_graph_def, "rb") as graph_file:
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(graph_file.read())
