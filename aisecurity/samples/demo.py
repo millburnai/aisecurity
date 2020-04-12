@@ -70,8 +70,8 @@ if __name__ == "__main__":
     parser.add_argument("--data_mutable", help="use this flag to allow a mutable db", action="store_true")
     parser.add_argument("--allow_gpu_growth", help="use this flag to use GPU growth", action="store_true")
     parser.add_argument("--socket", help="websocket address (default: None)", type=str, default=None)
-    parser.add_argument("--rotations", help="rotations to be applied to face (default: None)", type=list_of_ints,
-                        default=None)
+    parser.add_argument("--rotations", help="rotations to be applied to face (-1 is horizontal flip) (default: None)",
+                        type=list_of_ints, default=None)
     args = parser.parse_args()
 
 

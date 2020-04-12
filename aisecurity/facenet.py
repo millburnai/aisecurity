@@ -21,7 +21,6 @@ import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
-import collections
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
 from aisecurity.db import log, connection
@@ -319,7 +318,6 @@ class FaceNet:
             feed_dict[tensor] = value
         return feed_dict
 
-    @print_time("Embedding time")
     def embed(self, img):
         """Embeds cropped face
         :param img: img as a cropped face with shape (h, w, 3)
@@ -343,16 +341,17 @@ class FaceNet:
         :returns: normalized embeddings, facial coordinates
         """
 
-        normalized_embeddings, face_coords = [], None
-
         cropped_faces, face_coords = crop_face(
             img, margin, detector, alpha=self.HYPERPARAMS["mtcnn_alpha"], rotations=rotations
         )
 
+        start = timer()
+        normalized_embeddings = []
         for face in cropped_faces:
             raw_embedding = self.embed(normalize(face, mode=self.img_norm))
             normalized_embeddings.append(self.dist_metric.apply_norms(raw_embedding).reshape(raw_embedding.shape))
 
+        print("Embedding time ({} vectors): {}s".format(len(normalized_embeddings), round(timer() - start, 4)))
         return normalized_embeddings, face_coords
 
 
@@ -382,25 +381,25 @@ class FaceNet:
             start = timer()
 
             embeds, face = self.predict(img, **kwargs)
-            if embeds:
+            if face:
                 analysis = analyze_embeds(embeds)
 
-                embed = embeds[0]  # embed[0] is the embedding for 0° rotation of face
                 is_recognized = bool(round(sum(analysis["is_recognized"]) / len(analysis["is_recognized"])))
                 best_match = max(analysis["best_match"], key=analysis["best_match"].count)
-                dist = analysis["dists"][analysis["best_match"].index(best_match)]  # dist associated with best_match
+
+                # index associated with minimum distance best_match embedding
+                min_index = min((idx for idx, person in enumerate(analysis["best_match"]) if person == best_match),
+                    key=lambda idx: analysis["dists"][idx])
+                dist = analysis["dists"][min_index]
+                embed = embeds[min_index]
 
                 elapsed = round(timer() - start, 4)
 
-        except (ValueError, cv2.error) as error:  # error-handling using names is unstable-- change later
+        except Exception as error:  # error-handling using names is unstable-- change later
             if "query data dimension" in str(error):
                 raise ValueError("Current model incompatible with database")
-            elif "empty" in str(error):
-                print("Image refresh rate too high")
-            elif "opencv" in str(error):
-                print("Failed to capture frame")
             else:
-                raise error
+                print("[ERROR]", str(error))
 
         return embed, is_recognized, best_match, dist, face, elapsed
 
@@ -425,7 +424,7 @@ class FaceNet:
         :param detector: face detector type ("mtcnn" or "haarcascade") (default: "mtcnn")
         :param data_mutable: if true, prompt for verification on recognition and update database (default: False)
         :param socket: socket address (dev only)
-        :param rotations: rotations to be applied to face
+        :param rotations: rotations to be applied to face (Note: -1 is horizontal flip) (default: None)
         """
 
         # INITS
