@@ -30,7 +30,8 @@ def demo(path=DEFAULT_MODEL, dist_metric="zero", logging=None, dynamic_log=True,
 
     facenet.real_time_recognize(
         dist_metric=dist_metric, logging=logging, dynamic_log=dynamic_log, picam=picam, graphics=graphics,
-        resize=resize, pbar=pbar, flip=flip, device=device, detector=detector, data_mutable=data_mutable, socket=socket, rotations=rotations
+        resize=resize, pbar=pbar, flip=flip, device=device, detector=detector, data_mutable=data_mutable, socket=socket,
+        rotations=rotations
     )
 
 
@@ -39,17 +40,17 @@ if __name__ == "__main__":
 
 
     # TYPE CASTING
-    def bounded_float(string):
-        if 0. <= float(string) <= 1.:
-            return float(string)
-        else:
-            raise argparse.ArgumentTypeError("float between 0 and 1 expected")
-
     def to_int(string):
         try:
             return int(string)
         except TypeError:
-            raise argparse.ArgumentTypeError("integer expected")
+            raise argparse.ArgumentTypeError("int expected")
+
+    def list_of_ints(string):
+        try:
+            return [int(val) for val in string.split(",")]
+        except TypeError:
+            raise argparse.ArgumentTypeError("int list expected")
 
 
     # ARG PARSE
@@ -63,14 +64,14 @@ if __name__ == "__main__":
     parser.add_argument("--picam", help="use this flag to use a Picamera", action="store_true")
     parser.add_argument("--pbar", help="use this flag to use progress bar", action="store_true")
     parser.add_argument("--flip", help="flip method: +1 = +90º rotation (default: 0)", type=to_int, default=0)
-    parser.add_argument("--resize", help="resize frame for faster recognition (default: None)", type=bounded_float,
-                        default=None)
+    parser.add_argument("--resize", help="resize frame for faster runtime (default: None)", type=float, default=None)
     parser.add_argument("--device", help="camera device (default: 0)", type=to_int, default=0)
     parser.add_argument("--detector", help="type of face detector (default: mtcnn)", type=str, default="mtcnn")
     parser.add_argument("--data_mutable", help="use this flag to allow a mutable db", action="store_true")
     parser.add_argument("--allow_gpu_growth", help="use this flag to use GPU growth", action="store_true")
     parser.add_argument("--socket", help="websocket address (default: None)", type=str, default=None)
-    parser.add_argument("--rotations", help="array containing degrees of rotations to be applied to image during recognition", type=list, default=None)
+    parser.add_argument("--rotations", help="rotations to be applied to face (default: None)", type=list_of_ints,
+                        default=None)
     args = parser.parse_args()
 
 
