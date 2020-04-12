@@ -341,9 +341,7 @@ class FaceNet:
         :returns: normalized embeddings, facial coordinates
         """
 
-        cropped_faces, face_coords = crop_face(
-            img, margin, detector, alpha=self.HYPERPARAMS["mtcnn_alpha"], rotations=rotations
-        )
+        cropped_faces, face_coords = crop_face(img, margin, detector, self.HYPERPARAMS["mtcnn_alpha"], rotations)
 
         start = timer()
         normalized_embeddings = []
@@ -351,7 +349,8 @@ class FaceNet:
             raw_embedding = self.embed(normalize(face, mode=self.img_norm))
             normalized_embeddings.append(self.dist_metric.apply_norms(raw_embedding).reshape(raw_embedding.shape))
 
-        print("Embedding time ({} vectors): {}s".format(len(normalized_embeddings), round(timer() - start, 4)))
+        print("Embedding time ({} vector{}): {}s".format(
+            len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "", round(timer() - start, 4)))
         return normalized_embeddings, face_coords
 
 
@@ -364,7 +363,7 @@ class FaceNet:
         """
 
         def analyze_embeds(embeds):
-            analysis = {"embeds": embeds, "best_match": [], "dists": [], "is_recognized": []}
+            analysis = {"best_match": [], "dists": [], "is_recognized": []}
             for embed in embeds:
                 analysis["best_match"].append(self._knn.predict(embed)[0])
                 best_embed = self.expanded_embeds[self.expanded_names.index(analysis["best_match"][-1])]
@@ -374,33 +373,38 @@ class FaceNet:
 
             return analysis
 
+        start = timer()
         embed, is_recognized, best_match, dist, face, elapsed = None, None, None, None, None, None
 
         try:
-            assert self._db, "data must be provided"
-            start = timer()
-
             embeds, face = self.predict(img, **kwargs)
-            if face:
-                analysis = analyze_embeds(embeds)
+            analysis = analyze_embeds(embeds)
 
-                is_recognized = bool(round(sum(analysis["is_recognized"]) / len(analysis["is_recognized"])))
+            if len(embeds) > 1:
                 best_match = max(analysis["best_match"], key=analysis["best_match"].count)
 
+                best_match_idxs = [idx for idx, person in enumerate(analysis["best_match"]) if person == best_match]
+                min_index = min(best_match_idxs, key=lambda idx: analysis["dists"][idx])
                 # index associated with minimum distance best_match embedding
-                min_index = min((idx for idx, person in enumerate(analysis["best_match"]) if person == best_match),
-                    key=lambda idx: analysis["dists"][idx])
+
+                results = [result for idx, result in enumerate(analysis["is_recognized"]) if idx in best_match_idxs]
+                is_recognized = bool(round(sum(results) / len(results)))
                 dist = analysis["dists"][min_index]
                 embed = embeds[min_index]
 
-                elapsed = round(timer() - start, 4)
+            else:
+                embed = embeds[0]
+                is_recognized = analysis["is_recognized"][0]
+                best_match = analysis["best_match"][0]
+                dist = analysis["dists"][0]
 
         except Exception as error:  # error-handling using names is unstable-- change later
             if "query data dimension" in str(error):
                 raise ValueError("Current model incompatible with database")
-            else:
+            elif not isinstance(error, IndexError):
                 print("[ERROR]", str(error))
 
+        elapsed = round(timer() - start, 4)
         return embed, is_recognized, best_match, dist, face, elapsed
 
 
@@ -428,6 +432,7 @@ class FaceNet:
         """
 
         # INITS
+        assert self._db, "data must be provided"
         log.init(logging, flush=True)
         if dist_metric:
             self.set_dist_metric(dist_metric)
@@ -436,7 +441,7 @@ class FaceNet:
         if pbar:
             lcd.init()
         if resize:
-            assert 0. <= resize <= 1.
+            assert 0. <= resize <= 1., "resize must be in [0., 1.]"
             face_width, face_height = width * resize, height * resize
         else:
             face_width, face_height = width, height
