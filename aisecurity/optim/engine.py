@@ -89,6 +89,10 @@ class CudaEngineManager:
 
         self.stream = cuda.Stream()
 
+    def create_context(self):
+        """Creates execution context for engine"""
+        self.context = self.engine.create_execution_context()
+
 
     # INFERENCE
     def inference(self, imgs):
@@ -108,15 +112,12 @@ class CudaEngineManager:
         for idx, img in enumerate(np.expand_dims(imgs, axis=1)):
             np.copyto(self.h_input, buffer_ready(img))
 
-            # TODO: if possible, only create one context per batch / object to reduce handle overhead
-            #   (takes ~15% of inference time per embedding to create context)
-            with self.engine.create_execution_context() as context:
-                cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
-                context.execute_async(
-                    batch_size=1, bindings=[int(self.d_input), int(self.d_output)],stream_handle=self.stream.handle
-                )
-                cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
-                self.stream.synchronize()
+            cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
+            self.context.execute_async(
+                batch_size=1, bindings=[int(self.d_input), int(self.d_output)], stream_handle=self.stream.handle
+            )
+            cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
+            self.stream.synchronize()
 
             np.copyto(outputs[idx], self.h_output)
 
@@ -265,6 +266,7 @@ class CudaEngine:
 
         # memory allocation
         self.engine_manager.allocate_buffers()
+        self.engine_manager.create_context()
 
     def io_check(self, filepath, input_name, output_name, input_shape):
         """Checks that I/O names and shapes are provided or detected
