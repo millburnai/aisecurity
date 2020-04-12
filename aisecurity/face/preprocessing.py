@@ -42,12 +42,14 @@ def crop_face(img, margin, detector="mtcnn", alpha=0.9, rotations=None):
         img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
 
         resized = cv2.resize(img, IMG_CONSTANTS["img_size"])
-        if rotation_angle != 0.:
+        if rotation_angle == 0:
+            return resized
+        elif rotation_angle == -1:
+            return cv2.flip(resized, 1)
+        else:
             # https://stackoverflow.com/questions/9041681/opencv-python-rotate-image-by-x-degrees-around-specific-point
             rotation_matrix = cv2.getRotationMatrix2D(tuple(np.array(resized.shape[1::-1]) / 2), rotation_angle, 1.)
             return cv2.warpAffine(resized, rotation_matrix, resized.shape[1::-1], flags=cv2.INTER_LINEAR)
-        else:
-            return resized
 
 
     resized_faces, face = [], None
