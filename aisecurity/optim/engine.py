@@ -35,7 +35,7 @@ except (ModuleNotFoundError, ImportError) as e:  # don't know which exception
 
 ################################ CUDA Engine Manager ################################
 class CudaEngineManager:
-    """Class-oriented cuda engine management"""
+    """Cuda engine management and interface with GPU using pycuda, trt"""
 
     # CONSTANTS
     CONSTANTS = {
@@ -49,9 +49,7 @@ class CudaEngineManager:
     # INITS
     def __init__(self, **kwargs):
         """Initializes CudaEngineManager
-
         :param kwargs: overrides CudaEngineManager.CONSTANTS
-
         """
 
         # constants (have to be set here in case trt isn't imported)
@@ -97,10 +95,8 @@ class CudaEngineManager:
     # INFERENCE
     def inference(self, imgs):
         """Run inference on given images
-
         :param imgs: input image arrays
         :returns: output array
-
         """
 
         def buffer_ready(arr):
@@ -127,9 +123,7 @@ class CudaEngineManager:
     # CUDA ENGINE READ/WRITE
     def read_cuda_engine(self, engine_file):
         """Read and deserialize engine from file
-
         :param engine_file: path to engine file
-
         """
 
         with open(engine_file, "rb") as file, trt.Runtime(self.CONSTANTS["logger"]) as runtime:
@@ -143,12 +137,10 @@ class CudaEngineManager:
     @print_time("uff model parsing time")
     def parse_uff(self, uff_file, input_name, input_shape, output_name):
         """Parses .uff file and prepares for serialization
-
         :param uff_file: path to uff model
         :param input_name: name of input
         :param input_shape: input shape (channels first)
         :param output_name: name of output
-
         """
 
         parser = trt.UffParser()
@@ -164,11 +156,9 @@ class CudaEngineManager:
     @print_time("caffe model parsing time")
     def parse_caffe(self, caffe_model_file, caffe_deploy_file, output_name="prob1"):
         """Parses caffe model file and prepares for serialization
-
         :param caffe_model_file: path to caffe model file
         :param caffe_deploy_file: path to caffe deploy file
         :param output_name: output name
-
         """
 
         parser = trt.CaffeParser()
@@ -184,13 +174,11 @@ class CudaEngineManager:
 
     def uff_write_cuda_engine(self, uff_file, target_file, input_name, input_shape, output_name):
         """Parses a uff model and writes it as a serialized cuda engine
-
         :param uff_file: uff filepath
         :param target_file: target filepath for engine
         :param input_name: name of input
         :param input_shape: input shape (channels first)
         :param output_name: name of output
-
         """
 
         self.parse_uff(uff_file, input_name, input_shape, output_name)
@@ -201,12 +189,10 @@ class CudaEngineManager:
 
     def caffe_write_cuda_engine(self, caffe_model_file, caffe_deploy_file, output_name, target_file):
         """Parses a caffe model and writes it as a serialized cuda engine
-
         :param caffe_model_file: path to caffe model
         :param caffe_deploy_file: path to caffe deploy file
         :param output_name: name of output
         :param target_file: target filepath for engine
-
         """
 
         self.parse_caffe(caffe_model_file, caffe_deploy_file, output_name)
@@ -216,30 +202,9 @@ class CudaEngineManager:
             file.write(self.engine)
 
 
-    # DISPLAY
-    def summary(self):
-        """Printed summary of all the layers of the network"""
-        for i in range(self.network.num_layers):
-            layer = self.network.get_layer(i)
-
-            print("\nLAYER {}".format(i))
-            print("===========================================")
-
-            layer_input = layer.get_input(0)
-            if layer_input:
-                print("\tInput Name:  {}".format(layer_input.name))
-                print("\tInput Shape: {}".format(layer_input.shape))
-
-            layer_output = layer.get_output(0)
-            if layer_output:
-                print("\tOutput Name:  {}".format(layer_output.name))
-                print("\tOutput Shape: {}".format(layer_output.shape))
-            print("===========================================")
-
-
 ################################ CUDA Engine ################################
 class CudaEngine:
-    """Class-oriented cuda engine manager wrapper"""
+    """Cuda engine manager wrapper for interfacing with FaceNet class"""
 
     # PREBUILT MODELS
     MODELS = json.load(open(CONFIG_HOME + "/config/cuda_models.json", encoding="utf-8"))
@@ -248,13 +213,11 @@ class CudaEngine:
     # INITS
     def __init__(self, filepath, input_name, output_name, input_shape, **kwargs):
         """Initializes a cuda engine
-
         :param filepath: path to engine file
         :param input_name: name of input
         :param output_name: name of output
         :param input_shape: input shape (channels first)
         :param kwargs: overrides CudaEngineManager.CONSTANTS
-
         """
 
         # engine
@@ -270,13 +233,11 @@ class CudaEngine:
 
     def io_check(self, filepath, input_name, output_name, input_shape):
         """Checks that I/O names and shapes are provided or detected
-
         :param filepath: path to engine file
         :param input_name: provided name of input
         :param output_name: provided name of output
         :param input_shape: provided input shape
         :raises: AssertionError: if I/O name and shape is not detected or provided
-
         """
 
         self.input_name, self.output_name, self.model_name = None, None, None
@@ -305,16 +266,8 @@ class CudaEngine:
     # INFERENCE
     def inference(self, *args, **kwargs):
         """Inference on given image
-
         :param args: args to CudaEngineManager().inference()
         :param kwargs: kwargs to CudaEngineManager().inference()
-
         """
 
         return self.engine_manager.inference(*args, **kwargs)
-
-
-    # SUMMARY
-    def summary(self):
-        """Printed summary of all engine layers"""
-        self.engine_manager.summary()
