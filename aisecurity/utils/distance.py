@@ -73,7 +73,7 @@ class DistMetric:
         ),
         "zero": construct_dist(
             norm=lambda x:x,
-            calc=lambda a,b: 0
+            calc=lambda a, b: 0
         )
     }
 
@@ -159,16 +159,17 @@ class DistMetric:
 
     # "PUBLIC" FUNCTIONS
     def apply_norms(self, *args, dist_norm=True):
-        if len(args) == 1:
-            normalized = np.array(self._apply_norms(args[0]))
+        result = []
+
+        for arg in args:
+            normalized = np.array(self._apply_norms(arg))
 
             if dist_norm:
                 normalized = self.DISTS[self.dist]["norm"](normalized)
 
-            return normalized
+            result.append(normalized)
 
-        else:
-            return np.array([self.apply_norms(arg, dist_norm=dist_norm) for arg in args])
+        return np.array(result)
 
     def distance(self, a, b, apply_norms=True, ignore_norms=None):
         if ignore_norms is None:

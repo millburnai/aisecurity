@@ -21,14 +21,14 @@ IMG_CONSTANTS = {
 
 
 # IMAGE PROCESSING
-def normalize(x, mode="per_image"):
+def normalize(imgs, mode="per_image"):
     if mode == "per_image":
         # linearly scales x to have mean of 0, variance of 1
-        std_adj = np.maximum(np.std(x, axis=(0, 1, 2), keepdims=True), 1. / np.sqrt(x.size))
-        normalized = (x - np.mean(x, axis=(0, 1, 2), keepdims=True)) / std_adj
+        std_adj = np.maximum(np.std(imgs, axis=(1, 2, 3), keepdims=True), 1. / np.sqrt(imgs.size / len(imgs)))
+        normalized = (imgs - np.mean(imgs, axis=(1, 2, 3), keepdims=True)) / std_adj
     elif mode == "fixed":
         # scales x to [-1, 1]
-        normalized = (x - 127.5) / 128.0
+        normalized = (imgs - 127.5) / 128.0
     else:
         raise ValueError("only 'per_image' and 'fixed' standardization supported")
 
@@ -51,7 +51,6 @@ def crop_face(img, margin, detector="mtcnn", alpha=0.9, rotations=None):
             rotation_matrix = cv2.getRotationMatrix2D(tuple(np.array(resized.shape[1::-1]) / 2), rotation_angle, 1.)
             return cv2.warpAffine(resized, rotation_matrix, resized.shape[1::-1], flags=cv2.INTER_LINEAR)
 
-
     resized_faces, face = [], None
 
     if rotations is None:
@@ -70,4 +69,4 @@ def crop_face(img, margin, detector="mtcnn", alpha=0.9, rotations=None):
             else:
                 print("{}% face detection confidence is too low".format(round(face["confidence"] * 100, 2)))
 
-    return resized_faces, face
+    return np.array(resized_faces), face

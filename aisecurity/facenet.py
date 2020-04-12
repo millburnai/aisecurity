@@ -55,19 +55,19 @@ class FaceNet:
         :param model_path: path to model (default: aisecurity.utils.paths.DEFAULT_MODEL)
         :param data_path: path to data(default: aisecurity.utils.paths.DATABASE)
         :param sess: tf.Session to use (default: None)
-        :param input_name: name of input tensor-- only required if using (TF)TRT non-default model (default: None)
-        :param output_name: name of output tensor-- only required if using (TF)TRT non-default model (default: None)
-        :param input_shape: input shape-- only required if using (TF)TRT non-default model (default: None)
+        :param input_name: name of input tensor-- only required if using TF/TRT non-default model (default: None)
+        :param output_name: name of output tensor-- only required if using TF/TRT non-default model (default: None)
+        :param input_shape: input shape-- only required if using TF/TRT non-default model (default: None)
         :param hyperparams: hyperparameters to override FaceNet.HYPERPARAMS
         """
 
         assert os.path.exists(model_path), "{} not found".format(model_path)
         assert not data_path or os.path.exists(data_path), "{} not found".format(data_path)
 
-        if ".pb" in model_path:
-            self._tf_trt_init(model_path, input_name, output_name, sess, input_shape)
-        elif ".h5" in model_path:
+        if ".h5" in model_path:
             self._keras_init(model_path)
+        elif ".pb" in model_path:
+            self._tf_init(model_path, input_name, output_name, sess, input_shape)
         elif ".engine" in model_path:
             self._trt_init(model_path, input_name, output_name, input_shape)
         else:
@@ -98,9 +98,9 @@ class FaceNet:
         IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
 
 
-    # TF-TRT INIT
-    def _tf_trt_init(self, filepath, input_name, output_name, sess, input_shape):
-        """Initializes a TF-TRT model
+    # TENSORFLOW INIT
+    def _tf_init(self, filepath, input_name, output_name, sess, input_shape):
+        """Initializes a TensorFlow model
         :param filepath: path to model (.pb)
         :param input_name: name of input tensor
         :param output_name: name of output tensor
@@ -108,7 +108,7 @@ class FaceNet:
         :param input_shape: input shape for facenet
         """
 
-        self.MODE = "tf-trt"
+        self.MODE = "tf"
 
         graph_def = self.get_frozen_graph(filepath)
 
@@ -135,7 +135,7 @@ class FaceNet:
             warnings.warn("Input tensor size not detected. Default size is {}".format(IMG_CONSTANTS["img_size"]))
 
     def _tensor_init(self, model_name, input_name, output_name):
-        """Initializes tensors (TF-TRT or TRT modes only)
+        """Initializes tensors (TF or TRT modes only)
         :param model_name: name of model
         :param input_name: input tensor name
         :param output_name: output tensor name
@@ -297,7 +297,7 @@ class FaceNet:
 
     @staticmethod
     def get_frozen_graph(path):
-        """Gets frozen graph from .pb file (TF-TRT only)
+        """Gets frozen graph from .pb file (TF only)
         :param path: path to .pb frozen graph file
         :returns: tf.GraphDef object
         """
@@ -307,30 +307,35 @@ class FaceNet:
             graph_def.ParseFromString(graph_file.read())
         return graph_def
 
-    def _make_feed_dict(self, img):
-        """Makes feed dict for sess.run (TF-TRT only)
-        :param img: image input
+    def _make_feed_dict(self, imgs):
+        """Makes feed dict for sess.run (TF mode only)
+        :param imgs: image input with shape (batch_size, h, w, 3)
         :returns: feed dict
         """
 
-        feed_dict = {self.input_name: np.expand_dims(img, axis=0)}
+        feed_dict = {self.input_name: imgs}
         for tensor, value in self.params["feed_dict"].items():
             feed_dict[tensor] = value
         return feed_dict
 
-    def embed(self, img):
+    def embed(self, imgs):
         """Embeds cropped face
-        :param img: img as a cropped face with shape (h, w, 3)
+        :param imgs: list of cropped faces with shape (batch_size, h, w, 3)
         :returns: embedding as array with shape (1, -1)
         """
 
         if self.MODE == "keras":
-            return self.facenet.predict(np.expand_dims(img, axis=0)).reshape(1, -1)
-        elif self.MODE == "tf-trt":
+            embeds = self.facenet.predict(imgs, batch_size=len(imgs))
+        elif self.MODE == "tf":
             output_tensor = self.facenet.get_tensor_by_name(self.output_name)
-            return self.sess.run(output_tensor, feed_dict=self._make_feed_dict(img)).reshape(1, -1)
+            embeds = self.sess.run(output_tensor, feed_dict=self._make_feed_dict(imgs))
         elif self.MODE == "trt":
-            return self.facenet.inference(np.expand_dims(img, axis=0), output_shape=(1, -1))
+            embeds = self.facenet.inference(imgs)
+            # TODO: make inference work in batches
+            if len(embeds) > 1:
+                raise NotImplementedError("CUDA inference with batch_size>1 not supported yet")
+
+        return embeds.reshape(len(imgs), -1)
 
     def predict(self, img, detector="both", margin=IMG_CONSTANTS["margin"], rotations=None):
         """Embeds and normalizes an image from path or array
@@ -344,13 +349,14 @@ class FaceNet:
         cropped_faces, face_coords = crop_face(img, margin, detector, self.HYPERPARAMS["mtcnn_alpha"], rotations)
 
         start = timer()
-        normalized_embeddings = []
-        for face in cropped_faces:
-            raw_embedding = self.embed(normalize(face, mode=self.img_norm))
-            normalized_embeddings.append(self.dist_metric.apply_norms(raw_embedding).reshape(raw_embedding.shape))
 
-        print("Embedding time ({} vector{}): {}s".format(
-            len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "", round(timer() - start, 4)))
+        # this line will raise AttributeError if no faces are found
+        raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
+        normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
+
+        vectors = "{} vector{}".format(len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "")
+        print("Embedding time ({}): {}s".format(vectors, round(timer() - start, 4)))
+
         return normalized_embeddings, face_coords
 
 
@@ -398,11 +404,11 @@ class FaceNet:
                 best_match = analysis["best_match"][0]
                 dist = analysis["dists"][0]
 
-        except Exception as error:  # error-handling using names is unstable-- change later
+        except (ValueError, IndexError) as error:
             if "query data dimension" in str(error):
                 raise ValueError("Current model incompatible with database")
             elif not isinstance(error, IndexError):
-                print("[ERROR]", str(error))
+                raise error
 
         elapsed = round(timer() - start, 4)
         return embed, is_recognized, best_match, dist, face, elapsed
