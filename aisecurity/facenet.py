@@ -470,12 +470,7 @@ class FaceNet:
 
             if face:
                 print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
-
-                # add graphics, lcd, logging
-                self.log_activity(is_recognized, best_match, embed, dynamic_log, data_mutable, pbar, dist)
-
-                if graphics:
-                    add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
+                self.log_activity(best_match, embed, dynamic_log, data_mutable, pbar, dist)
 
             else:
                 absent_frames += 1
@@ -488,6 +483,7 @@ class FaceNet:
                 lcd.check_clear()
 
             if graphics:
+                add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
                 cv2.imshow("AI Security v0.9a", original_frame)
 
                 if cv2.waitKey(1) & 0xFF == ord("q"):
@@ -503,9 +499,8 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, is_recognized, best_match, embedding, dynamic_log, data_mutable, pbar, dist):
+    def log_activity(self, best_match, embedding, dynamic_log, data_mutable, pbar, dist):
         """Logs facial recognition activity
-        :param is_recognized: whether face was recognized or not
         :param best_match: best match from database
         :param mode: logging type: "firebase" or "mysql"
         :param embedding: embedding vector
@@ -515,6 +510,7 @@ class FaceNet:
         :param dist: distance between best match and current frame
         """
 
+        is_recognized = dist <= FaceNet.HYPERPARAMS["mtcnn_alpha"]
         update_progress, update_recognized, update_unrecognized = log.update(is_recognized, best_match)
 
         if pbar and update_progress:

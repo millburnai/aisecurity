@@ -104,37 +104,46 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
         cv2.line(overlay, features["mouth_right"], features["nose"], color, radius)
 
     def add_fps(frame, elapsed, font_size, thickness):
+        if elapsed is None:
+            text = "FPS: --"
+        else:
+            text = "FPS: {}".format(round(1. / elapsed, 2))
+
         x, y = 10, 20
-        text = "FPS: {}".format(round(1. / elapsed, 2))
         font = cv2.FONT_HERSHEY_DUPLEX
         color = (255. - np.mean(frame[:x, :y], axis=(0, 1))).flatten().tolist()
 
         cv2.putText(frame, text, (x, y), font, font_size, color, thickness)
 
-    features = person["keypoints"]
-    x, y, height, width = person["box"]
+    try:
+        features = person["keypoints"]
+        x, y, height, width = person["box"]
 
-    if resize:
-        scale_factor = 1. / resize
+        if resize:
+            scale_factor = 1. / resize
 
-        scale = lambda x: tuple(round(element * scale_factor) for element in x)
-        features = {feature: scale(features[feature]) for feature in features}
+            scale = lambda x: tuple(round(element * scale_factor) for element in x)
+            features = {feature: scale(features[feature]) for feature in features}
 
-        scale = lambda *xs: tuple(round(x * scale_factor) for x in xs)
-        x, y, height, width = scale(x, y, height, width)
+            scale = lambda *xs: tuple(round(x * scale_factor) for x in xs)
+            x, y, height, width = scale(x, y, height, width)
 
-    color = get_color(is_recognized, best_match)
+        color = get_color(is_recognized, best_match)
 
-    margin = IMG_CONSTANTS["margin"]
-    origin = (x - margin // 2, y - margin // 2)
-    corner = (x + height + margin // 2, y + width + margin // 2)
+        margin = IMG_CONSTANTS["margin"]
+        origin = (x - margin // 2, y - margin // 2)
+        corner = (x + height + margin // 2, y + width + margin // 2)
 
-    if features:
-        overlay = frame.copy()
-        add_features(overlay, features, radius, color, line_thickness)
-        cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+        if features:
+            overlay = frame.copy()
+            add_features(overlay, features, radius, color, line_thickness)
+            cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
 
-    text = best_match if is_recognized else ""
-    add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
+        text = best_match if is_recognized else ""
+        add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
-    add_fps(frame, elapsed, font_size, thickness=2)
+    except TypeError:
+        pass
+
+    finally:
+        add_fps(frame, elapsed, font_size, thickness=2)
