@@ -401,9 +401,11 @@ class FaceNet:
                 best_match = analysis["best_match"][0]
                 dist = analysis["dists"][0]
 
-        except (ValueError, IndexError) as error:
+        except (ValueError, IndexError, cv2.error) as error:
             if "query data dimension" in str(error):
                 raise ValueError("Current model incompatible with database")
+            elif isinstance(error, cv2.error) and "resize" in str(error):
+                print("Frame capture failed")
             elif not isinstance(error, IndexError):
                 raise error
 
