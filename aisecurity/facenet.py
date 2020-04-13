@@ -351,8 +351,8 @@ class FaceNet:
         raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
         normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
 
-        vectors = "{} vector{}".format(len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "")
-        print("Embedding time ({}): {}s".format(vectors, round(timer() - start, 4)))
+        message = "{} rotation{}".format(len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "")
+        print("Embedding time ({}): \033[1m{} ms\033[0m".format(message, round(1000. * (timer() - start), 2)))
 
         return normalized_embeddings, face_coords
 
@@ -401,6 +401,8 @@ class FaceNet:
                 best_match = analysis["best_match"][0]
                 dist = analysis["dists"][0]
 
+            print("%s: \033[1m%.4f (%s)%s\033[0m" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
+
         except (ValueError, IndexError, cv2.error) as error:
             if "query data dimension" in str(error):
                 raise ValueError("Current model incompatible with database")
@@ -409,14 +411,14 @@ class FaceNet:
             elif not isinstance(error, IndexError):
                 raise error
 
-        elapsed = round(timer() - start, 4)
+        elapsed = round(1000. * (timer() - start), 4)
         return embed, is_recognized, best_match, dist, face, elapsed
 
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, dist_metric="zero", logging=None, dynamic_log=False,
-                            picam=False, graphics=True, pbar=False, framerate=20, resize=None, flip=0, device=0,
-                            detector="mtcnn", data_mutable=False, socket=None, rotations=None):
+    def real_time_recognize(self, width=640, height=360, dist_metric=None, logging=None, dynamic_log=False, picam=False,
+                            pbar=False, framerate=20, resize=None, flip=0, device=0, detector="both",
+                            data_mutable=False, socket=None, rotations=None):
         """Real-time facial recognition
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
@@ -424,13 +426,12 @@ class FaceNet:
         :param logging: logging type-- None, "firebase", or "mysql" (default: None)
         :param dynamic_log: use dynamic database for visitors or not (default: False)
         :param picam: use picamera or not (default: False)
-        :param graphics: display video feed or not (default: True)
         :param pbar: use progress bar or not. If Pi isn't reachable, will default to LCD simulation (default: False)
         :param framerate: frame rate, only matters if use_picamera is True (recommended <120) (default: 20)
         :param resize: resize scale (float between 0. and 1.) (default: None)
         :param flip: flip method: +1 = +90º rotation (default: 0)
         :param device: camera device (/dev/video{device}) (default: 0)
-        :param detector: face detector type ("mtcnn" or "haarcascade") (default: "mtcnn")
+        :param detector: face detector type ("mtcnn", "haarcascade", "both") (default: "both")
         :param data_mutable: if true, prompt for verification on recognition and update database (default: False)
         :param socket: socket address (dev only)
         :param rotations: rotations to be applied to face (Note: -1 is horizontal flip) (default: None)
@@ -454,7 +455,7 @@ class FaceNet:
         cap = get_video_cap(width, height, picamera=picam, framerate=framerate, flip=flip, device=device)
         assert cap.isOpened(), "video capture failed to initialize"
 
-        detector_init(min_face_size=int(0.5 * (face_width + face_height) / 2))
+        detector_init(min_face_size=0.5 * (face_width + face_height) / 2)
         # face needs to fill at least ~1/2 of the frame
 
         absent_frames = 0
@@ -473,26 +474,13 @@ class FaceNet:
                 frame, detector=detector, rotations=rotations
             )
 
-            if face:
-                print("%s: %.4f (%s)%s" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
-                self.log_activity(best_match, embed, dynamic_log, data_mutable, pbar, dist)
+            # graphics, logging, lcd, etc.
+            absent_frames += self.log_activity(best_match, embed, dynamic_log, data_mutable, pbar, dist, absent_frames)
+            add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
 
-            else:
-                absent_frames += 1
-                if absent_frames > log.THRESHOLDS["missed_frames"]:
-                    absent_frames = 0
-                    log.flush_current(mode="known+unknown", flush_times=False)
-                print("No face detected")
-
-            if pbar:
-                lcd.check_clear()
-
-            if graphics:
-                add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
-                cv2.imshow("AI Security v0.9a", original_frame)
-
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
+            cv2.imshow("AI Security v0.9a", original_frame)
+            if cv2.waitKey(1) & 0xFF == ord("q"):
+                break
 
             frames += 1
             time.sleep(0.01)
@@ -504,7 +492,7 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, best_match, embedding, dynamic_log, data_mutable, pbar, dist):
+    def log_activity(self, best_match, embedding, dynamic_log, data_mutable, pbar, dist, absent_frames):
         """Logs facial recognition activity
         :param best_match: best match from database
         :param mode: logging type: "firebase" or "mysql"
@@ -514,6 +502,13 @@ class FaceNet:
         :param pbar: use pbar or not
         :param dist: distance between best match and current frame
         """
+
+        if best_match is None:
+            absent_frames += 1
+            if absent_frames > log.THRESHOLDS["missed_frames"]:
+                absent_frames = 0
+                log.flush_current(mode="known+unknown", flush_times=False)
+            return absent_frames
 
         is_recognized = dist <= FaceNet.HYPERPARAMS["mtcnn_alpha"]
         update_progress, update_recognized, update_unrecognized = log.update(is_recognized, best_match)
@@ -557,4 +552,8 @@ class FaceNet:
                 else:
                     cprint("'{}' is not in database".format(name), attrs=["bold"])
 
+        if pbar:
+            lcd.check_clear()
+
         log.DISTS.append(dist)
+        return 0

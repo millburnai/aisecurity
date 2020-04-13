@@ -6,10 +6,11 @@ Preprocessing for FaceNet.
 
 """
 
+from timeit import default_timer as timer
+
 import cv2
 import numpy as np
 
-from aisecurity.dataflow.loader import print_time
 from aisecurity.face.detection import detect_faces
 
 
@@ -35,7 +36,6 @@ def normalize(imgs, mode="per_image"):
     return normalized
 
 
-@print_time("Detection time")
 def crop_face(img, margin, detector="mtcnn", alpha=0.9, rotations=None):
     def crop_and_rotate(img, face_coords, rotation_angle):
         x, y, width, height = face_coords
@@ -51,6 +51,7 @@ def crop_face(img, margin, detector="mtcnn", alpha=0.9, rotations=None):
             rotation_matrix = cv2.getRotationMatrix2D(tuple(np.array(resized.shape[1::-1]) / 2), rotation_angle, 1.)
             return cv2.warpAffine(resized, rotation_matrix, resized.shape[1::-1], flags=cv2.INTER_LINEAR)
 
+    start = timer()
     resized_faces, face = [], None
 
     if rotations is None:
@@ -66,7 +67,11 @@ def crop_face(img, margin, detector="mtcnn", alpha=0.9, rotations=None):
 
             if face["confidence"] >= alpha:
                 resized_faces = [crop_and_rotate(img, face["box"], angle) for angle in sorted(rotations)]
+                print("Detection time ({}): \033[1m{} ms\033[0m".format(detector, round(1000. * (timer() - start), 2)))
             else:
                 print("{}% face detection confidence is too low".format(round(face["confidence"] * 100, 2)))
+
+        else:
+            print("No face detected")
 
     return np.array(resized_faces), face
