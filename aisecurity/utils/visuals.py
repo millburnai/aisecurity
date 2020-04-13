@@ -13,36 +13,37 @@ from aisecurity.face.preprocessing import IMG_CONSTANTS
 
 
 ################################ Camera ###############################
-def get_video_cap(width, height, picamera, framerate, flip, device=0):
+def get_video_cap(width, height, flip):
     """Initializes cv2.VideoCapture object
 
     :param width: width of frame
     :param height: height of frame
-    :param picamera: use picamera or not
-    :param framerate: framerate, recommended <120
     :param flip: flip method: +1 = +90º rotation (default: 0)
-    :param device: VideoCapture will use /dev/video{'device'} (default: 0)
     :returns: cv2.VideoCapture object
 
     """
 
-    def _gstreamer_pipeline(capture_width=1280, capture_height=720, display_width=640, display_height=360,
+    def _gstreamer_pipeline(cap_width=1280, cap_height=720, disp_width=640, disp_height=360,
                             framerate=20, flip=0):
         return (
             "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
             " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
             " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
-            % (capture_width, capture_height, framerate, flip, display_width, display_height)
+            % (cap_width, cap_height, framerate, flip, disp_width, disp_height)
         )
 
-    if picamera:
-        return cv2.VideoCapture(
-            _gstreamer_pipeline(display_width=width, display_height=height, framerate=framerate, flip=flip),
-            cv2.CAP_GSTREAMER)
-    else:
-        cap = cv2.VideoCapture(device)
+    try:
+        cap = cv2.VideoCapture(0)
+        assert cap.isOpened(), "video capture failed to initialize"
+
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+
+        return cap
+
+    except AssertionError:
+        cap = cv2.VideoCapture(_gstreamer_pipeline(disp_width=width, disp_height=height, flip=flip), cv2.CAP_GSTREAMER)
+        assert cap.isOpened()
         return cap
 
 
@@ -104,16 +105,13 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
         cv2.line(overlay, features["mouth_right"], features["nose"], color, radius)
 
     def add_fps(frame, elapsed, font_size, thickness):
-        if elapsed is None:
-            text = "FPS: --"
-        else:
-            text = "FPS: {}".format(round(1. / elapsed, 2))
+        text = "FPS: {}".format(round(1000. / elapsed, 2))  # elapsed is in ms, so *1000.
 
         x, y = 10, 20
         font = cv2.FONT_HERSHEY_DUPLEX
-        color = (255. - np.mean(frame[:x, :y], axis=(0, 1))).flatten().tolist()
+        rgb = [255. - np.mean(frame[:x, :y])] * 3
 
-        cv2.putText(frame, text, (x, y), font, font_size, color, thickness)
+        cv2.putText(frame, text, (x, y), font, font_size, rgb, thickness)
 
     try:
         features = person["keypoints"]

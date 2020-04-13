@@ -416,21 +416,17 @@ class FaceNet:
 
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, dist_metric=None, logging=None, dynamic_log=False, picam=False,
-                            pbar=False, framerate=20, resize=None, flip=0, device=0, detector="both",
-                            data_mutable=False, socket=None, rotations=None):
+    def real_time_recognize(self, width=640, height=360, dist_metric=None, logging=None, dynamic_log=False, pbar=False,
+                            resize=None, flip=0, detector="both", data_mutable=False, socket=None, rotations=None):
         """Real-time facial recognition
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
         :param dist_metric: DistMetric object or str distance metric (default: this.dist_metric)
         :param logging: logging type-- None, "firebase", or "mysql" (default: None)
         :param dynamic_log: use dynamic database for visitors or not (default: False)
-        :param picam: use picamera or not (default: False)
         :param pbar: use progress bar or not. If Pi isn't reachable, will default to LCD simulation (default: False)
-        :param framerate: frame rate, only matters if use_picamera is True (recommended <120) (default: 20)
         :param resize: resize scale (float between 0. and 1.) (default: None)
         :param flip: flip method: +1 = +90º rotation (default: 0)
-        :param device: camera device (/dev/video{device}) (default: 0)
         :param detector: face detector type ("mtcnn", "haarcascade", "both") (default: "both")
         :param data_mutable: if true, prompt for verification on recognition and update database (default: False)
         :param socket: socket address (dev only)
@@ -452,9 +448,7 @@ class FaceNet:
         else:
             face_width, face_height = width, height
 
-        cap = get_video_cap(width, height, picamera=picam, framerate=framerate, flip=flip, device=device)
-        assert cap.isOpened(), "video capture failed to initialize"
-
+        cap = get_video_cap(width, height, flip)
         detector_init(min_face_size=0.5 * (face_width + face_height) / 2)
         # face needs to fill at least ~1/2 of the frame
 
