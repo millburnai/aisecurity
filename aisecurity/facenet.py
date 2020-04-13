@@ -390,16 +390,13 @@ class FaceNet:
                 min_index = min(best_match_idxs, key=lambda idx: analysis["dists"][idx])
                 # index associated with minimum distance best_match embedding
 
-                results = [result for idx, result in enumerate(analysis["is_recognized"]) if idx in best_match_idxs]
-                is_recognized = bool(round(sum(results) / len(results)))
-                dist = analysis["dists"][min_index]
-                embed = embeds[min_index]
-
             else:
-                embed = embeds[0]
-                is_recognized = analysis["is_recognized"][0]
                 best_match = analysis["best_match"][0]
-                dist = analysis["dists"][0]
+                min_index = 0
+
+            embed = embeds[min_index]
+            dist = analysis["dists"][min_index]
+            is_recognized = analysis["is_recognized"][min_index]
 
             print("%s: \033[1m%.4f (%s)%s\033[0m" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
 

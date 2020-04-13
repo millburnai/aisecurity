@@ -113,21 +113,21 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
 
         cv2.putText(frame, text, (x, y), font, font_size, rgb, thickness)
 
-    try:
+    if person is not None:
         features = person["keypoints"]
         x, y, height, width = person["box"]
 
         if resize:
             scale_factor = 1. / resize
 
-            scale = lambda x: tuple(round(element * scale_factor) for element in x)
-            features = {feature: scale(features[feature]) for feature in features}
+            if features:
+                scale = lambda x: tuple(round(element * scale_factor) for element in x)
+                features = {feature: scale(features[feature]) for feature in features}
 
-            scale = lambda *xs: tuple(round(x * scale_factor) for x in xs)
+            scale = lambda *xs: tuple(int(round(x * scale_factor)) for x in xs)
             x, y, height, width = scale(x, y, height, width)
 
         color = get_color(is_recognized, best_match)
-
         margin = IMG_CONSTANTS["margin"]
         origin = (x - margin // 2, y - margin // 2)
         corner = (x + height + margin // 2, y + width + margin // 2)
@@ -140,8 +140,4 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
         text = best_match if is_recognized else ""
         add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
 
-    except TypeError:
-        pass
-
-    finally:
-        add_fps(frame, elapsed, font_size, thickness=2)
+    add_fps(frame, elapsed, font_size, thickness=2)
