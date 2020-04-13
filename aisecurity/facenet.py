@@ -550,4 +550,4 @@ class FaceNet:
             lcd.check_clear()
 
         log.DISTS.append(dist)
-        return 0
+        return absent_frames
