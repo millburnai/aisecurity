@@ -13,12 +13,13 @@ from aisecurity.face.preprocessing import IMG_CONSTANTS
 
 
 ################################ Camera ###############################
-def get_video_cap(width, height, flip):
+def get_video_cap(width, height, flip, device):
     """Initializes cv2.VideoCapture object
 
     :param width: width of frame
     :param height: height of frame
     :param flip: flip method: +1 = +90º rotation (default: 0)
+    :param device: video file to read from (passing an int will use /dev/video{device}) (default: 0)
     :returns: cv2.VideoCapture object
 
     """
@@ -33,7 +34,7 @@ def get_video_cap(width, height, flip):
         )
 
     try:
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(device)
         assert cap.isOpened(), "video capture failed to initialize"
 
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)

@@ -14,7 +14,7 @@ from aisecurity.utils.paths import DEFAULT_MODEL
 
 
 def demo(path=DEFAULT_MODEL, dist_metric="zero", logging=None, dynamic_log=True,  pbar=False, resize=None, flip=0,
-         detector="both", data_mutable=True, socket="ws://67.205.155.37:8000/v1/nano", rotations=None,
+         detector="both", data_mutable=True, socket="ws://67.205.155.37:8000/v1/nano", rotations=None, device=0,
          allow_gpu_growth=False):
 
     if allow_gpu_growth:
@@ -30,7 +30,7 @@ def demo(path=DEFAULT_MODEL, dist_metric="zero", logging=None, dynamic_log=True,
 
     facenet.real_time_recognize(
         dist_metric=dist_metric, logging=logging, dynamic_log=dynamic_log, resize=resize, pbar=pbar, flip=flip,
-        detector=detector, data_mutable=data_mutable, socket=socket, rotations=rotations
+        detector=detector, data_mutable=data_mutable, socket=socket, rotations=rotations, device=device
     )
 
 
@@ -51,6 +51,12 @@ if __name__ == "__main__":
         except TypeError:
             raise argparse.ArgumentTypeError("int list expected")
 
+    def str_or_int(string):
+        try:
+            return int(string)
+        except TypeError:
+            return string
+
 
     # ARG PARSE
     parser = argparse.ArgumentParser()
@@ -67,7 +73,8 @@ if __name__ == "__main__":
     parser.add_argument("--socket", help="websocket address (default: None)", type=str, default=None)
     parser.add_argument("--rotations", help="rotations to be applied to face (-1 is horizontal flip) (default: None)",
                         type=list_of_ints, default=None)
-    parser.add_argument("--allow_gpu_growth", help="use this flag to use GPU growth", action="store_true")
+    parser.add_argument("--device", help="video file to read from (default: 0)", type=str_or_int)
+    parser.add_argument("--allow_gpu_growth", help="use this flag to use GPU growth", action="store_true", default=0)
     args = parser.parse_args()
 
 
@@ -75,5 +82,5 @@ if __name__ == "__main__":
     demo(
         path=args.path_to_model, dist_metric=args.dist_metric, logging=args.logging, dynamic_log=args.dynamic_log,
         pbar=args.pbar,  flip=args.flip, resize=args.resize, detector=args.detector, data_mutable=args.data_mutable,
-        socket=args.socket, rotations=args.rotations, allow_gpu_growth=args.allow_gpu_growth
+        socket=args.socket, rotations=args.rotations, device=args.device, allow_gpu_growth=args.allow_gpu_growth
     )
