@@ -134,7 +134,7 @@ class CudaEngineManager:
         """Builds and serializes a cuda engine"""
         self.engine = self.builder.build_cuda_engine(self.network).serialize()
 
-    @print_time("uff model parsing time")
+    @print_time(".uff model parsing time")
     def parse_uff(self, uff_file, input_name, input_shape, output_name):
         """Parses .uff file and prepares for serialization
         :param uff_file: path to uff model
@@ -153,7 +153,7 @@ class CudaEngineManager:
 
         self.parser = parser
 
-    @print_time("caffe model parsing time")
+    @print_time(".caffe model parsing time")
     def parse_caffe(self, caffe_model_file, caffe_deploy_file, output_name="prob1"):
         """Parses caffe model file and prepares for serialization
         :param caffe_model_file: path to caffe model file

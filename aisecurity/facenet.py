@@ -126,7 +126,8 @@ class FaceNet:
 
         try:
             if input_shape is not None:
-                IMG_CONSTANTS["img_size"] = input_shape
+                assert input_shape[-1] == 3, "input shape must be channels-last for tensorflow mode"
+                IMG_CONSTANTS["img_size"] = input_shape[:-1]
             else:
                 IMG_CONSTANTS["img_size"] = tuple(
                     self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3]
@@ -149,8 +150,7 @@ class FaceNet:
 
         self.input_name = self.model_config["input"]
         self.output_name = self.model_config["output"]
-        self.params = self.model_config["params"]
-        self.img_norm = self.params["img_norm"]
+        self.img_norm = self.model_config["img_norm"]
 
         if not self.input_name:
             self.input_name = input_name
@@ -158,6 +158,7 @@ class FaceNet:
             self.output_name = output_name
 
         assert self.input_name and self.output_name, "I/O tensors for {} not detected or provided".format(model_name)
+
 
     # TRT INIT
     def _trt_init(self, filepath, input_name, output_name, input_shape):
@@ -177,7 +178,11 @@ class FaceNet:
 
         self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
 
-        self.img_norm = self.MODELS["_default"]["params"]["img_norm"]
+        self.img_norm = self.MODELS["_default"]["img_norm"]
+        for model in self.MODELS:
+            if filepath.strip(".engine") in model:
+                self.img_norm = self.MODELS[model]["img_norm"]
+
         IMG_CONSTANTS["img_size"] = tuple(reversed(self.facenet.input_shape))[:-1]
 
 
@@ -311,17 +316,6 @@ class FaceNet:
             graph_def.ParseFromString(graph_file.read())
         return graph_def
 
-    def _make_feed_dict(self, imgs):
-        """Makes feed dict for sess.run (TF mode only)
-        :param imgs: image input with shape (batch_size, h, w, 3)
-        :returns: feed dict
-        """
-
-        feed_dict = {self.input_name: imgs}
-        for tensor, value in self.params["feed_dict"].items():
-            feed_dict[tensor] = value
-        return feed_dict
-
     def embed(self, imgs):
         """Embeds cropped face
         :param imgs: list of cropped faces with shape (batch_size, h, w, 3)
@@ -332,7 +326,7 @@ class FaceNet:
             embeds = self.facenet.predict(imgs, batch_size=len(imgs))
         elif self.MODE == "tf":
             output_tensor = self.facenet.get_tensor_by_name(self.output_name)
-            embeds = self.sess.run(output_tensor, feed_dict=self._make_feed_dict(imgs))
+            embeds = self.sess.run(output_tensor, feed_dict={self.input_name: imgs})
         elif self.MODE == "trt":
             embeds = self.facenet.inference(imgs)
 
@@ -350,7 +344,7 @@ class FaceNet:
         cropped_faces, face_coords = crop_face(img, margin, detector, self.HYPERPARAMS["mtcnn_alpha"], rotations)
         start = timer()
 
-        assert cropped_faces.shape[1:] == (*IMG_CONSTANTS["img_size"], 3)
+        assert cropped_faces.shape[1:] == (*IMG_CONSTANTS["img_size"], 3), "no face detected"
 
         raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
         normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
