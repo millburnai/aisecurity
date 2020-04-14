@@ -193,7 +193,7 @@ class FaceNet:
 
         for embed in value:
             embed = np.asarray(embed)
-            is_vector = embed.ndim <= 2 and (1 in embed.shape or embed.ndim == 1)
+            is_vector = np.prod(embed.shape) == embed.flatten().shape
             assert is_vector, "each value must be a vectorized embedding, got shape {}".format(embed.shape)
 
         return key, value
@@ -207,6 +207,9 @@ class FaceNet:
 
         person, embeddings = self._screen_data(person, embeddings)
         embeddings = [np.array(embed).reshape(-1, ) for embed in embeddings]
+
+        if not self.data:
+            self._db = {}
 
         if person in self.data:
             self._db[person].extend(embeddings)
@@ -222,17 +225,18 @@ class FaceNet:
         :param config: data config dict with the entry "metric": <DistMetric str constructor> (default: None)
         """
 
-        assert data, "data must be provided"
+        self._db = None
 
-        for person, embed in data.items():
-            self.update_data(person, embed, train_knn=False)
-        self._train_knn()
+        if data:
+            for person, embed in data.items():
+                self.update_data(person, embed, train_knn=False)
+            self._train_knn()
 
-        if config is None:
-            warnings.warn("data config missing. Distance metric not detected")
-        else:
-            self.data_config = config
-            self.cfg_dist_metric = self.data_config["metric"]
+            if config is None:
+                warnings.warn("data config missing. Distance metric not detected")
+            else:
+                self.data_config = config
+                self.cfg_dist_metric = self.data_config["metric"]
 
     def set_dist_metric(self, dist_metric):
         """Sets distance metric for FaceNet
@@ -344,10 +348,10 @@ class FaceNet:
         """
 
         cropped_faces, face_coords = crop_face(img, margin, detector, self.HYPERPARAMS["mtcnn_alpha"], rotations)
-
         start = timer()
 
-        # this line will raise an IndexError if no faces are found
+        assert cropped_faces.shape[1:] == (*IMG_CONSTANTS["img_size"], 3)
+
         raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
         normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
 
@@ -400,12 +404,12 @@ class FaceNet:
 
             print("%s: \033[1m%.4f (%s)%s\033[0m" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
 
-        except (ValueError, IndexError, cv2.error) as error:
+        except (ValueError, AssertionError, cv2.error) as error:
             if "query data dimension" in str(error):
                 raise ValueError("Current model incompatible with database")
             elif isinstance(error, cv2.error) and "resize" in str(error):
                 print("Frame capture failed")
-            elif not isinstance(error, IndexError):
+            elif not isinstance(error, AssertionError):
                 raise error
 
         elapsed = round(1000. * (timer() - start), 4)
