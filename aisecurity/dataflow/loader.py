@@ -33,28 +33,6 @@ def print_time(message="Time elapsed"):
     return _timer
 
 
-# LOAD ON THE FLY
-@print_time("Data embedding time")
-def online_load(facenet, img_dir, people=None):
-    if people is None:
-        people = [f for f in os.listdir(img_dir) if f.endswith(".jpg") or f.endswith(".png")]
-
-    data = {}
-    no_faces = []
-
-    with tqdm.trange(len(people)) as pbar:
-        for person in people:
-            try:
-                data[person.strip(".jpg").strip(".png")] = facenet.predict(os.path.join(img_dir, person))
-                pbar.update()
-            except AssertionError:
-                warnings.warn("face not found in {}".format(person))
-                no_faces.append(person)
-                continue
-
-    return data, no_faces
-
-
 # LONG TERM STORAGE
 def encrypt_to_ignore(encrypt):
     ignore = ["names", "embeddings"]

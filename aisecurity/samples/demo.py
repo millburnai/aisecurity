@@ -73,7 +73,7 @@ if __name__ == "__main__":
     parser.add_argument("--socket", help="websocket address (default: None)", type=str, default=None)
     parser.add_argument("--rotations", help="rotations to be applied to face (-1 is horizontal flip) (default: None)",
                         type=list_of_ints, default=None)
-    parser.add_argument("--device", help="video file to read from (default: 0)", type=str_or_int)
+    parser.add_argument("--device", help="video file to read from (default: 0)", type=str_or_int, default=0)
     parser.add_argument("--allow_gpu_growth", help="use this flag to use GPU growth", action="store_true", default=0)
     args = parser.parse_args()
 

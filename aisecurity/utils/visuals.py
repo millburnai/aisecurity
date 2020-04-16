@@ -44,7 +44,7 @@ def get_video_cap(width, height, flip, device):
 
     except AssertionError:
         cap = cv2.VideoCapture(_gstreamer_pipeline(disp_width=width, disp_height=height, flip=flip), cv2.CAP_GSTREAMER)
-        assert cap.isOpened()
+        assert cap.isOpened(), "video capture failed to initialize"
         return cap
 
 
