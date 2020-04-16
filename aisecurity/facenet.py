@@ -30,7 +30,7 @@ from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
 from aisecurity.utils.visuals import get_video_cap, add_graphics
 from aisecurity.face.detection import detector_init
-from aisecurity.face.preprocessing import IMG_CONSTANTS, normalize, crop_face
+from aisecurity.face.preprocessing import set_img_shape, normalize, crop_face, IMG_SHAPE
 
 
 ################################ FaceNet ###############################
@@ -38,10 +38,8 @@ class FaceNet:
     """Class implementation of FaceNet"""
 
     # HYPERPARAMETERS
-    HYPERPARAMS = {
-        "alpha": 0.75,
-        "mtcnn_alpha": 0.9,
-    }
+    ALPHA = 0.75
+
 
     # PRE-BUILT MODEL CONFIGS
     MODELS = json.load(open(CONFIG_HOME + "/config/models.json", encoding="utf-8"))
@@ -50,7 +48,7 @@ class FaceNet:
     # INITS
     @print_time("Model load time")
     def __init__(self, model_path=DEFAULT_MODEL, data_path=DATABASE, sess=None, input_name=None, output_name=None,
-                 input_shape=None, **hyperparams):
+                 input_shape=None):
         """Initializes FaceNet object
         :param model_path: path to model (default: aisecurity.utils.paths.DEFAULT_MODEL)
         :param data_path: path to data(default: aisecurity.utils.paths.DATABASE)
@@ -58,7 +56,6 @@ class FaceNet:
         :param input_name: name of input tensor-- only required if using TF/TRT non-default model (default: None)
         :param output_name: name of output tensor-- only required if using TF/TRT non-default model (default: None)
         :param input_shape: input shape-- only required if using TF/TRT non-default model (default: None)
-        :param hyperparams: hyperparameters to override FaceNet.HYPERPARAMS
         """
 
         assert os.path.exists(model_path), "{} not found".format(model_path)
@@ -73,6 +70,11 @@ class FaceNet:
         else:
             raise TypeError("model must be an .h5, .pb, or .engine file")
 
+        self.img_norm = self.MODELS["_default"]["img_norm"]
+        for model in self.MODELS:
+            if model_path[model_path.rfind("/")+1:model_path.rfind(".")] in model:
+                self.img_norm = self.MODELS[model]["img_norm"]
+
         self._db = {}
         self._knn = None
 
@@ -82,7 +84,6 @@ class FaceNet:
             warnings.warn("data not set. Set it manually with set_data to use FaceNet")
         self.set_dist_metric("auto")
 
-        self.HYPERPARAMS.update(hyperparams)
 
     # KERAS INIT
     def _keras_init(self, filepath):
@@ -94,8 +95,7 @@ class FaceNet:
 
         self.facenet = keras.models.load_model(filepath)
 
-        self.img_norm = self.MODELS["_default"]["params"]["img_norm"]
-        IMG_CONSTANTS["img_size"] = self.facenet.input_shape[1:3]
+        set_img_shape(self.facenet.input_shape[1:3])
 
 
     # TENSORFLOW INIT
@@ -127,13 +127,12 @@ class FaceNet:
         try:
             if input_shape is not None:
                 assert input_shape[-1] == 3, "input shape must be channels-last for tensorflow mode"
-                IMG_CONSTANTS["img_size"] = input_shape[:-1]
+                set_img_shape(input_shape[:-1])
             else:
-                IMG_CONSTANTS["img_size"] = tuple(
-                    self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3]
-                )
+                set_img_shape(self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3])
+
         except ValueError:
-            warnings.warn("Input tensor size not detected. Default size is {}".format(IMG_CONSTANTS["img_size"]))
+            warnings.warn("Input tensor size not detected. Default size is {}".format(IMG_SHAPE))
 
     def _tensor_init(self, model_name, input_name, output_name):
         """Initializes tensors (TF or TRT modes only)
@@ -150,7 +149,6 @@ class FaceNet:
 
         self.input_name = self.model_config["input"]
         self.output_name = self.model_config["output"]
-        self.img_norm = self.model_config["img_norm"]
 
         if not self.input_name:
             self.input_name = input_name
@@ -178,12 +176,7 @@ class FaceNet:
 
         self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
 
-        self.img_norm = self.MODELS["_default"]["img_norm"]
-        for model in self.MODELS:
-            if filepath.strip(".engine") in model:
-                self.img_norm = self.MODELS[model]["img_norm"]
-
-        IMG_CONSTANTS["img_size"] = tuple(reversed(self.facenet.input_shape))[:-1]
+        set_img_shape(list(reversed(self.facenet.input_shape))[:-1])
 
 
     # MUTATORS
@@ -332,19 +325,19 @@ class FaceNet:
 
         return embeds.reshape(len(imgs), -1)
 
-    def predict(self, img, detector="both", margin=IMG_CONSTANTS["margin"], rotations=None):
+    def predict(self, img, detector="both", margin=10, rotations=None):
         """Embeds and normalizes an image from path or array
         :param img: image to be predicted on
         :param detector: face detector (either mtcnn, haarcascade, or None) (default: "both")
-        :param margin: margin for MTCNN face cropping (default: aisecurity.preprocessing.IMG_CONSTANTS["margin"])
+        :param margin: margin for MTCNN face cropping (default: 10)
         :param rotations: array of rotations to be applied to face (default: None)
         :returns: normalized embeddings, facial coordinates
         """
 
-        cropped_faces, face_coords = crop_face(img, margin, detector, self.HYPERPARAMS["mtcnn_alpha"], rotations)
+        cropped_faces, face_coords = crop_face(img, margin, detector, rotations=rotations)
         start = timer()
 
-        assert cropped_faces.shape[1:] == (*IMG_CONSTANTS["img_size"], 3), "no face detected"
+        assert cropped_faces.shape[1:] == (*IMG_SHAPE, 3), "no face detected"
 
         raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
         normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
@@ -370,7 +363,7 @@ class FaceNet:
                 best_embed = self.expanded_embeds[self.expanded_names.index(analysis["best_match"][-1])]
 
                 analysis["dists"].append(self.dist_metric.distance(embed, best_embed, ignore_norms=self.ignore_norms))
-                analysis["is_recognized"].append(analysis["dists"][-1] <= FaceNet.HYPERPARAMS["alpha"])
+                analysis["is_recognized"].append(analysis["dists"][-1] <= FaceNet.ALPHA)
 
             return analysis
 
@@ -501,7 +494,7 @@ class FaceNet:
                 log.flush_current(mode="known+unknown", flush_times=False)
             return absent_frames
 
-        is_recognized = dist <= FaceNet.HYPERPARAMS["mtcnn_alpha"]
+        is_recognized = dist <= FaceNet.ALPHA
         update_progress, update_recognized, update_unrecognized = log.update(is_recognized, best_match)
 
         if pbar and update_progress:

@@ -14,11 +14,14 @@ import numpy as np
 from aisecurity.face.detection import detect_faces
 
 
-# CONSTANTS
-IMG_CONSTANTS = {
-    "margin": 10,
-    "img_size": (160, 160)
-}
+# GLOBALS
+IMG_SHAPE = (160, 160)
+
+
+def set_img_shape(img_shape):
+    global IMG_SHAPE
+
+    IMG_SHAPE = tuple(img_shape)
 
 
 # IMAGE PROCESSING
@@ -41,7 +44,7 @@ def crop_face(img, margin, detector="mtcnn", alpha=0.9, rotations=None):
         x, y, width, height = face_coords
         img = img[y - margin // 2:y + height + margin // 2, x - margin // 2:x + width + margin // 2, :]
 
-        resized = cv2.resize(img, IMG_CONSTANTS["img_size"])
+        resized = cv2.resize(img, IMG_SHAPE)
         if rotation_angle == 0:
             return resized
         elif rotation_angle == -1:

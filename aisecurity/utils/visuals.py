@@ -9,8 +9,6 @@ Graphics utils.
 import cv2
 import numpy as np
 
-from aisecurity.face.preprocessing import IMG_CONSTANTS
-
 
 ################################ Camera ###############################
 def get_video_cap(width, height, flip, device):
@@ -49,7 +47,7 @@ def get_video_cap(width, height, flip, device):
 
 
 ################################ Graphics ###############################
-def add_graphics(frame, person, width, height, is_recognized, best_match, resize, elapsed):
+def add_graphics(frame, person, width, height, is_recognized, best_match, resize, elapsed, margin=10):
     """Adds graphics to a frame
 
     :param frame: frame as array
@@ -60,6 +58,7 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
     :param best_match: best match from database
     :param resize: resize scale factor, from 0. to 1.
     :param elapsed: time it took to run face detection and recognition
+    :param margin: crop margin for face detection (default: 10)
 
     """
 
@@ -129,7 +128,6 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
             x, y, height, width = scale(x, y, height, width)
 
         color = get_color(is_recognized, best_match)
-        margin = IMG_CONSTANTS["margin"]
         origin = (x - margin // 2, y - margin // 2)
         corner = (x + height + margin // 2, y + width + margin // 2)
 
