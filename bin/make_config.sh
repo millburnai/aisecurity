@@ -72,6 +72,12 @@ if [ ! -f "$config_path/models/haarcascade_frontalface_default.xml" ] ; then
   || { echo -e "\033[0;31mError: haarcascade model could not be downloaded\033[0m" ; ERRORS=$((ERRORS + 1)) ; }
 fi
 
+if [ ! -f "$config_path/models/20180402-114759.pb" ] ; then
+  echo -e "\033[0;95mDownloading 20180402-114759 tensorflow model\033[0m"
+  wget -O "$config_path/models/20180402-114759.pb" "https://www.dropbox.com/s/ek2y33ntzfr2zgq/20180402-114759.pb?dl=1" \
+  || { echo -e "\033[0;31mError: 20180402-114759 model could not be downloaded\033[0m" ; ERRORS=$((ERRORS + 1)) ; }
+fi
+
 # keys
 if [ ! -d "$config_path/keys" ] ; then
   echo -e "\033[0;95mCreating keys directory\033[0m"
