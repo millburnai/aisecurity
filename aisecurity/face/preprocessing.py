@@ -32,7 +32,7 @@ def normalize(imgs, mode="per_image"):
         normalized = (imgs - np.mean(imgs, axis=(1, 2, 3), keepdims=True)) / std_adj
     elif mode == "fixed":
         # scales x to [-1, 1]
-        normalized = (imgs - 127.5) / 128.0
+        normalized = (imgs - 127.5) / 128.
     else:
         raise ValueError("only 'per_image' and 'fixed' standardization supported")
 
@@ -63,7 +63,7 @@ def crop_face(img, margin, detector="mtcnn", alpha=0.9, rotations=None):
         rotations.append(0.)
 
     if detector:
-        result = detect_faces(img, mode=detector)
+        result = detect_faces(img, mode=detector, alpha=alpha)
 
         if len(result) != 0:
             face = max(result, key=lambda person: person["confidence"])

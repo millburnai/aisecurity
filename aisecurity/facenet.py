@@ -468,7 +468,6 @@ class FaceNet:
                 break
 
             frames += 1
-            time.sleep(0.01)
 
         cap.release()
         cv2.destroyAllWindows()

@@ -107,7 +107,7 @@ def get_percent_diff(item, log):
     try:
         return 1. - (len(log[item]) / len([i for n in log.values() for i in n]))
     except KeyError:
-        return 1.0
+        return 1.
 
 
 def update(is_recognized, best_match):
