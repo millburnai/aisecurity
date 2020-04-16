@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # ".aisecurity.make_config"
 # Program to make config files (~/.aisecurity)
@@ -42,13 +42,13 @@ fi
 
 if [ ! -f "$config_path/database/test.json" ] ; then
   echo -e "\033[0;95mDownloading mini-database\033[0m"
-  curl -Lo "$config_path/database/test.json" "https://www.dropbox.com/s/umjku76xppc0396/test.json?dl=1" \
+  wget -O "$config_path/database/test.json" "http://www.dropbox.com/s/umjku76xppc0396/test.json?dl=1" \
   || { echo -e "\033[0;31mError: unable to download test.json\033[0m" ; ERRORS=$((ERRORS + 1)) ; }
 fi
 
 if [ ! -f "$config_path/database/test_info.json" ] ; then
   echo -e "\033[0;95mDownloading mini-database config\033[0m"
-  curl -Lo "$config_path/database/test_info.json" "https://www.dropbox.com/s/ihfmemt6sqdfj74/test_info.json?dl=1" \
+  wget -O "$config_path/database/test_info.json" "https://www.dropbox.com/s/ihfmemt6sqdfj74/test_info.json?dl=1" \
   || { echo -e "\033[0;31mError: unable to download test_info.json\033[0m" ; ERRORS=$((ERRORS + 1)) ; }
 fi
 
@@ -61,13 +61,13 @@ fi
 
 if [ ! -f "$config_path/models/ms_celeb_1m.h5" ] ; then
   echo -e "\033[0;95mDownloading MS-CELEB-1M keras model\033[0m"
-  curl -Lo "$config_path/models/ms_celeb_1m.h5" "https://www.dropbox.com/s/i4r3jbnzuzcc9fh/ms_celeb_1m.h52?dl=1" \
+  wget -O "$config_path/models/ms_celeb_1m.h5" "https://www.dropbox.com/s/i4r3jbnzuzcc9fh/ms_celeb_1m.h52?dl=1" \
   || { echo -e "\033[0;31mError: MS-Celeb-1M model could not be downloaded\033[0m" ; ERRORS=$((ERRORS + 1)) ; }
 fi
 
 if [ ! -f "$config_path/models/haarcascade_frontalface_default.xml" ] ; then
   echo -e "\033[0;95mDownloading Haarcascade model\033[0m"
-  curl -Lo "$config_path/models/haarcascade_frontalface_default.xml" \
+  wget -O "$config_path/models/haarcascade_frontalface_default.xml" \
   "https://www.dropbox.com/s/zhb4cn9idl6rrvm/haarcascade_frontalface_default.xml?dl=1" \
   || { echo -e "\033[0;31mError: haarcascade model could not be downloaded\033[0m" ; ERRORS=$((ERRORS + 1)) ; }
 fi
@@ -80,14 +80,14 @@ fi
 
 if [ ! -f "$config_path/keys/test_name_keys.txt" ] ; then
   echo -e "\033[0;95mDownloading test_name_keys.txt\033[0m"
-  curl -Lo "$config_path/keys/test_name_keys.txt" \
+  wget -O "$config_path/keys/test_name_keys.txt" \
   "https://www.dropbox.com/s/yxebmo4gm0qq7nj/test_name_keys.txt?dl=1" || \
   { echo -e "\033[0;31mError: could not download test_name_keys.txt\033[0m" ; ERRORS=$((ERRORS + 1)) ; }
 fi
 
 if [ ! -f "$config_path/keys/test_embedding_keys.txt" ] ; then
   echo -e "\033[0;95mDownloading test_embedding_keys.txt\033[0m"
-  curl -Lo "$config_path/keys/test_embedding_keys.txt" \
+  wget -O "$config_path/keys/test_embedding_keys.txt" \
   "https://www.dropbox.com/s/kl5s77evy8m9mpm/test_embedding_keys.txt?dl=1" \
   || { echo -e "\033[0;31mError: could not download test_embedding_keys.txt\033[0m" ; ERRORS=$((ERRORS + 1)) ; }
 fi
@@ -108,12 +108,12 @@ if [ ! -d "$config_path/config" ] ; then
 fi
 
 if [ ! -f "$config_path/config/models.json" ] ; then
-  curl -Lo "$config_path/config/models.json" "https://www.dropbox.com/s/9my8ofbzohi0dsm/models.json?dl=1" \
+  wget -O "$config_path/config/models.json" "https://www.dropbox.com/s/9my8ofbzohi0dsm/models.json?dl=1" \
   || { echo -e "\033[0;31mError: unable to download models.json\033[0m" ; ERRORS=$((ERRORS + 1)) ; }
 fi
 
 if [ ! -f "$config_path/config/cuda_models.json" ] ; then
-  curl -Lo "$config_path/config/cuda_models.json" "https://www.dropbox.com/s/ieke59ny0r7qxo3/cuda_models.json?dl=1" \
+  wget -O "$config_path/config/cuda_models.json" "https://www.dropbox.com/s/ieke59ny0r7qxo3/cuda_models.json?dl=1" \
   || { echo -e "\033[0;31mError: unable to download cuda_models.json\033[0m" ; ERRORS=$((ERRORS + 1)) ; }
 fi
 
