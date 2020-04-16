@@ -233,13 +233,14 @@ class FaceNet:
             if config is None:
                 warnings.warn("data config missing. Distance metric not detected")
             else:
-                self.data_config = config
-                self.cfg_dist_metric = self.data_config["metric"]
+                self.data_cfg = config
 
     def set_dist_metric(self, dist_metric):
         """Sets distance metric for FaceNet
-        :param dist_metric: DistMetric object or str constructor, or "auto+{whatever}" to detect from self.data_config
+        :param dist_metric: DistMetric object or str constructor, or "auto+{whatever}" to detect from self.data_cfg
         """
+
+        cfg_metric = self.data_cfg["metric"]
 
         # set distance metric
         if isinstance(dist_metric, DistMetric):
@@ -247,7 +248,7 @@ class FaceNet:
 
         elif isinstance(dist_metric, str):
             if "auto" in dist_metric:
-                constructor = self.cfg_dist_metric
+                constructor = cfg_metric
                 if "+" in dist_metric:
                     constructor += dist_metric[dist_metric.find("+"):]
             else:
@@ -261,11 +262,11 @@ class FaceNet:
         # check against data config
         self.ignore_norms = [self.dist_metric.get_config()]
 
-        if self.cfg_dist_metric != self.dist_metric.get_config():
-            self.ignore_norms.append(self.cfg_dist_metric)
+        if cfg_metric != self.dist_metric.get_config():
+            self.ignore_norms.append(self.data_cfg)
 
             warnings.warn("provided DistMetric ({}) is not the same as the data config metric ({}) ".format(
-                self.dist_metric.get_config(), self.cfg_dist_metric))
+                self.dist_metric.get_config(), cfg_metric))
 
     def _train_knn(self):
         """Trains K-Nearest-Neighbors"""
@@ -327,14 +328,14 @@ class FaceNet:
 
     def predict(self, img, detector="both", margin=10, rotations=None):
         """Embeds and normalizes an image from path or array
-        :param img: image to be predicted on
+        :param img: image to be predicted on (BGR image)
         :param detector: face detector (either mtcnn, haarcascade, or None) (default: "both")
         :param margin: margin for MTCNN face cropping (default: 10)
         :param rotations: array of rotations to be applied to face (default: None)
         :returns: normalized embeddings, facial coordinates
         """
 
-        cropped_faces, face_coords = crop_face(img, margin, detector, rotations=rotations)
+        cropped_faces, face_coords = crop_face(img[:, :, ::-1], margin, detector, rotations=rotations)
         start = timer()
 
         assert cropped_faces.shape[1:] == (*IMG_SHAPE, 3), "no face detected"
@@ -351,7 +352,7 @@ class FaceNet:
     # FACIAL RECOGNITION HELPER
     def recognize(self, img, **kwargs):
         """Facial recognition
-        :param img: image array
+        :param img: image array in BGR mode
         :param kwargs: named arguments to self.get_embeds (will be passed to self.predict)
         :returns: embedding, is recognized (bool), best match from database(s), distance
         """

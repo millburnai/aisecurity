@@ -57,24 +57,6 @@ def dump_and_encrypt(data, dump_path, encrypt=None, mode="w+"):
     return encrypted_data
 
 
-@print_time("Data embedding and dumping time")
-def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, encrypt="all", mode="w+"):
-    if not full_overwrite:
-        old_embeds = retrieve_embeds(retrieve_path if retrieve_path else dump_path)
-        new_embeds, no_faces = online_load(facenet, img_dir)
-        data = {**old_embeds, **new_embeds}
-    else:
-        data, no_faces = online_load(facenet, img_dir)
-
-    encrypted_data = dump_and_encrypt(data, dump_path, encrypt=encrypt, mode=mode)
-
-    path_to_config = dump_path.replace(".json", "_info.json")
-    with open(path_to_config, "w+", encoding="utf-8") as config_file:
-        metadata = {"encrypted": encrypt, "metric": facenet.dist_metric.get_config()}
-        json.dump(metadata, config_file, indent=4)
-
-    return encrypted_data, no_faces
-
 
 @print_time("Data retrieval time")
 def retrieve_embeds(path=DATABASE, encrypted=DATABASE_INFO["encrypted"], name_keys=NAME_KEYS,
