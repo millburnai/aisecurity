@@ -32,7 +32,7 @@ setup(
     license=None,
     python_requires=">=3.5.0",
     install_requires=INSTALL_REQUIRES,
-    scripts=["bin/drop.sql", "bin/make_config.sh", "bin/convert_engine.py"],
+    scripts=["bin/drop.sql", "bin/make_config.sh"],
     packages=find_packages(),
     zip_safe=False
 )
