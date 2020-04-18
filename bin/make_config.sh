@@ -42,7 +42,7 @@ fi
 
 if [ ! -f "$config_path/database/small_embeddings.json" ] ; then
   echo -e "\033[0;95mDownloading mini-database\033[0m"
-  wget -O "$config_path/database/small_embeddings.json" \
+  curl -Lo "$config_path/database/small_embeddings.json" \
   "https://www.dropbox.com/s/2x7w5ga1pqanaug/small_embeddings.json?dl=1" \
   || { echo -e "\033[0;31mError: unable to download small_embeddings.json\033[0m" ; ERRORS=$((ERRORS + 1)) ; \
   rm "$config_path/database/small_embeddings.json" ; }
@@ -50,7 +50,7 @@ fi
 
 if [ ! -f "$config_path/database/small_embeddings_info.json" ] ; then
   echo -e "\033[0;95mDownloading mini-database config\033[0m"
-  wget -O "$config_path/database/small_embeddings_info.json" \
+  curl -Lo "$config_path/database/small_embeddings_info.json" \
   "https://www.dropbox.com/s/9xp0kxlx7xlowmi/small_embeddings_info.json?dl=1" \
   || { echo -e "\033[0;31mError: unable to download small_embeddings_info.json\033[0m" ; ERRORS=$((ERRORS + 1)) ; \
   rm "$config_path/database/small_embeddings_info.json" ; }
@@ -64,14 +64,14 @@ fi
 
 if [ ! -f "$config_path/models/20180402-114759.pb" ] ; then
   echo -e "\033[0;95mDownloading default FaceNet graphdef\033[0m"
-  wget -O "$config_path/models/20180402-114759.pb" "https://www.dropbox.com/s/ek2y33ntzfr2zgq/20180402-114759.pb?dl=1" \
+  curl -Lo "$config_path/models/20180402-114759.pb" "https://www.dropbox.com/s/ek2y33ntzfr2zgq/20180402-114759.pb?dl=1" \
   || { echo -e "\033[0;31mError: model could not be downloaded\033[0m" ; ERRORS=$((ERRORS + 1)) ; \
   rm "$config_path/models/20180402-114759.pb" ; }
 fi
 
 if [ ! -f "$config_path/models/haarcascade_frontalface_default.xml" ] ; then
   echo -e "\033[0;95mDownloading Haarcascade model\033[0m"
-  wget -O "$config_path/models/haarcascade_frontalface_default.xml" \
+  curl -Lo "$config_path/models/haarcascade_frontalface_default.xml" \
   "https://www.dropbox.com/s/zhb4cn9idl6rrvm/haarcascade_frontalface_default.xml?dl=1" \
   || { echo -e "\033[0;31mError: haarcascade model could not be downloaded\033[0m" ; ERRORS=$((ERRORS + 1)) ; \
   rm "$config_path/models/haarcascade_frontalface_default.xml" ; }
@@ -85,7 +85,7 @@ fi
 
 if [ ! -f "$config_path/keys/small_name_keys.txt" ] ; then
   echo -e "\033[0;95mDownloading small_name_keys.txt\033[0m"
-  wget -O "$config_path/keys/small_name_keys.txt" \
+  curl -Lo "$config_path/keys/small_name_keys.txt" \
   "https://www.dropbox.com/s/cla4qoumrzzq1ne/small_name_keys.txt?dl=1" || \
   { echo -e "\033[0;31mError: could not download small_name_keys.txt\033[0m" ; ERRORS=$((ERRORS + 1)) ; \
   rm "$config_path/keys/small_embedding_keys.txt" ; }
@@ -93,7 +93,7 @@ fi
 
 if [ ! -f "$config_path/keys/small_embedding_keys.txt" ] ; then
   echo -e "\033[0;95mDownloading small_embedding_keys.txt\033[0m"
-  wget -O "$config_path/keys/small_embedding_keys.txt" \
+  curl -Lo "$config_path/keys/small_embedding_keys.txt" \
   "https://www.dropbox.com/s/ondgqwr4flsdmkg/small_embedding_keys.txt?dl=1" \
   || { echo -e "\033[0;31mError: could not download small_embedding_keys.txt\033[0m" ; ERRORS=$((ERRORS + 1)) ; \
   rm "$config_path/keys/small_embedding_keys.txt" ; }
@@ -114,13 +114,13 @@ if [ ! -d "$config_path/config" ] ; then
 fi
 
 if [ ! -f "$config_path/config/models.json" ] ; then
-  wget -O "$config_path/config/models.json" "https://www.dropbox.com/s/9my8ofbzohi0dsm/models.json?dl=1" \
+  curl -Lo "$config_path/config/models.json" "https://www.dropbox.com/s/9my8ofbzohi0dsm/models.json?dl=1" \
   || { echo -e "\033[0;31mError: unable to download models.json\033[0m" ; ERRORS=$((ERRORS + 1)) ; \
   rm "$config_path/config/models.json" ; }
 fi
 
 if [ ! -f "$config_path/config/cuda_models.json" ] ; then
-  wget -O "$config_path/config/cuda_models.json" "https://www.dropbox.com/s/ieke59ny0r7qxo3/cuda_models.json?dl=1" \
+  curl -Lo "$config_path/config/cuda_models.json" "https://www.dropbox.com/s/ieke59ny0r7qxo3/cuda_models.json?dl=1" \
   || { echo -e "\033[0;31mError: unable to download cuda_models.json\033[0m" ; ERRORS=$((ERRORS + 1)) ; \
   rm "$config_path/config/cuda_models.json" ; }
 fi
