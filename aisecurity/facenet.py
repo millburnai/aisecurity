@@ -222,7 +222,7 @@ class FaceNet:
         :param data: new data in form {name: embedding vector, ...}
         :param config: data config dict with the entry "metric": <DistMetric str constructor> (default: None)
         """
-
+        print(data)
         self._db = None
 
         if data:
@@ -282,6 +282,8 @@ class FaceNet:
             # always use minkowski distance, other metrics are just normalizing before minkowski to act
             # as the desired metric (ex: cosine)
             n_neighbors = len(self.expanded_names) // len(set(self.expanded_names))
+            print("neighbors")
+            print(n_neighbors)
             self._knn = neighbors.KNeighborsClassifier(n_neighbors=n_neighbors)
             self._knn.fit(self.expanded_embeds, self.expanded_names)
 
@@ -343,7 +345,7 @@ class FaceNet:
         raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
         normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
 
-        message = "{} rotation{}".format(len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "")
+        message = "{} rotation{}".format(len(normalized_embeddings) - 1, "s" if len(normalized_embeddings) > 1 else "")
         print("Embedding time ({}): \033[1m{} ms\033[0m".format(message, round(1000. * (timer() - start), 2)))
 
         return normalized_embeddings, face_coords

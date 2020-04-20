@@ -92,22 +92,23 @@ class DataEncryption:
         encrypted = {}
         for person in data:
             name_cipher = generate_cipher(name_key_file, alloc_mem=decryptable)
-            embedding_cipher = generate_cipher(embeddings_key_file, alloc_mem=decryptable)
 
-            encrypted_name, encrypted_embed = person, data[person]
-
-            if isinstance(encrypted_embed, np.ndarray):
-                encrypted_embed = encrypted_embed.reshape(-1,).tolist()
+            encrypted_name, encrypted_embeds = person, data[person]
 
             if "names" not in ignore:
                 encrypted_name = [chr(c) for c in list(encrypt(person.encode("utf-8"), name_cipher))]
                 encrypted_name = "".join(encrypted_name)
                 # bytes are not json-serializable
             if "embeddings" not in ignore:
-                encrypted_embed = bytes(struct.pack("%sd" % len(data[person]), *data[person]))
-                encrypted_embed = list(encrypt(encrypted_embed, embedding_cipher))
+                encrypted_embeds = []
+                for embed in data[person]:
+                    if isinstance(embed, np.ndarray):
+                        embed = embed.reshape(-1,).tolist()
+                    embedding_cipher = generate_cipher(embeddings_key_file, alloc_mem=decryptable)
+                    byte_embed = bytes(struct.pack("%sd" % len(embed), *embed))
+                    encrypted_embeds.append(list(encrypt(byte_embed, embedding_cipher)))
 
-            encrypted[encrypted_name] = encrypted_embed
+            encrypted[encrypted_name] = encrypted_embeds
 
         return encrypted
 
@@ -115,7 +116,6 @@ class DataEncryption:
     def decrypt_data(data, ignore=None, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS):
         if ignore is None:
             ignore = []
-
         decrypted = {}
         for nonce_pos, encrypted_name in enumerate(data):
             name, embed = encrypted_name, data[encrypted_name]
