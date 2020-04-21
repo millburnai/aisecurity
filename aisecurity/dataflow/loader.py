@@ -1,21 +1,21 @@
 """
+
 "aisecurity.dataflow.loader"
+
 Data loader and writer utils.
+
 """
 
-from timeit import default_timer as timer
 import functools
 import json
 import os
+from timeit import default_timer as timer
 import warnings
-import gc
-import cv2
-import numpy as np
-import psutil
 
+import cv2
 import tqdm
 
-from aisecurity.privacy.encryptions import DataEncryption
+from aisecurity.privacy.encryptions import encrypt_data, decrypt_data
 from aisecurity.utils.paths import DATABASE_INFO, DATABASE, NAME_KEYS, EMBEDDING_KEYS
 
 
@@ -36,25 +36,28 @@ def print_time(message="Time elapsed"):
 
 # LOAD ON THE FLY
 @print_time("Data embedding time")
-def online_load(facenet, img_dir, people=None):
+def online_load(facenet, img_dir, people=None, **kwargs):
     if people is None:
-        people = [f for f in os.listdir(img_dir) if f.endswith(".jpg") or f.endswith(".png")]
+        people = [f for f in os.listdir(img_dir) if f.endswith("jpg") or f.endswith("png")]
 
     data = {}
     no_faces = []
 
     with tqdm.trange(len(people)) as pbar:
         for person in people:
-            print(psutil.virtual_memory())
             try:
-                data[person.strip(".jpg").strip(".png")] = np.squeeze(facenet.predict(cv2.imread(os.path.join(img_dir, person)), rotations=[15, 15])[0])
-                pbar.update()
+                assert person.endswith("jpg") or person.endswith("png") and os.path.getsize(person) < 1e6
+
+                img = cv2.imread(os.path.join(img_dir, person))
+                embeds, _ = facenet.dist_metric.apply_norms(facenet.predict(img, **kwargs))
+                data[person.strip("jpg").strip("png")] = embeds.reshape(len(embeds), -1)
+
             except AssertionError:
-                warnings.warn("face not found in {}".format(person))
+                warnings.warn("face not found or file too large ({})".format(person))
                 no_faces.append(person)
                 continue
 
-            gc.collect()
+        pbar.update()
 
     return data, no_faces
 
@@ -74,11 +77,9 @@ def encrypt_to_ignore(encrypt):
 
 
 @print_time("Data dumping time")
-def dump_and_encrypt(data, dump_path, encrypt=None, mode="w+"):
+def dump_and_encrypt(data, dump_path, encrypt=None, mode="w+", **kwargs):
     ignore = encrypt_to_ignore(encrypt)
-    for person, embeddings in data.items():
-        data[person] = [embed.tolist() for embed in embeddings]
-    encrypted_data = DataEncryption.encrypt_data(data, ignore=ignore)
+    encrypted_data = encrypt_data(data, ignore=ignore, **kwargs)
 
     with open(dump_path, mode, encoding="utf-8") as dump_file:
         json.dump(encrypted_data, dump_file, ensure_ascii=False, indent=4)
@@ -87,7 +88,7 @@ def dump_and_encrypt(data, dump_path, encrypt=None, mode="w+"):
 
 
 @print_time("Data embedding and dumping time")
-def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, encrypt="all", mode="w+"):
+def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, encrypt="all", **kwargs):
     if not full_overwrite:
         old_embeds = retrieve_embeds(retrieve_path if retrieve_path else dump_path)
         new_embeds, no_faces = online_load(facenet, img_dir)
@@ -95,12 +96,10 @@ def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None, full_overwri
     else:
         data, no_faces = online_load(facenet, img_dir)
 
-    encrypted_data = dump_and_encrypt(data, dump_path, encrypt=encrypt, mode=mode)
-    print(dump_path)
+    encrypted_data = dump_and_encrypt(data, dump_path, encrypt=encrypt, **kwargs)
 
     path_to_config = dump_path.replace(".json", "_info.json")
     with open(path_to_config, "w+", encoding="utf-8") as config_file:
-        print(path_to_config)
         metadata = {"encrypted": encrypt, "metric": facenet.dist_metric.get_config()}
         json.dump(metadata, config_file, indent=4)
 
@@ -115,4 +114,4 @@ def retrieve_embeds(path=DATABASE, encrypted=DATABASE_INFO["encrypted"], name_ke
     with open(path, "r", encoding="utf-8") as json_file:
         data = json.load(json_file)
 
-    return DataEncryption.decrypt_data(data, ignore=ignore, name_keys=name_keys, embedding_keys=embedding_keys)
+    return decrypt_data(data, ignore=ignore, name_keys=name_keys, embedding_keys=embedding_keys)

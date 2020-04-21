@@ -10,7 +10,6 @@ Reference paper: https://arxiv.org/pdf/1503.03832.pdf
 
 import json
 import os
-import time
 from timeit import default_timer as timer
 import warnings
 
@@ -204,7 +203,7 @@ class FaceNet:
         """
 
         person, embeddings = self._screen_data(person, embeddings)
-        embeddings = [np.array(embed).reshape(-1, ) for embed in embeddings]
+        embeddings = np.array(embeddings).reshape(len(embeddings), -1).tolist()
 
         if not self.data:
             self._db = {}
@@ -222,7 +221,7 @@ class FaceNet:
         :param data: new data in form {name: embedding vector, ...}
         :param config: data config dict with the entry "metric": <DistMetric str constructor> (default: None)
         """
-        print(data)
+
         self._db = None
 
         if data:
@@ -279,12 +278,10 @@ class FaceNet:
                     self.expanded_names.append(name)
                     self.expanded_embeds.append(embed)
 
-            # always use minkowski distance, other metrics are just normalizing before minkowski to act
-            # as the desired metric (ex: cosine)
             n_neighbors = len(self.expanded_names) // len(set(self.expanded_names))
-            print("neighbors")
-            print(n_neighbors)
+            # auto-detect number of neighbors as minimum number of embeddings per person
             self._knn = neighbors.KNeighborsClassifier(n_neighbors=n_neighbors)
+            # always use minkowski distance, other metrics are just normalizing to act as the desired metric
             self._knn.fit(self.expanded_embeds, self.expanded_names)
 
         except (AttributeError, ValueError):
@@ -345,7 +342,7 @@ class FaceNet:
         raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
         normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
 
-        message = "{} rotation{}".format(len(normalized_embeddings) - 1, "s" if len(normalized_embeddings) > 1 else "")
+        message = "{} vector{}".format(len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "")
         print("Embedding time ({}): \033[1m{} ms\033[0m".format(message, round(1000. * (timer() - start), 2)))
 
         return normalized_embeddings, face_coords
