@@ -63,7 +63,7 @@ def get_key(key_file):
 def get_nonce(key_file, position):
     with open(key_file, "rb") as keys:
         joined_nonces = b"".join(keys.readlines())[_BIT_ENCRYPTION:]
-        nonce = joined_nonces[position * _BIT_ENCRYPTION:(position + 1) * _BIT_ENCRYPTION]
+        nonce = joined_nonces[position*_BIT_ENCRYPTION:(position+1)*_BIT_ENCRYPTION]
     return nonce
 
 
@@ -79,54 +79,70 @@ def decrypt(cipher_text, position, key_file):
 
 
 # DATA ENCRYPTION
-class DataEncryption:
+def encrypt_data(data, ignore=None, decryptable=True, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS):
+    if ignore is None:
+        ignore = []
 
-    @staticmethod
-    def encrypt_data(data, ignore=None, decryptable=True, name_key_file=NAME_KEYS, embeddings_key_file=EMBEDDING_KEYS):
-        if ignore is None:
-            ignore = []
-        if decryptable:
-            generate_key(name_key_file)
-            generate_key(embeddings_key_file)
+    if decryptable:
+        generate_key(name_keys)
+        generate_key(embedding_keys)
 
-        encrypted = {}
-        for person in data:
-            name_cipher = generate_cipher(name_key_file, alloc_mem=decryptable)
+    encrypted = {}
+    for person in data:
+        assert data[person].ndim == 2, "embeds must have shape (number of embeds, dim(embed))"
+        encrypted_name, encrypted_embeds = person, data[person].tolist()
 
-            encrypted_name, encrypted_embeds = person, data[person]
+        if "names" not in ignore:
+            name_cipher = generate_cipher(name_keys, alloc_mem=decryptable)
+            encrypted_name = [chr(c) for c in list(encrypt(person.encode("utf-8"), name_cipher))]
+            encrypted_name = "".join(encrypted_name)
+            # bytes are not json-serializable
 
-            if "names" not in ignore:
-                encrypted_name = [chr(c) for c in list(encrypt(person.encode("utf-8"), name_cipher))]
-                encrypted_name = "".join(encrypted_name)
-                # bytes are not json-serializable
-            if "embeddings" not in ignore:
-                encrypted_embeds = []
-                for embed in data[person]:
-                    if isinstance(embed, np.ndarray):
-                        embed = embed.reshape(-1,).tolist()
-                    embedding_cipher = generate_cipher(embeddings_key_file, alloc_mem=decryptable)
-                    byte_embed = bytes(struct.pack("%sd" % len(embed), *embed))
-                    encrypted_embeds.append(list(encrypt(byte_embed, embedding_cipher)))
+        if "embeddings" not in ignore:
+            for idx, embed in enumerate(encrypted_embeds):
+                embed_cipher = generate_cipher(embedding_keys, alloc_mem=decryptable)
+                byte_embed = struct.pack("%sd" % len(embed), *embed)
+                encrypted_embeds[idx] = list(encrypt(byte_embed, embed_cipher))
 
-            encrypted[encrypted_name] = encrypted_embeds
+        encrypted[encrypted_name] = encrypted_embeds
 
-        return encrypted
+    return encrypted
 
-    @staticmethod
-    def decrypt_data(data, ignore=None, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS):
-        if ignore is None:
-            ignore = []
-        decrypted = {}
-        for nonce_pos, encrypted_name in enumerate(data):
-            name, embed = encrypted_name, data[encrypted_name]
-            if "names" not in ignore:
-                name = decrypt(bytes([ord(c) for c in encrypted_name]), nonce_pos, name_keys)
-                name = name.decode("utf-8")
-            if "embeddings" not in ignore:
-                byte_embed = decrypt(bytes(data[encrypted_name]), nonce_pos, embedding_keys)
-                embed = np.array(list(struct.unpack("%sd" % (len(byte_embed) // 8), byte_embed)), dtype=np.float32)
-                # using double precision (C long doubles not available), hence int division by 8 (double is 8 bits)
 
-            decrypted[name] = embed
+def decrypt_data(data, ignore=None, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS):
+    if ignore is None:
+        ignore = []
 
-        return decrypted
+    adj_nonce_pos = 0
+    decrypted = {}
+    for naive_nonce_pos, encrypted_name in enumerate(data):
+        name, embeds = encrypted_name, data[encrypted_name]
+        # assume embeds have shape (number of embeds, dim(embed) * 8) because double = 8 bytes
+
+        """
+        Obviously, if the embedding sets have differing lengths, the lengths of the nonce groups associated with
+        those embeddings will be different.
+
+        However, the position of the name nonce will not be affected by the length of the nonce group because it
+        is stored in a different memory buffer than the embedding nonces. Therefore, the name nonce's position
+        in its memory buffer is just the index of the name (naive_nonce_pos).
+
+        Embedding nonces are more complicated- we must take into account the lengths of the nonce groups.
+        Therefore, the position of any specific embed (x) in a set of embeddings is given by the total length
+        of all of the embeds in all of the embeddings prior to x (adj_nonce_pos).
+        """
+
+        if "names" not in ignore:
+            name = decrypt(bytes(ord(c) for c in encrypted_name), naive_nonce_pos, name_keys)
+            name = name.decode("utf-8")
+
+        if "embeddings" not in ignore:
+            for idx, embed in enumerate(embeds):
+                byte_embed = decrypt(bytes(embed), adj_nonce_pos + idx, embedding_keys)
+                embeds[idx] = np.array(struct.unpack("%sd" % (len(byte_embed) // 8), byte_embed))
+                # using double precision, hence int division by 8 (C double is 8 bits)
+
+        adj_nonce_pos += len(embeds)
+        decrypted[name] = embeds
+
+    return decrypted
