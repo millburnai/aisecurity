@@ -122,7 +122,7 @@ class DistMetric:
     def _apply_norm(self, norm_id, arg, normalized=None):
         if normalized is None:
             normalized = arg
-
+        
         actions = self.NORMALIZATIONS[norm_id].copy()
         apply_to = actions.pop("apply_to")
         use_stat = actions.pop("use_stat")
@@ -160,7 +160,7 @@ class DistMetric:
     # "PUBLIC" FUNCTIONS
     def apply_norms(self, *args, dist_norm=True):
         result = []
-
+        
         for arg in args:
             normalized = np.array(self._apply_norms(arg))
 

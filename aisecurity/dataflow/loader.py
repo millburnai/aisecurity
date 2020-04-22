@@ -49,7 +49,7 @@ def online_load(facenet, img_dir, people=None, **kwargs):
                 assert person.endswith("jpg") or person.endswith("png") and os.path.getsize(person) < 1e6
 
                 img = cv2.imread(os.path.join(img_dir, person))
-                embeds, _ = facenet.dist_metric.apply_norms(facenet.predict(img, **kwargs))
+                embeds, __ = facenet.predict(img, **kwargs)
                 data[person.strip("jpg").strip("png")] = embeds.reshape(len(embeds), -1)
 
             except AssertionError:
