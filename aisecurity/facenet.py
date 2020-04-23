@@ -351,10 +351,12 @@ class FaceNet:
 
 
     # FACIAL RECOGNITION HELPER
-    def recognize(self, img, **kwargs):
+    def recognize(self, img, detector="both", margin=10, rotations=None):
         """Facial recognition
         :param img: image array in BGR mode
-        :param kwargs: named arguments to self.get_embeds (will be passed to self.predict)
+        :param detector: face detector (either mtcnn, haarcascade, or None) (default: "both")
+        :param margin: margin for MTCNN face cropping (default: 10)
+        :param rotations: array of rotations to be applied to face (default: None)
         :returns: embedding, is recognized (bool), best match from database(s), distance
         """
 
@@ -372,20 +374,22 @@ class FaceNet:
         start = timer()
         embed, is_recognized, best_match, dist, face, elapsed = None, None, None, None, None, None
 
+        if rotations is None:
+            rotations = [0.]
+
         try:
-            embeds, face = self.predict(img, **kwargs)
+            if "rotations" in self.data_cfg and self.data_cfg["rotations"]:
+                rotations = self.data_cfg["rotations"] + rotations
+
+            embeds, face = self.predict(img, detector, margin, rotations)
+            embeds = np.expand_dims(np.concatenate([embed for embed, _ in zip(embeds, rotations)], axis=-1), axis=0)
             analysis = analyze_embeds(embeds)
 
-            if len(embeds) > 1:
-                best_match = max(analysis["best_match"], key=analysis["best_match"].count)
+            best_match = max(analysis["best_match"], key=analysis["best_match"].count)
 
-                best_match_idxs = [idx for idx, person in enumerate(analysis["best_match"]) if person == best_match]
-                min_index = min(best_match_idxs, key=lambda idx: analysis["dists"][idx])
-                # index associated with minimum distance best_match embedding
-
-            else:
-                best_match = analysis["best_match"][0]
-                min_index = 0
+            best_match_idxs = [idx for idx, person in enumerate(analysis["best_match"]) if person == best_match]
+            min_index = min(best_match_idxs, key=lambda idx: analysis["dists"][idx])
+            # index associated with minimum distance best_match embedding
 
             embed = embeds[min_index]
             dist = analysis["dists"][min_index]
@@ -456,9 +460,7 @@ class FaceNet:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
             # facial detection and recognition
-            embed, is_recognized, best_match, dist, face, elapsed = self.recognize(
-                frame, detector=detector, rotations=rotations
-            )
+            embed, is_recognized, best_match, dist, face, elapsed = self.recognize(frame, detector, rotations=rotations)
 
             # graphics, logging, lcd, etc.
             absent_frames += self.log_activity(best_match, embed, dynamic_log, data_mutable, pbar, dist, absent_frames)
