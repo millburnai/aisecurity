@@ -94,8 +94,7 @@ def encrypt_data(data, ignore=None, decryptable=True, name_keys=NAME_KEYS, embed
 
         if "names" not in ignore:
             name_cipher = generate_cipher(name_keys, alloc_mem=decryptable)
-            encrypted_name = [chr(c) for c in list(encrypt(person.encode("utf-8"), name_cipher))]
-            encrypted_name = "".join(encrypted_name)
+            encrypted_name = "".join(chr(c) for c in list(encrypt(person.encode("utf-8"), name_cipher)))
             # bytes are not json-serializable
 
         if "embeddings" not in ignore:
@@ -115,7 +114,7 @@ def decrypt_data(data, ignore=None, name_keys=NAME_KEYS, embedding_keys=EMBEDDIN
 
     adj_nonce_pos = 0
     decrypted = {}
-    for naive_nonce_pos, encrypted_name in enumerate(data):
+    for nonce_pos, encrypted_name in enumerate(data):
         name, embeds = encrypted_name, data[encrypted_name]
         # assume embeds have shape (number of embeds, dim(embed) * 8) because double = 8 bytes
 
@@ -125,7 +124,7 @@ def decrypt_data(data, ignore=None, name_keys=NAME_KEYS, embedding_keys=EMBEDDIN
 
         However, the position of the name nonce will not be affected by the length of the nonce group because it
         is stored in a different memory buffer than the embedding nonces. Therefore, the name nonce's position
-        in its memory buffer is just the index of the name (naive_nonce_pos).
+        in its memory buffer is just the index of the name (nonce_pos).
 
         Embedding nonces are more complicated- we must take into account the lengths of the nonce groups.
         Therefore, the position of any specific embed (x) in a set of embeddings is given by the total length
@@ -133,8 +132,7 @@ def decrypt_data(data, ignore=None, name_keys=NAME_KEYS, embedding_keys=EMBEDDIN
         """
 
         if "names" not in ignore:
-            name = decrypt(bytes(ord(c) for c in encrypted_name), naive_nonce_pos, name_keys)
-            name = name.decode("utf-8")
+            name = decrypt(bytes(ord(c) for c in encrypted_name), nonce_pos, name_keys).decode("utf-8")
 
         if "embeddings" not in ignore:
             for idx, embed in enumerate(embeds):

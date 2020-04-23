@@ -60,7 +60,7 @@ def crop_face(img, margin, detector="mtcnn", alpha=0.9, rotations=None):
     if rotations is None:
         rotations = [0.]
     elif 0. not in rotations:
-        rotations.append(0.)
+        rotations.insert(0, 0.)
 
     if detector:
         result = detect_faces(img, mode=detector, alpha=alpha)
@@ -69,7 +69,7 @@ def crop_face(img, margin, detector="mtcnn", alpha=0.9, rotations=None):
             face = max(result, key=lambda person: person["confidence"])
 
             if face["confidence"] >= alpha:
-                resized_faces = [crop_and_rotate(img, face["box"], angle) for angle in sorted(rotations)]
+                resized_faces = [crop_and_rotate(img, face["box"], angle) for angle in rotations]
                 print("Detection time ({}): \033[1m{} ms\033[0m".format(detector, round(1000. * (timer() - start), 2)))
             else:
                 print("{}% face detection confidence is too low".format(round(face["confidence"] * 100, 2)))

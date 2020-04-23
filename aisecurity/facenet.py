@@ -213,6 +213,8 @@ class FaceNet:
         else:
             self._db[person] = embeddings
 
+        self._db[person] = np.array(self._db[person])
+
         if train_knn:
             self._train_knn()
 
