@@ -241,7 +241,7 @@ class FaceNet:
         :param dist_metric: DistMetric object or str constructor, or "auto+{whatever}" to detect from self.data_cfg
         """
 
-        cfg_metric = self.data_cfg["metric"]
+        cfg_metric = self.data_cfg.get("metric")
 
         # set distance metric
         if isinstance(dist_metric, DistMetric):
@@ -379,10 +379,13 @@ class FaceNet:
 
         try:
             if "rotations" in self.data_cfg and self.data_cfg["rotations"]:
-                rotations = self.data_cfg["rotations"] + rotations
+                assert rotations == [0.], "rotations + config rotations not supported yet"
+                rotations = self.data_cfg["rotations"]
+                embeds, face = self.predict(img, detector, margin, rotations)
+                embeds = np.expand_dims(np.concatenate([embed for embed, _ in zip(embeds, rotations)], axis=-1), axis=0)
+            else:
+                embeds, face = self.predict(img, detector, margin, rotations)
 
-            embeds, face = self.predict(img, detector, margin, rotations)
-            embeds = np.expand_dims(np.concatenate([embed for embed, _ in zip(embeds, rotations)], axis=-1), axis=0)
             analysis = analyze_embeds(embeds)
 
             best_match = max(analysis["best_match"], key=analysis["best_match"].count)
@@ -398,11 +401,11 @@ class FaceNet:
             print("%s: \033[1m%.4f (%s)%s\033[0m" % (self.dist_metric, dist, best_match, "" if is_recognized else " !"))
 
         except (ValueError, AssertionError, cv2.error) as error:
-            if "query data dimension" in str(error):
+            if isinstance(error, ValueError) and "query data dimension" in str(error):
                 raise ValueError("Current model incompatible with database")
             elif isinstance(error, cv2.error) and "resize" in str(error):
                 print("Frame capture failed")
-            elif not isinstance(error, AssertionError):
+            elif "no face detected" not in str(error):
                 raise error
 
         elapsed = round(1000. * (timer() - start), 4)
