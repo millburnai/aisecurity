@@ -33,11 +33,12 @@ class FaceDetector:
             self.kwargs["min_face_size"] = 20
 
         self.haarcascade = cv2.CascadeClassifier(CONFIG_HOME + "/models/haarcascade_frontalface_default.xml")
-        # TODO: find out why haarcascade init is needed for trt-mtcnn to work (without it, camera won't read properly)
+
+        if mode != "haarcascade":
+            self.mtcnn = MTCNN(min_face_size=int(self.kwargs["min_face_size"]))
+            # TODO: find out why mtcnn init is needed for trt-mtcnn to work (without it, camera won't read properly)
 
         if mode == "trt-mtcnn":
-            MTCNN(min_face_size=int(self.kwargs["min_face_size"]))
-
             trt_mtcnn_module = CONFIG_HOME + "/trt-mtcnn"
             current_path = os.getcwd()
 
@@ -49,9 +50,6 @@ class FaceDetector:
             self.trt_mtcnn = TrtMTCNNWrapper()
 
             os.chdir(current_path)
-
-        if mode == "mtcnn" or mode == "both":
-            self.mtcnn = MTCNN(min_face_size=int(self.kwargs["min_face_size"]))
 
     def detect_faces(self, img):
         result = []
