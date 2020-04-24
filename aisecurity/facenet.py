@@ -36,10 +36,6 @@ from aisecurity.face.preprocessing import set_img_shape, normalize, crop_face, I
 class FaceNet:
     """Class implementation of FaceNet"""
 
-    # HYPERPARAMETERS
-    ALPHA = 0.75
-
-
     # PRE-BUILT MODEL CONFIGS
     MODELS = json.load(open(CONFIG_HOME + "/config/models.json", encoding="utf-8"))
 
@@ -195,10 +191,11 @@ class FaceNet:
 
         return key, value
 
-    def update_data(self, person, embeddings, train_knn=True):
+    def update_data(self, person, embeddings, flush_entry=False, train_knn=True):
         """Updates data property
         :param person: new entry
         :param embeddings: new entry's list of embeddings
+        :param flush_entry: whether or not to overwrite previous person's embeddings
         :param train_knn: whether or not to train K-NN (default: True)
         """
 
@@ -208,7 +205,12 @@ class FaceNet:
         if not self.data:
             self._db = {}
 
-        self._db[person] = np.array(embeddings)
+        if person in self.data and not flush_entry:
+            self._db[person] = np.concatenate([embeddings, self._db[person]], axis=0)
+        else:
+            self._db[person] = embeddings
+
+        self._db[person] = np.array(self._db[person])
 
         if train_knn:
             self._train_knn()
@@ -236,28 +238,27 @@ class FaceNet:
         :param dist_metric: DistMetric object or str constructor, or "auto+{whatever}" to detect from self.data_cfg
         """
 
+        # retrieve database config
         cfg_metric = self.data_cfg.get("metric")
-        alpha = FaceNet.ALPHA
+        if isinstance(cfg_metric, list):
+            alpha, cfg_metric = cfg_metric
+        else:
+            alpha = 0.75
+            warnings.warn("alpha/cfg_metric not detected- default alpha is 0.75")
 
         # set distance metric
         if isinstance(dist_metric, DistMetric):
             self.dist_metric = dist_metric
 
         elif isinstance(dist_metric, str):
-            if isinstance(cfg_metric, list):
-                #Add option for cfg_metric to have own alpha- is impractical to share an alpha between different dists
-                #Rather than "metric": "cosine", would be "metric": ["cosine", .3] with .3 being the alpha. 
-                alpha = cfg_metric[1]
-                cfg_metric = cfg_metric[0]
             if "auto" in dist_metric:
                 constructor = cfg_metric
-
                 if "+" in dist_metric:
                     constructor += dist_metric[dist_metric.find("+"):]
             else:
                 constructor = dist_metric
 
-            self.dist_metric = DistMetric(constructor, alpha, data=list(self.data.values()), axis=0)
+            self.dist_metric = DistMetric(constructor, alpha=alpha, data=list(self.data.values()), axis=0)
 
         else:
             raise ValueError("{} not a supported dist metric".format(dist_metric))
@@ -329,7 +330,7 @@ class FaceNet:
 
         return embeds.reshape(len(imgs), -1)
 
-    def predict(self, img, detector="both", margin=10, rotations=None, **kwargs):
+    def predict(self, img, detector="both", margin=10, rotations=None):
         """Embeds and normalizes an image from path or array
         :param img: image to be predicted on (BGR image)
         :param detector: face detector (either mtcnn, haarcascade, or None) (default: "both")
@@ -368,7 +369,7 @@ class FaceNet:
                 best_embed = self.expanded_embeds[self.expanded_names.index(analysis["best_match"][-1])]
 
                 analysis["dists"].append(self.dist_metric.distance(embed, best_embed, ignore_norms=self.ignore_norms))
-                analysis["is_recognized"].append(analysis["dists"][-1] <= self.dist_metric.ALPHA)
+                analysis["is_recognized"].append(analysis["dists"][-1] <= self.dist_metric.alpha)
 
             return analysis
 
@@ -491,7 +492,7 @@ class FaceNet:
                 log.flush_current(mode="known+unknown", flush_times=False)
             return absent_frames
 
-        is_recognized = dist <= self.dist_metric.ALPHA
+        is_recognized = dist <= self.dist_metric.alpha
         update_progress, update_recognized, update_unrecognized = log.update(is_recognized, best_match)
 
         if pbar and update_progress:

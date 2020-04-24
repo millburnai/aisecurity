@@ -102,13 +102,11 @@ class DistMetric:
 
 
     # INITS
-    def __init__(self, constructor, alpha, data=None, **kwargs):
+    def __init__(self, constructor, alpha=0.75, data=None, **kwargs):
+        self.alpha = alpha
 
-        print(alpha)
         # eg: DistMetric("euclidean+subtract_mean+l2_normalize")
         self.dist, *self.normalizations = constructor.split("+")
-
-        self.ALPHA = alpha
 
         assert self.dist in self.DISTS, "supported dists are {}".format(list(self.DISTS.keys()))
         assert self.normalizations is None or all(norm in self.NORMALIZATIONS for norm in self.normalizations), \
