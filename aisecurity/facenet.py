@@ -208,12 +208,7 @@ class FaceNet:
         if not self.data:
             self._db = {}
 
-        if person in self.data:
-            self._db[person] = np.concatenate([embeddings, self._db[person]], axis=0)
-        else:
-            self._db[person] = embeddings
-
-        self._db[person] = np.array(self._db[person])
+        self._db[person] = np.array(embeddings)
 
         if train_knn:
             self._train_knn()
@@ -281,6 +276,8 @@ class FaceNet:
                     self.expanded_embeds.append(embed)
 
             n_neighbors = len(self.expanded_names) // len(set(self.expanded_names))
+            print("n_newighbors")
+            print(n_neighbors)
             # auto-detect number of neighbors as minimum number of embeddings per person
             self._knn = neighbors.KNeighborsClassifier(n_neighbors=n_neighbors)
             # always use minkowski distance, other metrics are just normalizing to act as the desired metric
@@ -351,12 +348,11 @@ class FaceNet:
 
 
     # FACIAL RECOGNITION HELPER
-    def recognize(self, img, detector="both", margin=10, rotations=None):
+    def recognize(self, img, *args, **kwargs):
         """Facial recognition
         :param img: image array in BGR mode
-        :param detector: face detector (either mtcnn, haarcascade, or None) (default: "both")
-        :param margin: margin for MTCNN face cropping (default: 10)
-        :param rotations: array of rotations to be applied to face (default: None)
+        :param args: unnamed arguments to self.get_embeds (will be passed to self.predict)
+        :param kwargs: named arguments to self.get_embeds (will be passed to self.predict)
         :returns: embedding, is recognized (bool), best match from database(s), distance
         """
 
@@ -374,11 +370,8 @@ class FaceNet:
         start = timer()
         embed, is_recognized, best_match, dist, face, elapsed = None, None, None, None, None, None
 
-        if rotations is None:
-            rotations = [0.]
-
         try:
-            embeds, face = self.predict(img, detector, margin, rotations)
+            embeds, face = self.predict(img, *args, **kwargs)
             analysis = analyze_embeds(embeds)
 
             best_match = max(analysis["best_match"], key=analysis["best_match"].count)
