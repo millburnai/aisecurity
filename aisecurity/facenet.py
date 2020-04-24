@@ -28,8 +28,7 @@ from aisecurity.utils import lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
 from aisecurity.utils.visuals import get_video_cap, add_graphics
-from aisecurity.face.detection import detector_init
-from aisecurity.face.preprocessing import set_img_shape, normalize, crop_face, IMG_SHAPE
+from aisecurity.face.detection import FaceDetector, normalize
 
 
 ################################ FaceNet ###############################
@@ -90,7 +89,7 @@ class FaceNet:
 
         self.facenet = keras.models.load_model(filepath)
 
-        set_img_shape(self.facenet.input_shape[1:3])
+        self.img_shape = self.facenet.input_shape[1:3]
 
 
     # TENSORFLOW INIT
@@ -122,12 +121,13 @@ class FaceNet:
         try:
             if input_shape is not None:
                 assert input_shape[-1] == 3, "input shape must be channels-last for tensorflow mode"
-                set_img_shape(input_shape[:-1])
+                self.img_shape = input_shape[:-1]
             else:
-                set_img_shape(self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3])
+                self.img_shape = self.facenet.get_tensor_by_name(self.input_name).get_shape().as_list()[1:3]
 
         except ValueError:
-            warnings.warn("Input tensor size not detected. Default size is {}".format(IMG_SHAPE))
+            self.img_shape = (160, 160)
+            warnings.warn("Input tensor size not detected. Default size is {}".format(self.img_shape))
 
     def _tensor_init(self, model_name, input_name, output_name):
         """Initializes tensors (TF or TRT modes only)
@@ -162,16 +162,17 @@ class FaceNet:
         :param input_shape: input shape (channels first)
         """
 
-        assert engine.INIT_SUCCESS, "tensorrt or pycuda import failed: trt mode not available"
-
         self.MODE = "trt"
 
-        tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
-        # needed to fix https://stackoverflow.com/questions/58756919/python-tensorrt-cudnn-status-mapping-error-error
+        try:
+            # https://stackoverflow.com/questions/58756919/python-tensorrt-cudnn-status-mapping-error-error
+            tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
+            self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
 
-        self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
+        except NameError:
+            raise ValueError("tensorrt or pycuda import failed: trt mode not available")
 
-        set_img_shape(list(reversed(self.facenet.input_shape))[:-1])
+        self.img_shape = list(reversed(self.facenet.input_shape))[:-1]
 
 
     # MUTATORS
@@ -330,19 +331,19 @@ class FaceNet:
 
         return embeds.reshape(len(imgs), -1)
 
-    def predict(self, img, detector="both", margin=10, rotations=None):
+    def predict(self, img, detector, margin=10, rotations=None):
         """Embeds and normalizes an image from path or array
         :param img: image to be predicted on (BGR image)
-        :param detector: face detector (either mtcnn, haarcascade, or None) (default: "both")
+        :param detector: FaceDetector object
         :param margin: margin for MTCNN face cropping (default: 10)
         :param rotations: array of rotations to be applied to face (default: None)
         :returns: normalized embeddings, facial coordinates
         """
 
-        cropped_faces, face_coords = crop_face(img[:, :, ::-1], margin, detector, rotations=rotations)
+        cropped_faces, face_coords = detector.crop_face(img, margin, rotations)
         start = timer()
 
-        assert cropped_faces.shape[1:] == (*IMG_SHAPE, 3), "no face detected"
+        assert cropped_faces.shape[1:] == (*self.img_shape, 3), "no face detected"
 
         raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
         normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
@@ -440,8 +441,7 @@ class FaceNet:
             face_width, face_height = width, height
 
         cap = get_video_cap(width, height, flip, device)
-        detector_init(min_face_size=0.5 * (face_width + face_height) / 2)
-        # face needs to fill at least ~1/2 of the frame
+        detector = FaceDetector(detector, self.img_shape, min_face_size=0.5 * (face_width + face_height) / 2)
 
         absent_frames = 0
         frames = 0
