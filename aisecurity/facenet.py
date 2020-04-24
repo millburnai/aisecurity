@@ -237,20 +237,27 @@ class FaceNet:
         """
 
         cfg_metric = self.data_cfg.get("metric")
+        alpha = FaceNet.ALPHA
 
         # set distance metric
         if isinstance(dist_metric, DistMetric):
             self.dist_metric = dist_metric
 
         elif isinstance(dist_metric, str):
+            if isinstance(cfg_metric, list):
+                #Add option for cfg_metric to have own alpha- is impractical to share an alpha between different dists
+                #Rather than "metric": "cosine", would be "metric": ["cosine", .3] with .3 being the alpha. 
+                alpha = cfg_metric[1]
+                cfg_metric = cfg_metric[0]
             if "auto" in dist_metric:
                 constructor = cfg_metric
+
                 if "+" in dist_metric:
                     constructor += dist_metric[dist_metric.find("+"):]
             else:
                 constructor = dist_metric
 
-            self.dist_metric = DistMetric(constructor, data=list(self.data.values()), axis=0)
+            self.dist_metric = DistMetric(constructor, alpha, data=list(self.data.values()), axis=0)
 
         else:
             raise ValueError("{} not a supported dist metric".format(dist_metric))
@@ -276,8 +283,6 @@ class FaceNet:
                     self.expanded_embeds.append(embed)
 
             n_neighbors = len(self.expanded_names) // len(set(self.expanded_names))
-            print("n_newighbors")
-            print(n_neighbors)
             # auto-detect number of neighbors as minimum number of embeddings per person
             self._knn = neighbors.KNeighborsClassifier(n_neighbors=n_neighbors)
             # always use minkowski distance, other metrics are just normalizing to act as the desired metric
@@ -363,7 +368,7 @@ class FaceNet:
                 best_embed = self.expanded_embeds[self.expanded_names.index(analysis["best_match"][-1])]
 
                 analysis["dists"].append(self.dist_metric.distance(embed, best_embed, ignore_norms=self.ignore_norms))
-                analysis["is_recognized"].append(analysis["dists"][-1] <= FaceNet.ALPHA)
+                analysis["is_recognized"].append(analysis["dists"][-1] <= self.dist_metric.ALPHA)
 
             return analysis
 
@@ -486,7 +491,7 @@ class FaceNet:
                 log.flush_current(mode="known+unknown", flush_times=False)
             return absent_frames
 
-        is_recognized = dist <= FaceNet.ALPHA
+        is_recognized = dist <= self.dist_metric.ALPHA
         update_progress, update_recognized, update_unrecognized = log.update(is_recognized, best_match)
 
         if pbar and update_progress:
