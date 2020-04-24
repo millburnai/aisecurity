@@ -35,7 +35,7 @@ class FaceDetector:
         self.haarcascade = cv2.CascadeClassifier(CONFIG_HOME + "/models/haarcascade_frontalface_default.xml")
 
         if mode != "haarcascade":
-            self.mtcnn = MTCNN(min_face_size=int(self.kwargs["min_face_size"]))
+            self.mtcnn = MTCNN(min_face_size=self.kwargs["min_face_size"])
             # TODO: find out why mtcnn init is needed for trt-mtcnn to work (without it, camera won't read properly)
 
         if mode == "trt-mtcnn":
@@ -55,13 +55,13 @@ class FaceDetector:
         result = []
 
         if self.mode == "trt-mtcnn":
-            result = self.trt_mtcnn.detect_faces(img, minsize=min(40, int(self.kwargs["min_face_size"])))
+            result = self.trt_mtcnn.detect_faces(img, minsize=max(40, int(self.kwargs["min_face_size"])))
 
         if self.mode == "mtcnn" or self.mode == "both":
             result = self.mtcnn.detect_faces(img)
 
         if self.mode == "haarcascade" or (self.mode == "both" and (not result or result[0]["confidence"] < self.alpha)):
-            min_face_size = int(round(self.kwargs["min_face_size"]))
+            min_face_size = int(self.kwargs["min_face_size"])
             faces = self.haarcascade.detectMultiScale(img, scaleFactor=1.1, minSize=(min_face_size, min_face_size))
 
             for (x, y, width, height) in faces:
