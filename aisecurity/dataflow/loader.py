@@ -77,9 +77,9 @@ def encrypt_to_ignore(encrypt):
 
 
 @print_time("Data dumping time")
-def dump_and_encrypt(data, dump_path, encrypt=None, mode="w+"):
+def dump_and_encrypt(data, dump_path, encrypt=None, mode="w+", **kwargs):
     ignore = encrypt_to_ignore(encrypt)
-    encrypted_data = encrypt_data(data, ignore=ignore)
+    encrypted_data = encrypt_data(data, ignore=ignore, **kwargs)
 
     with open(dump_path, mode, encoding="utf-8") as dump_file:
         json.dump(encrypted_data, dump_file, ensure_ascii=False, indent=4)
@@ -96,7 +96,7 @@ def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None, full_overwri
     else:
         data, no_faces = online_load(facenet, img_dir)
 
-    encrypted_data = dump_and_encrypt(data, dump_path, encrypt=encrypt)
+    encrypted_data = dump_and_encrypt(data, dump_path, encrypt=encrypt, **kwargs)
 
     path_to_config = dump_path.replace(".json", "_info.json")
     with open(path_to_config, "w+", encoding="utf-8") as config_file:
