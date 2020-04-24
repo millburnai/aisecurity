@@ -27,7 +27,7 @@ from aisecurity.optim import engine
 from aisecurity.utils import lcd
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
-from aisecurity.utils.visuals import get_video_cap, add_graphics
+from aisecurity.utils.visuals import add_graphics, Camera
 from aisecurity.face.detection import FaceDetector, normalize
 
 
@@ -440,7 +440,7 @@ class FaceNet:
         else:
             face_width, face_height = width, height
 
-        cap = get_video_cap(width, height, flip, device)
+        cap = Camera(device, width, height, flip)
         detector = FaceDetector(detector, self.img_shape, min_face_size=0.5 * (face_width + face_height) / 2)
 
         absent_frames = 0
@@ -448,7 +448,7 @@ class FaceNet:
 
         # CAM LOOP
         while True:
-            _, frame = cap.read()
+            frame = cap.read()
             original_frame = frame.copy()
 
             if resize:

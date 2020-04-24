@@ -6,44 +6,65 @@ Graphics utils.
 
 """
 
+import threading
+
 import cv2
 import numpy as np
 
 
 ################################ Camera ###############################
-def get_video_cap(width, height, flip, device):
-    """Initializes cv2.VideoCapture object
+class Camera:
+    # https://github.com/jkjung-avt/tensorrt_demos/blob/master/utils/camera.py
 
-    :param width: width of frame
-    :param height: height of frame
-    :param flip: flip method: +1 = +90º rotation (default: 0)
-    :param device: video file to read from (passing an int will use /dev/video{device}) (default: 0)
-    :returns: cv2.VideoCapture object
+    def __init__(self, dev=0, width=640, height=360, flip=0):
+        self.dev = dev
+        self.width = width
+        self.height = height
+        self.flip = flip
 
-    """
+        self.thread_running = False
+        self.img_handle = None
+        self.thread = None
 
-    def _gstreamer_pipeline(cap_width=1280, cap_height=720, disp_width=640, disp_height=360,
-                            framerate=20, flip=0):
-        return (
-            "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, format=(string)NV12,"
-            " framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! video/x-raw, width=(int)%d, height=(int)%d,"
-            " format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink"
-            % (cap_width, cap_height, framerate, flip, disp_width, disp_height)
-        )
+        self._open()
+        self._start()
 
-    try:
-        cap = cv2.VideoCapture(device)
-        assert cap.isOpened(), "video capture failed to initialize"
+    def _open(self):
+        try:
+            self.cap = cv2.VideoCapture(self.dev)
+            assert self.cap.isOpened(), "video capture failed to initialize"
 
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
 
-        return cap
+        except AssertionError:
+            gstreamer_pipeline = "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, " \
+                                 "format=(string)NV12, framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! " \
+                                 "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx ! videoconvert ! " \
+                                 "video/x-raw, format=(string)BGR ! appsink" \
+                                 % (1280, 720, 20, self.flip, self.width, self.height)
+            self.cap = cv2.VideoCapture(gstreamer_pipeline, cv2.CAP_GSTREAMER)
+            assert self.cap.isOpened(), "video capture failed to initialize"
 
-    except AssertionError:
-        cap = cv2.VideoCapture(_gstreamer_pipeline(disp_width=width, disp_height=height, flip=flip), cv2.CAP_GSTREAMER)
-        assert cap.isOpened(), "video capture failed to initialize"
-        return cap
+    def _start(self):
+        def grab_img(cam):
+            while cam.thread_running:
+                _, cam.img_handle = cam.cap.read()
+
+            cam.thread_running = False
+
+        assert not self.thread_running, "thread is already running"
+        self.thread_running = True
+        self.thread = threading.Thread(target=grab_img, args=(self,))
+        self.thread.start()
+
+    def read(self):
+        return self.img_handle
+
+    def release(self):
+        self.thread_running = False
+        self.thread.join()
+        self.cap.release()
 
 
 ################################ Graphics ###############################
