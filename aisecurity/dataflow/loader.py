@@ -49,6 +49,7 @@ def online_load(facenet, img_dir, people=None, **kwargs):
                 assert person.endswith("jpg") or person.endswith("png") and os.path.getsize(person) < 1e6
 
                 img = cv2.imread(os.path.join(img_dir, person))
+                print(kwargs)
                 embeds, __ = facenet.predict(img, **kwargs)
                 data[person.strip("jpg").strip("png")] = embeds.reshape(len(embeds), -1)
 
@@ -91,10 +92,10 @@ def dump_and_encrypt(data, dump_path, encrypt=None, mode="w+", **kwargs):
 def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None, full_overwrite=False, encrypt="all", **kwargs):
     if not full_overwrite:
         old_embeds = retrieve_embeds(retrieve_path if retrieve_path else dump_path)
-        new_embeds, no_faces = online_load(facenet, img_dir)
+        new_embeds, no_faces = online_load(facenet, img_dir, **kwargs)
         data = {**old_embeds, **new_embeds}
     else:
-        data, no_faces = online_load(facenet, img_dir)
+        data, no_faces = online_load(facenet, img_dir, **kwargs)
 
     encrypted_data = dump_and_encrypt(data, dump_path, encrypt=encrypt, **kwargs)
 

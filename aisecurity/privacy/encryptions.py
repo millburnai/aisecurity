@@ -79,7 +79,7 @@ def decrypt(cipher_text, position, key_file):
 
 
 # DATA ENCRYPTION
-def encrypt_data(data, ignore=None, decryptable=True, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS):
+def encrypt_data(data, ignore=None, decryptable=True, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS, **kwargs):
     if ignore is None:
         ignore = []
 

@@ -327,7 +327,7 @@ class FaceNet:
 
         return embeds.reshape(len(imgs), -1)
 
-    def predict(self, img, detector="both", margin=10, rotations=None):
+    def predict(self, img, detector="both", margin=10, rotations=None, **kwargs):
         """Embeds and normalizes an image from path or array
         :param img: image to be predicted on (BGR image)
         :param detector: face detector (either mtcnn, haarcascade, or None) (default: "both")
