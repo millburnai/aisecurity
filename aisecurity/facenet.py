@@ -203,13 +203,13 @@ class FaceNet:
         """
 
         person, embeddings = self._screen_data(person, embeddings)
-        embeddings = np.array(embeddings).reshape(len(embeddings), -1).tolist()
+        embeddings = np.array(embeddings).reshape(len(embeddings), -1)
 
         if not self.data:
             self._db = {}
 
         if person in self.data:
-            self._db[person].extend(embeddings)
+            self._db[person] = np.concatenate([embeddings, self._db[person]], axis=0)
         else:
             self._db[person] = embeddings
 
@@ -378,14 +378,7 @@ class FaceNet:
             rotations = [0.]
 
         try:
-            if "rotations" in self.data_cfg and self.data_cfg["rotations"]:
-                assert rotations == [0.], "rotations + config rotations not supported yet"
-                rotations = self.data_cfg["rotations"]
-                embeds, face = self.predict(img, detector, margin, rotations)
-                embeds = np.expand_dims(np.concatenate([embed for embed, _ in zip(embeds, rotations)], axis=-1), axis=0)
-            else:
-                embeds, face = self.predict(img, detector, margin, rotations)
-
+            embeds, face = self.predict(img, detector, margin, rotations)
             analysis = analyze_embeds(embeds)
 
             best_match = max(analysis["best_match"], key=analysis["best_match"].count)
