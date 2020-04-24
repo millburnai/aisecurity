@@ -6,6 +6,8 @@ Haarcascade or MTCNN face detection.
 
 """
 
+import os
+import sys
 from timeit import default_timer as timer
 
 import cv2
@@ -19,7 +21,8 @@ from aisecurity.utils.paths import CONFIG_HOME
 class FaceDetector:
 
     def __init__(self, mode, img_shape=(160, 160), alpha=0.9, **kwargs):
-        assert mode in ("both", "mtcnn", "haarcascade"), "supported modes are 'both', 'mtcnn', 'haarcascade')"
+        assert mode in ("both", "mtcnn", "haarcascade", "trt-mtcnn"), \
+            "supported modes are 'mtcnn', 'haarcascade', 'both', and 'trt-mtcnn')"
 
         self.mode = mode
         self.alpha = alpha
@@ -29,14 +32,32 @@ class FaceDetector:
         if "min_face_size" not in self.kwargs:
             self.kwargs["min_face_size"] = 20
 
+        self.haarcascade = cv2.CascadeClassifier(CONFIG_HOME + "/models/haarcascade_frontalface_default.xml")
+        # TODO: find out why haarcascade init is needed for trt-mtcnn to work (without it, camera won't read properly)
+
+        if mode == "trt-mtcnn":
+            MTCNN(min_face_size=int(self.kwargs["min_face_size"]))
+
+            trt_mtcnn_module = CONFIG_HOME + "/trt-mtcnn"
+            current_path = os.getcwd()
+
+            assert os.path.exists(trt_mtcnn_module), "trt-mtcnn not found"
+            sys.path.insert(0, trt_mtcnn_module)
+            os.chdir(trt_mtcnn_module)
+
+            from trt_mtcnn_main import TrtMTCNNWrapper
+            self.trt_mtcnn = TrtMTCNNWrapper()
+
+            os.chdir(current_path)
+
         if mode == "mtcnn" or mode == "both":
             self.mtcnn = MTCNN(min_face_size=int(self.kwargs["min_face_size"]))
 
-        if mode == "haarcascade" or mode == "both":
-            self.haarcascade = cv2.CascadeClassifier(CONFIG_HOME + "/models/haarcascade_frontalface_default.xml")
-
     def detect_faces(self, img):
         result = []
+
+        if self.mode == "trt-mtcnn":
+            result = self.trt_mtcnn.detect_faces(img, minsize=min(40, int(self.kwargs["min_face_size"])))
 
         if self.mode == "mtcnn" or self.mode == "both":
             result = self.mtcnn.detect_faces(img)
