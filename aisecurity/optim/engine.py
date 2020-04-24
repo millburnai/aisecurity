@@ -17,53 +17,41 @@ from aisecurity.utils.paths import CONFIG_HOME
 ################################ Setup ################################
 
 # AUTOINIT
-INIT_SUCCESS = True
-
 try:
     import pycuda.autoinit
     import pycuda.driver as cuda
 except (ModuleNotFoundError, ImportError) as e:  # don't know which exception
     warnings.warn("cannot import pycuda.autoinit or pycuda.driver: '{}'".format(e))
-    INIT_SUCCESS = False
 
 try:
     import tensorrt as trt
 except (ModuleNotFoundError, ImportError) as e:  # don't know which exception
     warnings.warn("cannot import tensorrt: '{}'".format(e))
-    INIT_SUCCESS = False
 
 
 ################################ CUDA Engine Manager ################################
 class CudaEngineManager:
     """Cuda engine management and interface with GPU using pycuda, trt"""
 
-    # CONSTANTS
-    CONSTANTS = {
-        "logger": None,
-        "dtype": None,
-        "max_batch_size": 1,
-        "max_workspace_size": 1 << 20,
-    }
-
-
     # INITS
-    def __init__(self, **kwargs):
+    def __init__(self, logger=None, dtype=None, max_batch_size=1, max_workspace_size=1 << 20):
         """Initializes CudaEngineManager
-        :param kwargs: overrides CudaEngineManager.CONSTANTS
+        :param logger: trt logger (default: trt.Logger(trt.Logger.ERROR))
+        :param dtype: trt dtype (default: trt.float32)
+        :param max_batch_size: max batch size (default: 1)
+        :param max_workspace_size: max workspace size (default: 1 << 20)
         """
 
-        # constants (have to be set here in case trt isn't imported)
-        self.CONSTANTS["logger"] = trt.Logger(trt.Logger.ERROR)
-        self.CONSTANTS["dtype"] = trt.float32
-
-        self.CONSTANTS = {**self.CONSTANTS, **kwargs}
+        self.logger = logger if logger else trt.Logger(trt.Logger.ERROR)
+        self.dtype = dtype if dtype else trt.float32
+        self.max_workspace_size = max_workspace_size
 
         # builder and netork
-        self.builder = trt.Builder(CudaEngineManager.CONSTANTS["logger"])
-        self.builder.max_batch_size = CudaEngineManager.CONSTANTS["max_batch_size"]
-        self.builder.max_workspace_size = CudaEngineManager.CONSTANTS["max_workspace_size"]
+        self.builder = trt.Builder(self.logger)
+        self.builder.max_batch_size = max_batch_size
+        self.builder.max_workspace_size = max_workspace_size
 
-        if self.CONSTANTS["dtype"] == trt.float16:
+        if self.dtype == trt.float16:
             self.builder.fp16_mode = True
 
         self.network = self.builder.create_network()
@@ -75,10 +63,10 @@ class CudaEngineManager:
 
         # determine dimensions and create page-locked memory buffers (i.e. won't be swapped to disk) to hold host i/o
         self.h_input = cuda.pagelocked_empty(
-            trt.volume(self.engine.get_binding_shape(0)), dtype=trt.nptype(self.CONSTANTS["dtype"])
+            trt.volume(self.engine.get_binding_shape(0)), dtype=trt.nptype(self.dtype)
         )
         self.h_output = cuda.pagelocked_empty(
-            trt.volume(self.engine.get_binding_shape(1)), dtype=trt.nptype(self.CONSTANTS["dtype"])
+            trt.volume(self.engine.get_binding_shape(1)), dtype=trt.nptype(self.dtype)
         )
 
         # allocate device memory for inputs and outputs
@@ -99,14 +87,14 @@ class CudaEngineManager:
         :returns: output array
         """
 
-        def buffer_ready(arr):
-            arr = arr.astype(trt.nptype(CudaEngineManager.CONSTANTS["dtype"]))
+        def buffer_ready(arr, dtype):
+            arr = arr.astype(dtype)
             arr = arr.transpose(0, 3, 1, 2).ravel()
             return arr
 
         outputs = np.empty((len(imgs), *self.h_output.shape))
         for idx, img in enumerate(np.expand_dims(imgs, axis=1)):
-            np.copyto(self.h_input, buffer_ready(img))
+            np.copyto(self.h_input, buffer_ready(img, trt.nptype(self.dtype)))
 
             cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
             self.context.execute_async(
@@ -126,7 +114,7 @@ class CudaEngineManager:
         :param engine_file: path to engine file
         """
 
-        with open(engine_file, "rb") as file, trt.Runtime(self.CONSTANTS["logger"]) as runtime:
+        with open(engine_file, "rb") as file, trt.Runtime(self.logger) as runtime:
             self.engine = runtime.deserialize_cuda_engine(file.read())
 
     @print_time("Engine building and serializing time")
@@ -149,7 +137,7 @@ class CudaEngineManager:
         parser.register_input(input_name, input_shape)
         parser.register_output(output_name)
 
-        parser.parse(uff_file, self.network, CudaEngineManager.CONSTANTS["dtype"])
+        parser.parse(uff_file, self.network, self.dtype)
 
         self.parser = parser
 
@@ -164,8 +152,7 @@ class CudaEngineManager:
         parser = trt.CaffeParser()
 
         model_tensors = parser.parse(
-            deploy=caffe_deploy_file, model=caffe_model_file, network=self.network,
-            dtype=CudaEngineManager.CONSTANTS["dtype"]
+            deploy=caffe_deploy_file, model=caffe_model_file, network=self.network, dtype=self.dtype
         )
 
         self.network.mark_output(model_tensors.find(output_name))
@@ -217,7 +204,7 @@ class CudaEngine:
         :param input_name: name of input
         :param output_name: name of output
         :param input_shape: input shape (channels first)
-        :param kwargs: overrides CudaEngineManager.CONSTANTS
+        :param kwargs: overrides CudaEngineManager settings
         """
 
         # engine
