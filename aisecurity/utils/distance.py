@@ -72,7 +72,7 @@ class DistMetric:
             calc=lambda a, b: cosine(a.flatten(), b.flatten())
         ),
         "zero": construct_dist(
-            norm=lambda x:x,
+            norm=lambda x: x,
             calc=lambda a, b: 0
         )
     }
