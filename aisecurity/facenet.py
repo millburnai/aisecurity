@@ -21,6 +21,7 @@ from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
 import threading
+from mtcnn import MTCNN
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
 from aisecurity.db import log, connection
@@ -362,17 +363,19 @@ class FaceNet:
         assert cropped_faces.shape[1:] == (*self.img_shape, 3), "no face detected"
 
         raw_embeddings = []
-        threads = []
-        for cropped_face in cropped_faces:
-            t = threading.Thread(target=self.embed, args=(np.expand_dims(normalize(cropped_face, mode=self.img_norm), axis=0), raw_embeddings,))
-            threads.append(t)
-            t.start()
-        for thread in threads:
-            thread.join()
 
-        raw_embeddings = np.array(raw_embeddings)
-
-        #raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
+        if rotations:
+            threads = []
+            for cropped_face in cropped_faces:
+                t = threading.Thread(target=self.embed, args=(np.expand_dims(normalize(cropped_face, mode=self.img_norm), axis=0), raw_embeddings,))
+                threads.append(t)
+                t.start()
+            for thread in threads:
+                thread.join()
+        
+        else:
+            raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
+        
         normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
 
         message = "{} vector{}".format(len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "")
@@ -467,7 +470,7 @@ class FaceNet:
 
 
         cap = Camera(device, self.width, self.height, flip)
-        detector = FaceDetector("both", self.img_shape, min_face_size=0.5 * (self.width + self.height) / 2)
+        mtcnn = MTCNN() #Why do we need this?
         # CAM LOOP
         while True:
             frame = cap.read()
