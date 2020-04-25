@@ -331,7 +331,7 @@ class FaceNet:
 
         return embeds.reshape(len(imgs), -1)
 
-    def predict(self, img, detector, margin=10, rotations=None):
+    def predict(self, img, detector, margin=10, rotations=None, use_threading=False):
         """Embeds and normalizes an image from path or array
         :param img: image to be predicted on (BGR image)
         :param detector: FaceDetector object
@@ -345,18 +345,20 @@ class FaceNet:
 
         assert cropped_faces.shape[1:] == (*self.img_shape, 3), "no face detected"
 
-        raw_embeddings, threads = [], []
+        raw_embeddings, threads, normalized_embeddings = [], [], None
+        
+        if use_threading:
+            for cropped_face in cropped_faces:
+                normalized_face = np.expand_dims(normalize(cropped_face, mode=self.img_norm), axis=0)
+                t = threading.Thread(target=lambda arg: raw_embeddings.append(self.embed(arg)), args=(normalized_face,))
+                threads.append(t)
+                t.start()
 
-        for cropped_face in cropped_faces:
-            normalized_face = np.expand_dims(normalize(cropped_face, mode=self.img_norm), axis=0)
-            t = threading.Thread(target=lambda arg: raw_embeddings.append(self.embed(arg)), args=(normalized_face,))
-            threads.append(t)
-            t.start()
+            for thread in threads:
+                thread.join()
 
-        for thread in threads:
-            thread.join()
-
-        normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
+        else:
+            normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
 
         message = "{} vector{}".format(len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "")
         print("Embedding time ({}): \033[1m{} ms\033[0m".format(message, round(1000. * (timer() - start), 2)))
