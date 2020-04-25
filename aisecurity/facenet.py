@@ -10,6 +10,7 @@ Reference paper: https://arxiv.org/pdf/1503.03832.pdf
 
 import json
 import os
+import threading
 from timeit import default_timer as timer
 import warnings
 
@@ -20,8 +21,6 @@ import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
-import threading
-from mtcnn import MTCNN
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
 from aisecurity.db import log, connection
@@ -44,7 +43,7 @@ class FaceNet:
     # INITS
     @print_time("Model load time")
     def __init__(self, model_path=DEFAULT_MODEL, data_path=DATABASE, sess=None, input_name=None, output_name=None,
-                 input_shape=None, width=360, height=640, resize=None, detector="both"):
+                 input_shape=None):
         """Initializes FaceNet object
         :param model_path: path to model (default: aisecurity.utils.paths.DEFAULT_MODEL)
         :param data_path: path to data(default: aisecurity.utils.paths.DATABASE)
@@ -55,7 +54,6 @@ class FaceNet:
         """
 
         assert os.path.exists(model_path), "{} not found".format(model_path)
-        print(data_path)
         assert not data_path or os.path.exists(data_path), "{} not found".format(data_path)
 
         if ".h5" in model_path:
@@ -69,7 +67,7 @@ class FaceNet:
 
         self.img_norm = self.MODELS["_default"]["img_norm"]
         for model in self.MODELS:
-            if model_path[model_path.rfind("/")+1:model_path.rfind(".")] in model:
+            if model_path[model_path.rfind("/") + 1:model_path.rfind(".")] in model:
                 self.img_norm = self.MODELS[model]["img_norm"]
 
         self._db = {}
@@ -80,17 +78,6 @@ class FaceNet:
         else:
             warnings.warn("data not set. Set it manually with set_data to use FaceNet")
         self.set_dist_metric("auto")
-
-        self.width = width
-        self.height = height
-
-        if resize:
-            assert 0. <= resize <= 1., "resize must be in [0., 1.]"
-            face_width, face_height = width * resize, height * resize
-        else:
-            face_width, face_height = width, height
-
-        self.detector = FaceDetector(detector, self.img_shape, min_face_size=0.5 * (face_width + face_height) / 2)
 
     # KERAS INIT
     def _keras_init(self, filepath):
@@ -348,7 +335,7 @@ class FaceNet:
 
         return embeds.reshape(len(imgs), -1)
 
-    def predict(self, img, margin=10, rotations=None):
+    def predict(self, img, detector, margin=10, rotations=None):
         """Embeds and normalizes an image from path or array
         :param img: image to be predicted on (BGR image)
         :param detector: FaceDetector object
@@ -357,7 +344,7 @@ class FaceNet:
         :returns: normalized embeddings, facial coordinates
         """
 
-        cropped_faces, face_coords = self.detector.crop_face(img, margin, rotations)
+        cropped_faces, face_coords = detector.crop_face(img, margin, rotations)
         start = timer()
 
         assert cropped_faces.shape[1:] == (*self.img_shape, 3), "no face detected"
@@ -436,9 +423,9 @@ class FaceNet:
 
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, dist_metric=None, logging=None, dynamic_log=False, pbar=False,
-                            flip=0, data_mutable=False, socket=None, rotations=None,
-                            device=0, resize=None):
+    def real_time_recognize(self, width=640, height=360, dist_metric=None, logging=None, dynamic_log=False, pbar=False,
+                            resize=None, flip=0, detector="both", data_mutable=False, socket=None, rotations=None,
+                            device=0):
         """Real-time facial recognition
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
@@ -464,13 +451,18 @@ class FaceNet:
             connection.init(socket)
         if pbar:
             lcd.init()
+        if resize:
+            assert 0. <= resize <= 1., "resize must be in [0., 1.]"
+            face_width, face_height = width * resize, height * resize
+        else:
+            face_width, face_height = width, height
+
+        cap = Camera(device, width, height, flip)
+        detector = FaceDetector(detector, self.img_shape, min_face_size=0.5 * (face_width + face_height) / 2)
 
         absent_frames = 0
         frames = 0
 
-
-        cap = Camera(device, self.width, self.height, flip)
-        mtcnn = MTCNN() #Why do we need this?
         # CAM LOOP
         while True:
             frame = cap.read()
@@ -480,11 +472,11 @@ class FaceNet:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
             # facial detection and recognition
-            embed, is_recognized, best_match, dist, face, elapsed = self.recognize(frame, rotations=rotations)
+            embed, is_recognized, best_match, dist, face, elapsed = self.recognize(frame, detector, rotations=rotations)
 
             # graphics, logging, lcd, etc.
             absent_frames += self.log_activity(best_match, embed, dynamic_log, data_mutable, pbar, dist, absent_frames)
-            add_graphics(original_frame, face, self.width, self.height, is_recognized, best_match, resize, elapsed)
+            add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
 
             cv2.imshow("AI Security v0.9a", original_frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
