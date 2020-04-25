@@ -39,17 +39,14 @@ class FaceDetector:
             # TODO: find out why mtcnn init is needed for trt-mtcnn to work (without it, camera won't read properly)
 
         if mode == "trt-mtcnn":
-            trt_mtcnn_module = CONFIG_HOME + "/trt-mtcnn"
-            current_path = os.getcwd()
+            trt_mtcnn_module = os.path.join(CONFIG_HOME, "trt-mtcnn")
+            engine_paths = [os.path.join(trt_mtcnn_module, "mtcnn/det{}.engine").format(net + 1) for net in range(3)]
 
-            assert os.path.exists(trt_mtcnn_module), "trt-mtcnn not found"
+            assert all(os.path.exists(net) for net in engine_paths), "trt-mtcnn engines not found"
             sys.path.insert(0, trt_mtcnn_module)
-            os.chdir(trt_mtcnn_module)
 
             from trt_mtcnn_main import TrtMTCNNWrapper
-            self.trt_mtcnn = TrtMTCNNWrapper()
-
-            os.chdir(current_path)
+            self.trt_mtcnn = TrtMTCNNWrapper(*engine_paths)
 
     def detect_faces(self, img):
         result = []
