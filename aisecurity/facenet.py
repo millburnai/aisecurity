@@ -20,6 +20,7 @@ import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
+import threading
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
 from aisecurity.db import log, connection
@@ -326,7 +327,7 @@ class FaceNet:
             graph_def.ParseFromString(graph_file.read())
         return graph_def
 
-    def embed(self, imgs):
+    def embed(self, imgs, array=None):
         """Embeds cropped face
         :param imgs: list of cropped faces with shape (batch_size, h, w, 3)
         :returns: embedding as array with shape (1, -1)
@@ -339,6 +340,10 @@ class FaceNet:
             embeds = self.sess.run(output_tensor, feed_dict={self.input_name: imgs})
         elif self.MODE == "trt":
             embeds = self.facenet.inference(imgs)
+
+        if isinstance(array, list): 
+            array.append(embeds)
+            return
 
         return embeds.reshape(len(imgs), -1)
 
@@ -356,7 +361,18 @@ class FaceNet:
 
         assert cropped_faces.shape[1:] == (*self.img_shape, 3), "no face detected"
 
-        raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
+        raw_embeddings = []
+        threads = []
+        for cropped_face in cropped_faces:
+            t = threading.Thread(target=self.embed, args=(np.expand_dims(normalize(cropped_face, mode=self.img_norm), axis=0), raw_embeddings,))
+            threads.append(t)
+            t.start()
+        for thread in threads:
+            thread.join()
+
+        raw_embeddings = np.array(raw_embeddings)
+
+        #raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
         normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
 
         message = "{} vector{}".format(len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "")
@@ -419,7 +435,7 @@ class FaceNet:
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, dist_metric=None, logging=None, dynamic_log=False, pbar=False,
                             flip=0, data_mutable=False, socket=None, rotations=None,
-                            device=0):
+                            device=0, resize=None):
         """Real-time facial recognition
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
@@ -449,10 +465,12 @@ class FaceNet:
         absent_frames = 0
         frames = 0
 
+
         cap = Camera(device, self.width, self.height, flip)
+        detector = FaceDetector("both", self.img_shape, min_face_size=0.5 * (self.width + self.height) / 2)
         # CAM LOOP
         while True:
-            frame = self.cap.read()
+            frame = cap.read()
             original_frame = frame.copy()
 
             if resize:
@@ -463,7 +481,7 @@ class FaceNet:
 
             # graphics, logging, lcd, etc.
             absent_frames += self.log_activity(best_match, embed, dynamic_log, data_mutable, pbar, dist, absent_frames)
-            add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
+            add_graphics(original_frame, face, self.width, self.height, is_recognized, best_match, resize, elapsed)
 
             cv2.imshow("AI Security v0.9a", original_frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
