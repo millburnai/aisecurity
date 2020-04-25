@@ -337,6 +337,7 @@ class FaceNet:
         :param detector: FaceDetector object
         :param margin: margin for MTCNN face cropping (default: 10)
         :param rotations: array of rotations to be applied to face (default: None)
+        :param use_threading: use threading for embed or not (default: False)
         :returns: normalized embeddings, facial coordinates
         """
 
@@ -345,9 +346,8 @@ class FaceNet:
 
         assert cropped_faces.shape[1:] == (*self.img_shape, 3), "no face detected"
 
-        raw_embeddings, threads, normalized_embeddings = [], [], None
-        
         if use_threading:
+            raw_embeddings, threads = [], []
             for cropped_face in cropped_faces:
                 normalized_face = np.expand_dims(normalize(cropped_face, mode=self.img_norm), axis=0)
                 t = threading.Thread(target=lambda arg: raw_embeddings.append(self.embed(arg)), args=(normalized_face,))
@@ -358,7 +358,9 @@ class FaceNet:
                 thread.join()
 
         else:
-            normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
+            raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
+
+        normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
 
         message = "{} vector{}".format(len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "")
         print("Embedding time ({}): \033[1m{} ms\033[0m".format(message, round(1000. * (timer() - start), 2)))
@@ -393,11 +395,16 @@ class FaceNet:
             embeds, face = self.predict(img, *args, **kwargs)
             analysis = analyze_embeds(embeds)
 
-            best_match = max(analysis["best_match"], key=analysis["best_match"].count)
+            if len(embeds) > 1:
+                best_match = max(analysis["best_match"], key=analysis["best_match"].count)
 
-            best_match_idxs = [idx for idx, person in enumerate(analysis["best_match"]) if person == best_match]
-            min_index = min(best_match_idxs, key=lambda idx: analysis["dists"][idx])
-            # index associated with minimum distance best_match embedding
+                best_match_idxs = [idx for idx, person in enumerate(analysis["best_match"]) if person == best_match]
+                min_index = min(best_match_idxs, key=lambda idx: analysis["dists"][idx])
+                # index associated with minimum distance best_match embedding
+
+            else:
+                best_match = analysis["best_match"][0]
+                min_index = 0
 
             embed = embeds[min_index]
             dist = analysis["dists"][min_index]
