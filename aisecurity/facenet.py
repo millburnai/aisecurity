@@ -315,7 +315,7 @@ class FaceNet:
             graph_def.ParseFromString(graph_file.read())
         return graph_def
 
-    def embed(self, imgs, array=None):
+    def embed(self, imgs):
         """Embeds cropped face
         :param imgs: list of cropped faces with shape (batch_size, h, w, 3)
         :returns: embedding as array with shape (1, -1)
@@ -328,10 +328,6 @@ class FaceNet:
             embeds = self.sess.run(output_tensor, feed_dict={self.input_name: imgs})
         elif self.MODE == "trt":
             embeds = self.facenet.inference(imgs)
-
-        if isinstance(array, list): 
-            array.append(embeds)
-            return
 
         return embeds.reshape(len(imgs), -1)
 
@@ -349,20 +345,17 @@ class FaceNet:
 
         assert cropped_faces.shape[1:] == (*self.img_shape, 3), "no face detected"
 
-        raw_embeddings = []
+        raw_embeddings, threads = [], []
 
-        if rotations:
-            threads = []
-            for cropped_face in cropped_faces:
-                t = threading.Thread(target=self.embed, args=(np.expand_dims(normalize(cropped_face, mode=self.img_norm), axis=0), raw_embeddings,))
-                threads.append(t)
-                t.start()
-            for thread in threads:
-                thread.join()
-        
-        else:
-            raw_embeddings = np.expand_dims(self.embed(normalize(cropped_faces, mode=self.img_norm)), axis=1)
-        
+        for cropped_face in cropped_faces:
+            normalized_face = np.expand_dims(normalize(cropped_face, mode=self.img_norm), axis=0)
+            t = threading.Thread(target=lambda arg: raw_embeddings.append(self.embed(arg)), args=(normalized_face,))
+            threads.append(t)
+            t.start()
+
+        for thread in threads:
+            thread.join()
+
         normalized_embeddings = self.dist_metric.apply_norms(*raw_embeddings)
 
         message = "{} vector{}".format(len(normalized_embeddings), "s" if len(normalized_embeddings) > 1 else "")
