@@ -14,17 +14,14 @@ from aisecurity.utils.paths import DEFAULT_MODEL
 
 
 def demo(path=DEFAULT_MODEL, dist_metric="zero", logging=None, dynamic_log=True,  pbar=False, resize=None, flip=0,
-         detector="both", data_mutable=True, socket="ws://67.205.155.37:8000/v1/nano", rotations=None, device=0,
-         allow_gpu_growth=False):
-
-    if allow_gpu_growth:
-        tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
+         detector="mtcnn+haarcascade", data_mutable=True, socket="ws://67.205.155.37:8000/v1/nano", rotations=None,
+         device=0, allow_gpu_growth=False):
 
     # demo
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
     cprint("...", attrs=["bold", "blink"])
 
-    facenet = FaceNet(path)
+    facenet = FaceNet(path, allow_gpu_growth=allow_gpu_growth)
 
     input("\nPress ENTER to continue:")
 
@@ -68,7 +65,8 @@ if __name__ == "__main__":
     parser.add_argument("--pbar", help="use this flag to use progress bar", action="store_true")
     parser.add_argument("--flip", help="flip method: +1 = +90º rotation (default: 0)", type=to_int, default=0)
     parser.add_argument("--resize", help="resize frame for faster runtime (default: None)", type=float, default=None)
-    parser.add_argument("--detector", help="type of face detector (default: both)", type=str, default="both")
+    parser.add_argument("--detector", help="type of face detector (default: mtcnn+haarcascade)", type=str,
+                        default="mtcnn+haarcascade")
     parser.add_argument("--data_mutable", help="use this flag to allow a mutable db", action="store_true")
     parser.add_argument("--socket", help="websocket address (default: None)", type=str, default=None)
     parser.add_argument("--rotations", help="rotations to be applied to face (-1 is horizontal flip) (default: None)",

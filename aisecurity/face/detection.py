@@ -20,11 +20,12 @@ from aisecurity.utils.paths import CONFIG_HOME
 # FACE DETECTION
 class FaceDetector:
 
-    def __init__(self, mode, img_shape=(160, 160), alpha=0.9, **kwargs):
-        assert mode in ("both", "mtcnn", "haarcascade", "trt-mtcnn"), \
-            "supported modes are 'mtcnn', 'haarcascade', 'both', and 'trt-mtcnn')"
+    MODES = ["mtcnn", "haarcascade", "trt-mtcnn"]
 
-        self.mode = mode
+    def __init__(self, mode, img_shape=(160, 160), alpha=0.9, **kwargs):
+        assert any(det in mode for det in self.MODES), "supported modes are 'mtcnn', 'haarcascade', and 'trt-mtcnn'"
+
+        self.mode =  mode
         self.alpha = alpha
         self.img_shape = tuple(img_shape)
         self.kwargs = kwargs
@@ -32,13 +33,10 @@ class FaceDetector:
         if "min_face_size" not in self.kwargs:
             self.kwargs["min_face_size"] = 20
 
-        self.haarcascade = cv2.CascadeClassifier(CONFIG_HOME + "/models/haarcascade_frontalface_default.xml")
-
-        if mode != "haarcascade":
+        if "mtcnn" in mode:
             self.mtcnn = MTCNN(min_face_size=self.kwargs["min_face_size"])
-            # TODO: find out why mtcnn init is needed for trt-mtcnn to work (without it, camera won't read properly)
 
-        if mode == "trt-mtcnn":
+        if "trt-mtcnn" in mode:
             trt_mtcnn_module = os.path.join(CONFIG_HOME, "trt-mtcnn")
             engine_paths = [os.path.join(trt_mtcnn_module, "mtcnn/det{}.engine").format(net + 1) for net in range(3)]
 
@@ -48,16 +46,19 @@ class FaceDetector:
             from trt_mtcnn_main import TrtMTCNNWrapper
             self.trt_mtcnn = TrtMTCNNWrapper(*engine_paths)
 
+        if "haarcascade" in mode:
+            self.haarcascade = cv2.CascadeClassifier(CONFIG_HOME + "/models/haarcascade_frontalface_default.xml")
+
     def detect_faces(self, img):
         result = []
 
-        if self.mode == "trt-mtcnn":
+        if "trt-mtcnn" in self.mode:
             result = self.trt_mtcnn.detect_faces(img, minsize=max(40, int(self.kwargs["min_face_size"])))
 
-        if self.mode == "mtcnn" or self.mode == "both":
+        if "mtcnn" in self.mode and "trt-mtcnn" not in self.mode:
             result = self.mtcnn.detect_faces(img)
 
-        if self.mode == "haarcascade" or (self.mode == "both" and (not result or result[0]["confidence"] < self.alpha)):
+        if "haarcascade" in self.mode and (not result or result[0]["confidence"] < self.alpha):
             min_face_size = int(self.kwargs["min_face_size"])
             faces = self.haarcascade.detectMultiScale(img, scaleFactor=1.1, minSize=(min_face_size, min_face_size))
 
