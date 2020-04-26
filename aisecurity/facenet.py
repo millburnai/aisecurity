@@ -16,7 +16,6 @@ import warnings
 
 import cv2
 import keras
-from keras import backend as K
 import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
@@ -42,24 +41,29 @@ class FaceNet:
 
     # INITS
     @print_time("Model load time")
-    def __init__(self, model_path=DEFAULT_MODEL, data_path=DATABASE, sess=None, input_name=None, output_name=None,
-                 input_shape=None):
+    def __init__(self, model_path=DEFAULT_MODEL, data_path=DATABASE, input_name=None, output_name=None,
+                 input_shape=None, allow_gpu_growth=False):
         """Initializes FaceNet object
         :param model_path: path to model (default: aisecurity.utils.paths.DEFAULT_MODEL)
         :param data_path: path to data(default: aisecurity.utils.paths.DATABASE)
-        :param sess: tf.Session to use (default: None)
         :param input_name: name of input tensor-- only required if using TF/TRT non-default model (default: None)
         :param output_name: name of output tensor-- only required if using TF/TRT non-default model (default: None)
         :param input_shape: input shape-- only required if using TF/TRT non-default model (default: None)
+        :param allow_gpu_growth: allow GPU growth via tf.ConfigProto + tf.GPUOptions or not (default: False)
         """
 
         assert os.path.exists(model_path), "{} not found".format(model_path)
         assert not data_path or os.path.exists(data_path), "{} not found".format(data_path)
 
+        if allow_gpu_growth or ".engine" in model_path:
+            # https://stackoverflow.com/questions/58756919/python-tensorrt-cudnn-status-mapping-error-error
+            self.sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True)))
+            self.sess.__enter__()
+
         if ".h5" in model_path:
             self._keras_init(model_path)
         elif ".pb" in model_path:
-            self._tf_init(model_path, input_name, output_name, sess, input_shape)
+            self._tf_init(model_path, input_name, output_name, input_shape)
         elif ".engine" in model_path:
             self._trt_init(model_path, input_name, output_name, input_shape)
         else:
@@ -93,29 +97,20 @@ class FaceNet:
 
 
     # TENSORFLOW INIT
-    def _tf_init(self, filepath, input_name, output_name, sess, input_shape):
+    def _tf_init(self, filepath, input_name, output_name, input_shape):
         """Initializes a TensorFlow model
         :param filepath: path to model (.pb)
         :param input_name: name of input tensor
         :param output_name: name of output tensor
-        :param sess: tf.Session to enter
         :param input_shape: input shape for facenet
         """
 
         self.MODE = "tf"
 
         graph_def = self.get_frozen_graph(filepath)
-
-        if sess:
-            self.sess = sess
-            K.set_session(self.sess)
-        else:
-            self.sess = K.get_session()
-
         tf.import_graph_def(graph_def, name="")
 
         self._tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
-
         self.facenet = self.sess.graph
 
         try:
@@ -165,10 +160,7 @@ class FaceNet:
         self.MODE = "trt"
 
         try:
-            # https://stackoverflow.com/questions/58756919/python-tensorrt-cudnn-status-mapping-error-error
-            tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))).__enter__()
             self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
-
         except NameError:
             raise ValueError("tensorrt or pycuda import failed: trt mode not available")
 
@@ -426,8 +418,8 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric=None, logging=None, dynamic_log=False, pbar=False,
-                            resize=None, flip=0, detector="both", data_mutable=False, socket=None, rotations=None,
-                            device=0):
+                            resize=None, flip=0, detector="mtcnn+haarcascade", data_mutable=False, socket=None,
+                            rotations=None, device=0):
         """Real-time facial recognition
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
@@ -437,7 +429,7 @@ class FaceNet:
         :param pbar: use progress bar or not. If Pi isn't reachable, will default to LCD simulation (default: False)
         :param resize: resize scale (float between 0. and 1.) (default: None)
         :param flip: flip method: +1 = +90º rotation (default: 0)
-        :param detector: face detector type ("mtcnn", "haarcascade", "both") (default: "both")
+        :param detector: face detector type ("mtcnn", "haarcascade", "trt-mtcnn") (default: "mtcnn+haarcascade")
         :param data_mutable: if true, prompt for verification on recognition and update database (default: False)
         :param socket: socket address (dev only)
         :param rotations: rotations to be applied to face (-1 is horizontal flip) (default: None)
@@ -460,7 +452,7 @@ class FaceNet:
             face_width, face_height = width, height
 
         cap = Camera(device, width, height, flip)
-        detector = FaceDetector(detector, self.img_shape, min_face_size=0.5 * (face_width + face_height) / 2)
+        detector = FaceDetector(detector, self.img_shape, min_face_size=0.5*(face_width+face_height)/2)
 
         absent_frames = 0
         frames = 0
