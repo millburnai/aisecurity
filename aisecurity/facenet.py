@@ -418,8 +418,7 @@ class FaceNet:
 
     # REAL-TIME FACIAL RECOGNITION
     def real_time_recognize(self, width=640, height=360, dist_metric=None, logging=None, dynamic_log=False, pbar=False,
-                            resize=None, flip=0, detector="mtcnn+haarcascade", data_mutable=False, socket=None,
-                            rotations=None, device=0):
+                            resize=None, detector="mtcnn+haarcascade", data_mutable=False, socket=None, rotations=None):
         """Real-time facial recognition
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
@@ -428,12 +427,10 @@ class FaceNet:
         :param dynamic_log: use dynamic database for visitors or not (default: False)
         :param pbar: use progress bar or not. If Pi isn't reachable, will default to LCD simulation (default: False)
         :param resize: resize scale (float between 0. and 1.) (default: None)
-        :param flip: flip method: +1 = +90º rotation (default: 0)
         :param detector: face detector type ("mtcnn", "haarcascade", "trt-mtcnn") (default: "mtcnn+haarcascade")
         :param data_mutable: if true, prompt for verification on recognition and update database (default: False)
         :param socket: socket address (dev only)
         :param rotations: rotations to be applied to face (-1 is horizontal flip) (default: None)
-        :param device: video file to read from (passing an int will use /dev/video{device}) (default: 0)
         """
 
         # INITS
@@ -451,7 +448,7 @@ class FaceNet:
         else:
             face_width, face_height = width, height
 
-        cap = Camera(device, width, height, flip)
+        cap = Camera(width, height)
         detector = FaceDetector(detector, self.img_shape, min_face_size=0.5*(face_width+face_height)/2)
 
         absent_frames = 0

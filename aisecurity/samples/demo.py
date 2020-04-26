@@ -6,16 +6,15 @@ Demonstration of facial recognition system.
 
 """
 
-import tensorflow as tf
 from termcolor import cprint
 
 from aisecurity.facenet import FaceNet
 from aisecurity.utils.paths import DEFAULT_MODEL
 
 
-def demo(path=DEFAULT_MODEL, dist_metric="zero", logging=None, dynamic_log=True,  pbar=False, resize=None, flip=0,
+def demo(path=DEFAULT_MODEL, dist_metric="zero", logging=None, dynamic_log=True,  pbar=False, resize=None,
          detector="mtcnn+haarcascade", data_mutable=True, socket="ws://67.205.155.37:8000/v1/nano", rotations=None,
-         device=0, allow_gpu_growth=False):
+         allow_gpu_growth=False):
 
     # demo
     cprint("\nLoading facial recognition system", attrs=["bold"], end="")
@@ -26,8 +25,8 @@ def demo(path=DEFAULT_MODEL, dist_metric="zero", logging=None, dynamic_log=True,
     input("\nPress ENTER to continue:")
 
     facenet.real_time_recognize(
-        dist_metric=dist_metric, logging=logging, dynamic_log=dynamic_log, resize=resize, pbar=pbar, flip=flip,
-        detector=detector, data_mutable=data_mutable, socket=socket, rotations=rotations, device=device
+        dist_metric=dist_metric, logging=logging, dynamic_log=dynamic_log, resize=resize, pbar=pbar, detector=detector,
+        data_mutable=data_mutable, socket=socket, rotations=rotations
     )
 
 
@@ -79,6 +78,6 @@ if __name__ == "__main__":
     # DEMO
     demo(
         path=args.path_to_model, dist_metric=args.dist_metric, logging=args.logging, dynamic_log=args.dynamic_log,
-        pbar=args.pbar,  flip=args.flip, resize=args.resize, detector=args.detector, data_mutable=args.data_mutable,
-        socket=args.socket, rotations=args.rotations, device=args.device, allow_gpu_growth=args.allow_gpu_growth
+        pbar=args.pbar, resize=args.resize, detector=args.detector, data_mutable=args.data_mutable, socket=args.socket,
+        rotations=args.rotations, allow_gpu_growth=args.allow_gpu_growth
     )

@@ -16,11 +16,10 @@ import numpy as np
 class Camera:
     # https://github.com/jkjung-avt/tensorrt_demos/blob/master/utils/camera.py
 
-    def __init__(self, dev=0, width=640, height=360, flip=0):
-        self.dev = dev
+    def __init__(self, width=640, height=360, dev=0):
         self.width = width
         self.height = height
-        self.flip = flip
+        self.dev = dev
 
         self.thread_running = False
         self.img_handle = None
@@ -38,11 +37,10 @@ class Camera:
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
 
         except AssertionError:
-            gstreamer_pipeline = "nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, " \
-                                 "format=(string)NV12, framerate=(fraction)%d/1 ! nvvidconv flip-method=%d ! " \
-                                 "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx ! videoconvert ! " \
-                                 "video/x-raw, format=(string)BGR ! appsink" \
-                                 % (1280, 720, 20, self.flip, self.width, self.height)
+            gstreamer_pipeline = ("nvarguscamerasrc ! video/x-raw(memory:NVMM), width=(int)1280, height=(int)720, "
+                                  "format=(string)NV12, framerate=(fraction)30/1 ! nvvidconv flip-method=2 ! "
+                                  "video/x-raw, width=(int){}, height=(int){}, format=(string)BGRx ! videoconvert ! "
+                                  "video/x-raw, format=(string)BGR ! appsink").format(self.width, self.height)
             self.cap = cv2.VideoCapture(gstreamer_pipeline, cv2.CAP_GSTREAMER)
             assert self.cap.isOpened(), "video capture failed to initialize"
 
