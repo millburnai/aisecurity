@@ -123,19 +123,21 @@ class CudaEngineManager:
         self.engine = self.builder.build_cuda_engine(self.network).serialize()
 
     @print_time(".uff model parsing time")
-    def parse_uff(self, uff_file, input_name, input_shape, output_name):
+    def parse_uff(self, uff_file, input_name, input_shape, output_names):
         """Parses .uff file and prepares for serialization
         :param uff_file: path to uff model
         :param input_name: name of input
         :param input_shape: input shape (channels first)
-        :param output_name: name of output
+        :param output_name: name of outputs
         """
 
         parser = trt.UffParser()
 
         # input shape must always be channels-first
         parser.register_input(input_name, input_shape)
-        parser.register_output(output_name)
+
+        for output in output_names:
+            parser.register_output(output)
 
         parser.parse(uff_file, self.network, self.dtype)
 
@@ -160,16 +162,16 @@ class CudaEngineManager:
 
         self.parser = parser
 
-    def uff_write_cuda_engine(self, uff_file, target_file, input_name, input_shape, output_name):
+    def uff_write_cuda_engine(self, uff_file, target_file, input_name, input_shape, output_names):
         """Parses a uff model and writes it as a serialized cuda engine
         :param uff_file: uff filepath
         :param target_file: target filepath for engine
         :param input_name: name of input
         :param input_shape: input shape (channels first)
-        :param output_name: name of output
+        :param output_names: name of outputs
         """
 
-        self.parse_uff(uff_file, input_name, input_shape, output_name)
+        self.parse_uff(uff_file, input_name, input_shape, output_names)
         self.build_and_serialize_engine()
 
         with open(target_file, "wb") as file:
