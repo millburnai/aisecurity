@@ -142,11 +142,11 @@ class CudaEngineManager:
         self.parser = parser
 
     @print_time(".caffe model parsing time")
-    def parse_caffe(self, caffe_model_file, caffe_deploy_file, output_name="prob1"):
+    def parse_caffe(self, caffe_model_file, caffe_deploy_file, output_names):
         """Parses caffe model file and prepares for serialization
         :param caffe_model_file: path to caffe model file
         :param caffe_deploy_file: path to caffe deploy file
-        :param output_name: output name
+        :param output_names: output names
         """
 
         parser = trt.CaffeParser()
@@ -155,7 +155,8 @@ class CudaEngineManager:
             deploy=caffe_deploy_file, model=caffe_model_file, network=self.network, dtype=self.dtype
         )
 
-        self.network.mark_output(model_tensors.find(output_name))
+        for output in output_names:
+            self.network.mark_output(model_tensors.find(output))
 
         self.parser = parser
 
@@ -174,15 +175,15 @@ class CudaEngineManager:
         with open(target_file, "wb") as file:
             file.write(self.engine)
 
-    def caffe_write_cuda_engine(self, caffe_model_file, caffe_deploy_file, output_name, target_file):
+    def caffe_write_cuda_engine(self, caffe_model_file, caffe_deploy_file, output_names, target_file):
         """Parses a caffe model and writes it as a serialized cuda engine
         :param caffe_model_file: path to caffe model
         :param caffe_deploy_file: path to caffe deploy file
-        :param output_name: name of output
+        :param output_names: name of outputs
         :param target_file: target filepath for engine
         """
 
-        self.parse_caffe(caffe_model_file, caffe_deploy_file, output_name)
+        self.parse_caffe(caffe_model_file, caffe_deploy_file, output_names)
         self.build_and_serialize_engine()
 
         with open(target_file, "wb") as file:
