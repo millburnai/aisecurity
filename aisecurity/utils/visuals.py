@@ -128,7 +128,7 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
 
         x, y = 10, 20
         font = cv2.FONT_HERSHEY_DUPLEX
-        rgb = [255. - np.mean(frame[:x, :y])] * 3
+        rgb = [255 * round((255 - np.mean(frame[:x, :y])) / 255)] * 3
 
         cv2.putText(frame, text, (x, y), font, font_size, rgb, thickness)
 

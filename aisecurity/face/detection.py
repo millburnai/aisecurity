@@ -25,7 +25,7 @@ class FaceDetector:
     def __init__(self, mode, img_shape=(160, 160), alpha=0.9, **kwargs):
         assert any(det in mode for det in self.MODES), "supported modes are 'mtcnn', 'haarcascade', and 'trt-mtcnn'"
 
-        self.mode =  mode
+        self.mode = mode
         self.alpha = alpha
         self.img_shape = tuple(img_shape)
         self.kwargs = kwargs

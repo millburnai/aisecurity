@@ -20,7 +20,7 @@ import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
-from keras import  backend as K
+from keras import backend as K
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
 from aisecurity.db import log, connection
@@ -436,6 +436,8 @@ class FaceNet:
         :param rotations: rotations to be applied to face (-1 is horizontal flip) (default: None)
         """
 
+        start = timer()
+
         # INITS
         assert self._db, "data must be provided"
         log.init(logging, flush=True)
@@ -480,6 +482,9 @@ class FaceNet:
 
         cap.release()
         cv2.destroyAllWindows()
+
+        elapsed = timer() - start
+        print("{} ms elapsed, {} frames = {} fps".format(round(elapsed * 1000., 2), frames, round(frames / elapsed, 2)))
 
         return frames
 
