@@ -20,6 +20,7 @@ import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
 from termcolor import cprint
+from keras import  backend as K
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
 from aisecurity.db import log, connection
@@ -108,6 +109,8 @@ class FaceNet:
         self.MODE = "tf"
 
         graph_def = self.get_frozen_graph(filepath)
+        self.sess = K.get_session()
+
         tf.import_graph_def(graph_def, name="")
 
         self._tensor_init(model_name=filepath, input_name=input_name, output_name=output_name)
