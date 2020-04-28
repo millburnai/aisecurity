@@ -436,8 +436,6 @@ class FaceNet:
         :param rotations: rotations to be applied to face (-1 is horizontal flip) (default: None)
         """
 
-        start = timer()
-
         # INITS
         assert self._db, "data must be provided"
         log.init(logging, flush=True)
@@ -458,6 +456,7 @@ class FaceNet:
 
         absent_frames = 0
         frames = 0
+        start = timer()
 
         # CAM LOOP
         while True:
