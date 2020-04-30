@@ -60,13 +60,15 @@ class LCDProgressBar:
 # LCDProgressBar + logging
 class LoggingLCDProgressBar(LCDProgressBar):
 
-    def __init__(self, websocket=None):
-        self.pbar = LCDProgressBar(mode="pi", total=log.THRESHOLDS["num_recognized"], websocket=websocket)
+    def __init__(self, logger, websocket):
+        self.logger = logger
+
+        self.pbar = LCDProgressBar(mode="pi", total=self.logger.num_recognized, websocket=websocket)
         self.pbar.set_message("Loading...\n[ Initializing ]")
 
     def check_clear(self):
-        lcd_clear = log.THRESHOLDS["num_recognized"] / log.THRESHOLDS["missed_frames"]
-        if log.LAST_LOGGED - timer() > lcd_clear or log.UNK_LAST_LOGGED - timer() > lcd_clear:
+        lcd_clear = self.logger.num_recognized / self.logger.missed_frames
+        if self.logger.last_logged - timer() > lcd_clear or self.logger.unk_last_logged - timer() > lcd_clear:
             self.pbar.reset()
 
     def update_progress(self, update_recognized):

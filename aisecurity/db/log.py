@@ -14,223 +14,195 @@ from termcolor import cprint
 from aisecurity.utils.paths import config_home, config
 
 
-################################ FaceNet ###############################
+################################ Logging class ###############################
+class Logger:
 
-# SETUP
-THRESHOLDS = {
-    "num_recognized": 3,
-    "num_unknown": 3,
-    "percent_diff": 0.2,
-    "cooldown": 5.,
-    "missed_frames": 10,
-}
+    # INIT
+    def __init__(self, mode, num_recognized=3, num_unknown=3, percent_diff=0.2, cooldown=5., missed_frames=10):
+        # database init
+        self.mode = mode
 
-MODE = None
+        if self.mode == "mysql":
+            try:
+                self._db = mysql.connector.connect(
+                    host="localhost",
+                    user=config["mysql_user"],
+                    passwd=config["mysql_password"],
+                    database="Log"
+                )
+                self._cursor = self._db.cursor()
 
-DATABASE = None
-CURSOR = None
-FIREBASE = None
+                self._cursor.execute("USE Log;")
+                self._db.commit()
 
-NUM_RECOGNIZED, NUM_UNKNOWN = 0, 0
-LAST_LOGGED, UNK_LAST_LOGGED = None, None
-LOG, DISTS = {"current": {}, "logged": {}}, []
+            except (mysql.connector.errors.DatabaseError, mysql.connector.errors.InterfaceError):
+                self.mode = "<no database>"
+                warnings.warn("MySQL database credentials missing or incorrect")
 
+        elif self.mode == "firebase":
+            try:
+                self._firebase = pyrebase.initialize_app(
+                    json.load(open(config_home + "/logging/firebase.json", encoding="utf-8"))
+                )
+                self._db = self._firebase.database()
 
-# LOGGING INIT AND HELPERS
-def init(logging, flush=False, thresholds=None):
-    global NUM_RECOGNIZED, NUM_UNKNOWN, LAST_LOGGED, UNK_LAST_LOGGED, LOG, DISTS, THRESHOLDS
-    global MODE, DATABASE, CURSOR, FIREBASE
+            except (FileNotFoundError, json.JSONDecodeError):
+                self.mode = "<no database>"
+                warnings.warn(config_home + "/logging/firebase.json and a key file are needed to use firebase")
 
-    MODE = logging
-
-    LAST_LOGGED, UNK_LAST_LOGGED = timer(), timer()
-
-    if logging == "mysql":
-        try:
-            DATABASE = mysql.connector.connect(
-                host="localhost",
-                user=config["mysql_user"],
-                passwd=config["mysql_password"],
-                database="LOG"
-            )
-            CURSOR = DATABASE.cursor()
-
-            CURSOR.execute("USE LOG;")
-            DATABASE.commit()
-
-            if flush:
-                instructions = open(config_home + "/bin/drop.sql", encoding="utf-8")
-                for cmd in instructions:
-                    if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"):
-                        CURSOR.execute(cmd)
-                        DATABASE.commit()
-
-        except (mysql.connector.errors.DatabaseError, mysql.connector.errors.InterfaceError):
-            MODE = "<no database>"
-            warnings.warn("MySQL database credentials missing or incorrect")
-
-    elif logging == "firebase":
-        try:
-            FIREBASE = pyrebase.initialize_app(
-                json.load(open(config_home + "/logging/firebase.json", encoding="utf-8"))
-            )
-            DATABASE = FIREBASE.database()
-
-        except (FileNotFoundError, json.JSONDecodeError):
-            MODE = "<no database>"
-            warnings.warn(config_home + "/logging/firebase.json and a key file are needed to use firebase")
-
-    else:
-        MODE = "<no database>"
-        warnings.warn("{} not a supported logging option. No logging will occur".format(logging))
-
-    if thresholds:
-        THRESHOLDS = {**THRESHOLDS, **thresholds}
-
-
-def get_now(seconds):
-    date_and_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(seconds))
-    return date_and_time.split(" ")
-
-
-def get_id(name):
-    # will be filled in later
-    if "visitor" in name.lower():
-        return "V0000"
-    else:
-        return "00000"
-
-
-def get_percent_diff(item, log):
-    try:
-        return 1. - (len(log[item]) / len([i for n in log.values() for i in n]))
-    except KeyError:
-        return 1.
-
-
-def update(is_recognized, best_match):
-    global LOG, NUM_RECOGNIZED, NUM_UNKNOWN
-
-    update_progress = False
-    now = timer()
-    cooled = cooldown_ok(LAST_LOGGED, best_match)
-
-    if len(DISTS) >= THRESHOLDS["num_recognized"] + THRESHOLDS["num_unknown"]:
-        flush_current(mode="unknown+known", flush_times=False)
-        flushed = True
-    else:
-        flushed = False
-
-    if is_recognized and cooled:
-        if best_match not in LOG["current"]:
-            LOG["current"][best_match] = [now]
         else:
-            LOG["current"][best_match].append(now)
+            self.mode = "<no database>"
+            warnings.warn("{} not a supported logging option. No logging will occur".format(mode))
+            
+        # stuff to keep track of
+        self.curr_recognized, self.curr_unknown = 0, 0
+        self.last_logged, self.unk_last_logged = timer(), timer()
+        self.log, self.dists = {"current": {}, "logged": {}}, []
 
-        percent_diff_ok = get_percent_diff(best_match, LOG["current"]) <= THRESHOLDS["percent_diff"]
+        # thresholds
+        self.num_recognized = num_recognized
+        self.num_unknown = num_unknown
+        self.percent_diff = percent_diff
+        self.cooldown = cooldown
+        self.missed_frames = missed_frames
+        
+    
+    # HELPERS
+    @staticmethod
+    def _get_now(seconds):
+        return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(seconds)).split(" ")
 
-        if percent_diff_ok or flushed:
-            NUM_RECOGNIZED += 1
-            NUM_UNKNOWN = 0
-
-            if percent_diff_ok and not flushed:
-                update_progress = True
-
-    elif not is_recognized:
-        NUM_UNKNOWN += 1
-        if NUM_UNKNOWN >= THRESHOLDS["num_unknown"]:
-            NUM_RECOGNIZED = 0
-
-    update_recognized = NUM_RECOGNIZED >= THRESHOLDS["num_recognized"] and cooled \
-                        and get_percent_diff(best_match, LOG["current"]) <= THRESHOLDS["percent_diff"]
-    update_unrecognized = NUM_UNKNOWN >= THRESHOLDS["num_unknown"] and cooldown_ok(UNK_LAST_LOGGED)
-
-    if update_recognized:
-        LOG["logged"][log_person()] = now
-    elif update_unrecognized:
-        log_unknown()
-
-    return update_progress, update_recognized, update_unrecognized
-
-
-def cooldown_ok(elapsed, best_match=None):
-    try:
-        last_student = max(LOG["logged"], key=lambda person: LOG["logged"][person])
-        if best_match == last_student:
-            return timer() - elapsed > THRESHOLDS["cooldown"]
+    @staticmethod
+    def _get_id(name):
+        # will be filled in later
+        if "visitor" in name.lower():
+            return "V0000"
         else:
+            return "00000"
+
+    @staticmethod
+    def _get_percent_diff(item, log):
+        try:
+            return 1. - (len(log[item]) / len([i for n in log.values() for i in n]))
+        except KeyError:
+            return 1.
+
+    def _cooldown_ok(self, elapsed, best_match=None):
+        try:
+            last_student = max(self.log["logged"], key=lambda person: self.log["logged"][person])
+            if best_match == last_student:
+                return timer() - elapsed > self.cooldown
+            else:
+                return True
+
+        except ValueError:
             return True
+        
 
-    except ValueError:
-        return True
+    # UPDATE LOGS
+    def update(self, is_recognized, best_match):
+        update_progress = False
+        now = timer()
+        cooled = self._cooldown_ok(self.last_logged, best_match)
 
+        if len(self.dists) >= self.num_recognized + self.num_unknown:
+            self.flush_current(mode="unknown+known", flush_times=False)
+            flushed = True
+        else:
+            flushed = False
 
-# LOGGING FUNCTIONS
-def log_person():
-    student_name = max(LOG["current"], key=lambda person: len(LOG["current"][person]))
-    times = LOG["current"][student_name]
-    now = get_now(sum(times) / len(times))
+        if is_recognized and cooled:
+            if best_match not in self.log["current"]:
+                self.log["current"][best_match] = [now]
+            else:
+                self.log["current"][best_match].append(now)
 
-    if MODE == "mysql":
-        add = "INSERT INTO Activity (id, name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
-            get_id(student_name), student_name.replace("_", " ").title(), *now)
-        CURSOR.execute(add)
-        DATABASE.commit()
+            percent_diff_ok = self._get_percent_diff(best_match, self.log["current"]) <= self.percent_diff
 
-    elif MODE == "firebase":
-        data = {
-            "id": get_id(student_name),
-            "name": student_name.replace("_", " ").title(),
-            "date": now[0],
-            "time": now[1]
-        }
-        DATABASE.child("known").child(*get_now(timer())).set(data)
+            if percent_diff_ok or flushed:
+                self.curr_recognized += 1
+                self.curr_unknown = 0
 
-    flush_current(mode="known")
+                if percent_diff_ok and not flushed:
+                    update_progress = True
 
-    cprint("Regular activity ({}) logged with {}".format(student_name, MODE), color="green", attrs=["bold"])
+        elif not is_recognized:
+            self.curr_unknown += 1
+            if self.curr_unknown >= self.num_unknown:
+                self.curr_recognized = 0
 
-    return student_name
+        update_recognized = self.curr_recognized >= self.num_recognized and cooled \
+                            and self._get_percent_diff(best_match, self.log["current"]) <= self.percent_diff
+        update_unrecognized = self.curr_unknown >= self.num_unknown and self._cooldown_ok(self.unk_last_logged)
 
+        if update_recognized:
+            self.log["logged"][self.log_person()] = now
+        elif update_unrecognized:
+            self.log_unknown()
 
-def log_unknown():
-    now = get_now(timer())
+        return update_progress, update_recognized, update_unrecognized
 
-    path_to_img = "<DEPRECATED>"
+    def flush_current(self, mode="known", flush_times=True):
+        if "known" in mode:
+            self.dists = []
+            self.log["current"] = {}
+            self.curr_recognized = 0
 
-    if MODE == "mysql":
-        add = "INSERT INTO Unknown (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
-            path_to_img, *now)
-        CURSOR.execute(add)
-        DATABASE.commit()
+            if flush_times:
+                self.last_logged = timer()
 
-    elif MODE == "firebase":
-        data = {
-            "path_to_img": path_to_img,
-            "date": now[0],
-            "time": now[1]
-        }
-        DATABASE.child("unknown").child(*get_now(timer())).set(data)
+        if "unknown" in mode:
+            self.dists = []
+            self.curr_unknown = 0
 
-    flush_current(mode="unknown")
+            if flush_times:
+                self.unk_last_logged = timer()
+                
+    
+    # LOGGING IN DATABASE
+    def log_person(self):
+        student_name = max(self.log["current"], key=lambda person: len(self.log["current"][person]))
+        times = self.log["current"][student_name]
+        now = self._get_now(sum(times) / len(times))
 
-    cprint("Unknown activity logged with {}".format(MODE), color="red", attrs=["bold"])
+        if self.mode == "mysql":
+            add = "INSERT INTO Activity (id, name, date, time) VALUES ({}, '{}', '{}', '{}');".format(
+                self._get_id(student_name), student_name.replace("_", " ").title(), *now)
+            self._cursor.execute(add)
+            self._db.commit()
 
+        elif self.mode == "firebase":
+            data = {
+                "id": self._get_id(student_name),
+                "name": student_name.replace("_", " ").title(),
+                "date": now[0],
+                "time": now[1]
+            }
+            self._db.child("known").child(*self._get_now(timer())).set(data)
 
-def flush_current(mode="known", flush_times=True):
-    global LOG, NUM_RECOGNIZED, NUM_UNKNOWN, DISTS, LAST_LOGGED, UNK_LAST_LOGGED
+        self.flush_current(mode="known")
 
-    if "known" in mode:
-        DISTS = []
-        LOG["current"] = {}
-        NUM_RECOGNIZED = 0
+        cprint("Regular activity ({}) logged with {}".format(student_name, self.mode), color="green", attrs=["bold"])
 
-        if flush_times:
-            LAST_LOGGED = timer()
+        return student_name
 
-    if "unknown" in mode:
-        DISTS = []
-        NUM_UNKNOWN = 0
+    def log_unknown(self):
+        now = self._get_now(timer())
 
-        if flush_times:
-            UNK_LAST_LOGGED = timer()
+        if self.mode == "mysql":
+            add = "INSERT INTO Unknown (path_to_img, date, time) VALUES ('{}', '{}', '{}');".format(
+                "<DEPRECATED>", *now)
+            self._cursor.execute(add)
+            self._db.commit()
+
+        elif self.mode == "firebase":
+            data = {
+                "path_to_img": "<DEPRECATED>",
+                "date": now[0],
+                "time": now[1]
+            }
+            self._db.child("unknown").child(*self._get_now(timer())).set(data)
+
+        self.flush_current(mode="unknown")
+
+        cprint("Unknown activity logged with {}".format(self.mode), color="red", attrs=["bold"])

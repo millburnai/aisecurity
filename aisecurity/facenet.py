@@ -17,7 +17,7 @@ from termcolor import cprint
 from keras import backend as K
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
-from aisecurity.db import log
+from aisecurity.db.log import Logger
 from aisecurity.db.connection import Websocket
 from aisecurity.optim.engine import CudaEngine
 from aisecurity.utils.lcd import LoggingLCDProgressBar
@@ -434,9 +434,9 @@ class FaceNet:
         assert self._db, "data must be provided"
         assert not resize or 0. <= resize <= 1., "resize must be in [0., 1.]"
 
-        log.init(logging, flush=True)
+        logger = Logger(logging)
         websocket = Websocket(socket) if socket else None
-        pbar = LoggingLCDProgressBar(websocket) if pbar else None
+        pbar = LoggingLCDProgressBar(logger, websocket) if pbar else None
         resize = resize if resize else 1.
 
         cap = Camera(width, height)
@@ -458,7 +458,8 @@ class FaceNet:
             embed, is_recognized, best_match, dist, face, elapsed = self.recognize(frame, detector, rotations=rotations)
 
             # graphics, logging, lcd, etc.
-            absent_frames += self.log_activity(best_match, embed, dynamic_log, data_mutable, pbar, dist, absent_frames, websocket)
+            absent_frames += self.log_activity(
+                logger, best_match, embed, dynamic_log, data_mutable, pbar, dist, absent_frames, websocket)
             add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
 
             cv2.imshow("AI Security v0.9a", original_frame)
@@ -477,8 +478,9 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, best_match, embedding, dynamic_log, data_mutable, pbar, dist, absent_frames, websocket):
+    def log_activity(self, logger, best_match, embedding, dynamic_log, data_mutable, pbar, dist, absent_frames, websocket):
         """Logs facial recognition activity
+        :param logger: Logger object
         :param best_match: best match from database
         :param mode: logging type: "firebase" or "mysql"
         :param embedding: embedding vector
@@ -491,13 +493,13 @@ class FaceNet:
 
         if best_match is None:
             absent_frames += 1
-            if absent_frames > log.THRESHOLDS["missed_frames"]:
+            if absent_frames > logger.missed_frames:
                 absent_frames = 0
-                log.flush_current(mode="known+unknown", flush_times=False)
+                logger.flush_current(mode="known+unknown", flush_times=False)
             return absent_frames
 
         is_recognized = dist <= self.dist_metric.alpha
-        update_progress, update_recognized, update_unrecognized = log.update(is_recognized, best_match)
+        update_progress, update_recognized, update_unrecognized = logger.update(is_recognized, best_match)
 
         if pbar and update_progress:
             pbar.update_progress(update_recognized)
@@ -541,5 +543,5 @@ class FaceNet:
         if pbar:
             pbar.check_clear()
 
-        log.DISTS.append(dist)
+        logger.dists.append(dist)
         return absent_frames
