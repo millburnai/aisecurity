@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.face.detection"
-
-Haarcascade or MTCNN face detection.
+"""Haarcascade or MTCNN face detection.
 
 """
 
@@ -14,8 +10,9 @@ import cv2
 from mtcnn import MTCNN
 import numpy as np
 
-from aisecurity.utils.paths import CONFIG_HOME
+from aisecurity.utils.paths import config_home
 
+################################ Classes ###############################
 
 # FACE DETECTION
 class FaceDetector:
@@ -37,7 +34,7 @@ class FaceDetector:
             self.mtcnn = MTCNN(min_face_size=self.kwargs["min_face_size"])
 
         if "trt-mtcnn" in mode:
-            trt_mtcnn_module = os.path.join(CONFIG_HOME, "trt-mtcnn")
+            trt_mtcnn_module = os.path.join(config_home, "trt-mtcnn")
             engine_paths = [os.path.join(trt_mtcnn_module, "mtcnn/det{}.engine").format(net + 1) for net in range(3)]
 
             assert all(os.path.exists(net) for net in engine_paths), "trt-mtcnn engines not found"
@@ -47,7 +44,7 @@ class FaceDetector:
             self.trt_mtcnn = TrtMTCNNWrapper(*engine_paths)
 
         if "haarcascade" in mode:
-            self.haarcascade = cv2.CascadeClassifier(CONFIG_HOME + "/models/haarcascade_frontalface_default.xml")
+            self.haarcascade = cv2.CascadeClassifier(config_home + "/models/haarcascade_frontalface_default.xml")
 
     def detect_faces(self, img):
         result = []
@@ -111,6 +108,8 @@ class FaceDetector:
 
         return np.array(resized_faces), face
 
+
+################################ Functions ###############################
 
 # IMAGE PROCESSING
 def normalize(imgs, mode="per_image"):

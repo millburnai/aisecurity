@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.dataflow.graphs"
-
-Graph control and flow.
+"""Graph control and flow.
 
 """
 
@@ -15,7 +11,9 @@ from tensorflow.python.framework import graph_io
 from aisecurity.dataflow.loader import print_time
 
 
-# MODEL CONVERSIONS
+################################ Model conversions ###############################
+
+# freeze graph
 def _freeze_graph(graph, sess, output_names, save_dir=None, save_name=None):
     def freeze(graph, sess, output):
         with graph.as_default():

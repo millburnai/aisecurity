@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.dataflow.loader"
-
-Data loader and writer utils.
+"""Data loader and writer utils.
 
 """
 
@@ -16,8 +12,9 @@ import cv2
 import tqdm
 
 from aisecurity.privacy.encryptions import encrypt_data, decrypt_data
-from aisecurity.utils.paths import DATABASE_INFO, DATABASE, NAME_KEYS, EMBEDDING_KEYS
+from aisecurity.utils.paths import db_info, db_loc, name_key_path, embed_key_path
 
+################################ Helpers ###############################
 
 # DECORATORS
 def print_time(message="Time elapsed"):
@@ -33,6 +30,8 @@ def print_time(message="Time elapsed"):
 
     return _timer
 
+
+################################ Data utils ###############################
 
 # LOAD ON THE FLY
 @print_time("Data embedding time")
@@ -108,8 +107,8 @@ def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None, full_overwri
 
 
 @print_time("Data retrieval time")
-def retrieve_embeds(path=DATABASE, encrypted=DATABASE_INFO["encrypted"], name_keys=NAME_KEYS,
-                    embedding_keys=EMBEDDING_KEYS):
+def retrieve_embeds(path=db_loc, encrypted=db_info["encrypted"], name_keys=name_key_path,
+                    embedding_keys=embed_key_path):
     ignore = encrypt_to_ignore(encrypted)
 
     with open(path, "r", encoding="utf-8") as json_file:

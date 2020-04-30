@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.privacy.encryptions"
-
-AES encryption for the image database.
+"""AES encryption for the image database.
 
 """
 
@@ -13,8 +9,10 @@ import numpy as np
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-from aisecurity.utils.paths import NAME_KEYS, EMBEDDING_KEYS
+from aisecurity.utils.paths import name_key_path, embed_key_path
 
+
+################################ Setup ###############################
 
 # CONSTANTS
 _BIT_ENCRYPTION = 16
@@ -31,6 +29,8 @@ def require_permission(func):
 
     return _func
 
+
+################################ Encryption helpers ###############################
 
 # GENERATING ENCRYPTION INFO
 @require_permission
@@ -78,8 +78,8 @@ def decrypt(cipher_text, position, key_file):
     return decrypt_cipher.decrypt(cipher_text)
 
 
-# DATA ENCRYPTION
-def encrypt_data(data, ignore=None, decryptable=True, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS, **kwargs):
+################################ Used in aisecurity ###############################
+def encrypt_data(data, ignore=None, decryptable=True, name_keys=name_key_path, embedding_keys=embed_key_path, **kwargs):
     if ignore is None:
         ignore = []
 
@@ -108,7 +108,7 @@ def encrypt_data(data, ignore=None, decryptable=True, name_keys=NAME_KEYS, embed
     return encrypted
 
 
-def decrypt_data(data, ignore=None, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS):
+def decrypt_data(data, ignore=None, name_keys=name_key_path, embedding_keys=embed_key_path):
     if ignore is None:
         ignore = []
 

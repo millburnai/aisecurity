@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.hardware.lcd"
-
-LCD utils.
+"""LCD utils.
 
 """
 
@@ -11,20 +7,7 @@ import warnings
 
 from termcolor import cprint
 
-from aisecurity.db import connection, log
-
-################################ Inits ################################
-
-# GLOBALS
-PROGRESS_BAR = None
-
-
-# LCD INIT
-def init():
-    global PROGRESS_BAR
-
-    PROGRESS_BAR = LCDProgressBar(mode="pi" if connection.SOCKET else "sim", total=log.THRESHOLDS["num_recognized"])
-    PROGRESS_BAR.set_message("Loading...\n[ Initializing ]")
+from aisecurity.db import log
 
 
 ################################ Classes ################################
@@ -32,13 +15,12 @@ def init():
 # LCD PROGRESS BAR
 class LCDProgressBar:
 
-    def __init__(self, mode, total, length=16, marker="#"):
+    def __init__(self, mode, total, length=16, marker="#", websocket=None):
         assert mode in ("pi", "sim"), "supported modes are physical (physical LCD) and dev (testing)"
 
         try:
-            assert connection.SOCKET, "connection.SOCKET must be initialized by using connection.init()"
+            assert websocket and "pi" == mode
             self.mode = "pi"
-            assert self.mode == mode  # making sure that physical doesn't override user choice\
 
         except (ValueError, NameError, AssertionError):
             self.mode = "sim"
@@ -50,10 +32,11 @@ class LCDProgressBar:
         self.marker = marker
         self.progress = 0.
         self.blank = " " * self.bar_length
+        self.websocket = websocket
 
     def set_message(self, message):
         if self.mode == "pi":
-            connection.send(lcd=message)
+            self.websocket.send(lcd=message)
         elif self.mode == "sim":
             cprint(message, attrs=["bold"])
 
@@ -74,22 +57,22 @@ class LCDProgressBar:
             self.progress = 0.
 
 
-################################ Functions ################################
+# LCDProgressBar + logging
+class LoggingLCDProgressBar(LCDProgressBar):
 
-# PERIODIC LCD CLEAR
-def check_clear():
-    global PROGRESS_BAR
+    def __init__(self, logger, websocket):
+        self.logger = logger
 
-    lcd_clear = log.THRESHOLDS["num_recognized"] / log.THRESHOLDS["missed_frames"]
-    if log.LAST_LOGGED - timer() > lcd_clear or log.UNK_LAST_LOGGED - timer() > lcd_clear:
-        PROGRESS_BAR.reset()
+        self.pbar = LCDProgressBar(mode="pi", total=self.logger.num_recognized, websocket=websocket)
+        self.pbar.set_message("Loading...\n[ Initializing ]")
 
+    def check_clear(self):
+        lcd_clear = self.logger.num_recognized / self.logger.missed_frames
+        if self.logger.last_logged - timer() > lcd_clear or self.logger.unk_last_logged - timer() > lcd_clear:
+            self.pbar.reset()
 
-# PBAR UPDATE
-def update_progress(update_recognized):
-    global PROGRESS_BAR
-
-    if update_recognized:
-        PROGRESS_BAR.update(amt=PROGRESS_BAR.total, message="Recognizing...")
-    elif 1. / PROGRESS_BAR.total + PROGRESS_BAR.progress < 1.:
-        PROGRESS_BAR.update(message="Recognizing...")
+    def update_progress(self, update_recognized):
+        if update_recognized:
+            self.pbar.update(amt=self.pbar.total, message="Recognizing...")
+        elif 1. / self.pbar.total + self.pbar.progress < 1.:
+            self.pbar.update(message="Recognizing...")

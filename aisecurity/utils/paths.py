@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.samples.paths"
-
-Common paths used throughout the repository.
+"""Common paths used throughout the package.
 
 """
 
@@ -12,19 +8,23 @@ import subprocess
 
 import aisecurity
 
-# download stuff and set up stuff
+
+################################ Update to ~/.aisecurity ###############################
 subprocess.call(["make_config.sh"], shell=True)
+# apparently it's bad practice to use shell=True because security reasons
+# if anyone wants to remove shell=True and make it still work on Windows please do so
 
-# paths
-CONFIG_HOME = os.path.expanduser("~") + "/.aisecurity"
-HOME = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
 
-CONFIG = json.load(open(CONFIG_HOME + "/aisecurity.json", encoding="utf-8"))
+################################ Paths ###############################
+config_home = os.path.expanduser("~") + "/.aisecurity"
+home = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
 
-DATABASE = CONFIG["database_location"]
-DATABASE_INFO = json.load(open(CONFIG["database_info"], encoding="utf-8"))
+config = json.load(open(config_home + "/aisecurity.json", encoding="utf-8"))
 
-NAME_KEYS = CONFIG["name_keys"]
-EMBEDDING_KEYS = CONFIG["embedding_keys"]
+db_loc = config["database_location"]
+db_info = json.load(open(config["database_info"], encoding="utf-8"))
 
-DEFAULT_MODEL = CONFIG["default_model"]
+name_key_path = config["name_keys"]
+embed_key_path = config["embedding_keys"]
+
+default_model = config["default_model"]

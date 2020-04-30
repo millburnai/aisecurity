@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.utils.distance"
-
-Distance metrics for facial recognition.
+"""Distance metrics for facial recognition.
 
 """
 
