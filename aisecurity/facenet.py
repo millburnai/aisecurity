@@ -27,7 +27,7 @@ from aisecurity.db import log, connection
 from aisecurity.optim import engine
 from aisecurity.utils import lcd
 from aisecurity.utils.distance import DistMetric
-from aisecurity.utils.paths import DATABASE, DATABASE_INFO, DEFAULT_MODEL, CONFIG_HOME
+from aisecurity.utils.paths import db_loc, db_info, default_model, config_home
 from aisecurity.utils.visuals import add_graphics, Camera
 from aisecurity.face.detection import FaceDetector, normalize
 
@@ -37,16 +37,16 @@ class FaceNet:
     """Class implementation of FaceNet"""
 
     # PRE-BUILT MODEL CONFIGS
-    MODELS = json.load(open(CONFIG_HOME + "/config/models.json", encoding="utf-8"))
+    MODELS = json.load(open(config_home + "/config/models.json", encoding="utf-8"))
 
 
     # INITS
     @print_time("Model load time")
-    def __init__(self, model_path=DEFAULT_MODEL, data_path=DATABASE, input_name=None, output_name=None,
+    def __init__(self, model_path=default_model, data_path=db_loc, input_name=None, output_name=None,
                  input_shape=None, allow_gpu_growth=False):
         """Initializes FaceNet object
-        :param model_path: path to model (default: aisecurity.utils.paths.DEFAULT_MODEL)
-        :param data_path: path to data(default: aisecurity.utils.paths.DATABASE)
+        :param model_path: path to model (default: aisecurity.utils.paths.default_model)
+        :param data_path: path to data(default: aisecurity.utils.paths.db_loc)
         :param input_name: name of input tensor-- only required if using TF/TRT non-default model (default: None)
         :param output_name: name of output tensor-- only required if using TF/TRT non-default model (default: None)
         :param input_shape: input shape-- only required if using TF/TRT non-default model (default: None)
@@ -79,7 +79,7 @@ class FaceNet:
         self._knn = None
 
         if data_path:
-            self.set_data(retrieve_embeds(data_path), config=DATABASE_INFO)
+            self.set_data(retrieve_embeds(data_path), config=db_info)
         else:
             warnings.warn("data not set. Set it manually with set_data to use FaceNet")
         self.set_dist_metric("auto")
@@ -439,10 +439,9 @@ class FaceNet:
         # INITS
         assert self._db, "data must be provided"
         log.init(logging, flush=True)
+        websocket = connection.Websocket(socket) if socket else None
         if dist_metric:
             self.set_dist_metric(dist_metric)
-        if socket:
-            connection.init(socket)
         if pbar:
             lcd.init()
         if resize:
@@ -470,7 +469,7 @@ class FaceNet:
             embed, is_recognized, best_match, dist, face, elapsed = self.recognize(frame, detector, rotations=rotations)
 
             # graphics, logging, lcd, etc.
-            absent_frames += self.log_activity(best_match, embed, dynamic_log, data_mutable, pbar, dist, absent_frames)
+            absent_frames += self.log_activity(best_match, embed, dynamic_log, data_mutable, pbar, dist, absent_frames, websocket)
             add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
 
             cv2.imshow("AI Security v0.9a", original_frame)
@@ -489,7 +488,7 @@ class FaceNet:
 
 
     # LOGGING
-    def log_activity(self, best_match, embedding, dynamic_log, data_mutable, pbar, dist, absent_frames):
+    def log_activity(self, best_match, embedding, dynamic_log, data_mutable, pbar, dist, absent_frames, websocket):
         """Logs facial recognition activity
         :param best_match: best match from database
         :param mode: logging type: "firebase" or "mysql"
@@ -498,6 +497,7 @@ class FaceNet:
         :param data_mutable: static data mutability or not
         :param pbar: use pbar or not
         :param dist: distance between best match and current frame
+        :param websocket: Websocket object
         """
 
         if best_match is None:
@@ -513,9 +513,9 @@ class FaceNet:
         if pbar and update_progress:
             lcd.update_progress(update_recognized)
 
-        if update_recognized and connection.SOCKET:
-            connection.send(best_match=best_match)
-            connection.receive()
+        if update_recognized and websocket:
+            websocket.send(best_match=best_match)
+            websocket.receive()
 
         elif update_unrecognized:
             if pbar:
@@ -529,8 +529,8 @@ class FaceNet:
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
         if data_mutable and (update_recognized or update_unrecognized):
-            if connection.SOCKET:
-                is_correct = not bool(connection.RECV)
+            if websocket:
+                is_correct = not bool(websocket.recv)
             else:
                 user_input = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
                 is_correct = bool(len(user_input) == 0 or user_input[0] == "y")
@@ -538,8 +538,8 @@ class FaceNet:
             if is_correct:
                 self.update_data(best_match, [embedding])
             else:
-                if connection.SOCKET:
-                    name, connection.RECV = connection.RECV, None
+                if websocket:
+                    name, websocket.recv = websocket.recv, None
                 else:
                     name = input("Who are you? ").lower().replace(" ", "_")
 
