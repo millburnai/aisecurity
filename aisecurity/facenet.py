@@ -19,7 +19,7 @@ from aisecurity.dataflow.loader import print_time, retrieve_embeds
 from aisecurity.db.log import IntegratedLogger, Logger
 from aisecurity.db.connection import Websocket
 from aisecurity.optim.engine import CudaEngine
-from aisecurity.utils.lcd import LoggingLCDProgressBar
+from aisecurity.utils.lcd import IntegratedLCDProgressBar
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.paths import db_loc, db_info, default_model, config_home
 from aisecurity.utils.visuals import Camera, GraphicsController
@@ -435,8 +435,8 @@ class FaceNet:
 
         logger = Logger(logging)
         websocket = Websocket(socket) if socket else None
-        pbar = LoggingLCDProgressBar(logger, websocket) if pbar else None
-        ilogger = IntegratedLogger(self, logger, pbar, websocket, data_mutable, dynamic_log)
+        ipbar = IntegratedLCDProgressBar(logger, websocket) if pbar else None
+        ilogger = IntegratedLogger(self, logger, ipbar, websocket, data_mutable, dynamic_log)
 
         graphics_controller = GraphicsController(width, height, resize)
         cap = Camera(width, height)

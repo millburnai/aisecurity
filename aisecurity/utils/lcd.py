@@ -56,9 +56,9 @@ class LCDProgressBar:
 
 
 # LCDProgressBar + logging
-class LoggingLCDProgressBar(LCDProgressBar):
+class IntegratedLCDProgressBar:
 
-    def __init__(self, logger, websocket):
+    def __init__(self, logger, websocket=None):
         self.logger = logger
 
         self.pbar = LCDProgressBar(mode="pi", total=self.logger.num_recognized, websocket=websocket)
@@ -74,3 +74,9 @@ class LoggingLCDProgressBar(LCDProgressBar):
             self.pbar.update(amt=self.pbar.total, message="Recognizing...")
         elif 1. / self.pbar.total + self.pbar.progress < 1.:
             self.pbar.update(message="Recognizing...")
+
+    def update(self, *args, **kwargs):
+        self.pbar.update(*args, **kwargs)
+
+    def reset(self, *args, **kwargs):
+        self.pbar.reset(*args,  **kwargs)

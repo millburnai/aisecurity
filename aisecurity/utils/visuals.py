@@ -65,7 +65,7 @@ class Camera:
 ################################ Graphics ###############################
 class GraphicsController:
 
-    def __init__(self, width, height, resize, margin=10, font=cv2.FONT_HERSHEY_DUPLEX):
+    def __init__(self, width=640, height=360, resize=1., margin=10, font=cv2.FONT_HERSHEY_DUPLEX):
         self.width = width
         self.height = height
         self.resize = resize

@@ -14,6 +14,7 @@ import tqdm
 from aisecurity.privacy.encryptions import encrypt_data, decrypt_data
 from aisecurity.utils.paths import db_info, db_loc, name_key_path, embed_key_path
 
+
 ################################ Helpers ###############################
 
 # DECORATORS
@@ -107,8 +108,7 @@ def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None, full_overwri
 
 
 @print_time("Data retrieval time")
-def retrieve_embeds(path=db_loc, encrypted=db_info["encrypted"], name_keys=name_key_path,
-                    embedding_keys=embed_key_path):
+def retrieve_embeds(path=db_loc, encrypted=db_info["encrypted"], name_keys=name_key_path, embedding_keys=embed_key_path):
     ignore = encrypt_to_ignore(encrypted)
 
     with open(path, "r", encoding="utf-8") as json_file:

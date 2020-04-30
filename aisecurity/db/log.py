@@ -20,7 +20,7 @@ from aisecurity.utils.paths import config_home, config
 class Logger:
 
     # INIT
-    def __init__(self, mode, num_recognized=3, num_unknown=3, percent_diff=0.2, cooldown=5., missed_frames=10):
+    def __init__(self, mode=None, num_recognized=3, num_unknown=3, percent_diff=0.2, cooldown=5., missed_frames=10):
         # database init
         self.mode = mode
 
@@ -251,7 +251,7 @@ class IntegratedLogger:
                     visitor_num = len([person for person in self.facenet.data if "visitor" in person]) + 1
                     self.facenet.update_data("visitor_{}".format(visitor_num), [embedding])
 
-                    self.pbar.update(amt=self.pbar.amt, message="Visitor {} created".format(visitor_num))
+                    self.pbar.update(amt=self.pbar.pbar.amt, message="Visitor {} created".format(visitor_num))
                     cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
             if self.data_mutable and (update_recognized or update_unrecognized):
