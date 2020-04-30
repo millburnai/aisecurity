@@ -23,9 +23,10 @@ from termcolor import cprint
 from keras import backend as K
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
-from aisecurity.db import log, connection
-from aisecurity.optim import engine
-from aisecurity.utils import lcd
+from aisecurity.db import log
+from aisecurity.db.connection import Websocket
+from aisecurity.optim.engine import CudaEngine
+from aisecurity.utils.lcd import LoggingLCDProgressBar
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.paths import db_loc, db_info, default_model, config_home
 from aisecurity.utils.visuals import add_graphics, Camera
@@ -163,7 +164,7 @@ class FaceNet:
         self.MODE = "trt"
 
         try:
-            self.facenet = engine.CudaEngine(filepath, input_name, output_name, input_shape)
+            self.facenet = CudaEngine(filepath, input_name, output_name, input_shape)
         except NameError:
             raise ValueError("tensorrt or pycuda import failed: trt mode not available")
 
@@ -420,12 +421,11 @@ class FaceNet:
 
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, dist_metric=None, logging=None, dynamic_log=False, pbar=False,
-                            resize=None, detector="mtcnn+haarcascade", data_mutable=False, socket=None, rotations=None):
+    def real_time_recognize(self, width=640, height=360, logging=None, dynamic_log=False, pbar=False, resize=None,
+                            detector="mtcnn+haarcascade", data_mutable=False, socket=None, rotations=None):
         """Real-time facial recognition
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
         :param height: height of frame (only matters if use_graphics is True) (default: 360)
-        :param dist_metric: DistMetric object or str distance metric (default: this.dist_metric)
         :param logging: logging type-- None, "firebase", or "mysql" (default: None)
         :param dynamic_log: use dynamic database for visitors or not (default: False)
         :param pbar: use progress bar or not. If Pi isn't reachable, will default to LCD simulation (default: False)
@@ -438,20 +438,15 @@ class FaceNet:
 
         # INITS
         assert self._db, "data must be provided"
+        assert not resize or 0. <= resize <= 1., "resize must be in [0., 1.]"
+
         log.init(logging, flush=True)
-        websocket = connection.Websocket(socket) if socket else None
-        if dist_metric:
-            self.set_dist_metric(dist_metric)
-        if pbar:
-            lcd.init()
-        if resize:
-            assert 0. <= resize <= 1., "resize must be in [0., 1.]"
-            face_width, face_height = width * resize, height * resize
-        else:
-            face_width, face_height = width, height
+        websocket = Websocket(socket) if socket else None
+        pbar = LoggingLCDProgressBar(websocket) if pbar else None
+        resize = resize if resize else 1.
 
         cap = Camera(width, height)
-        detector = FaceDetector(detector, self.img_shape, min_face_size=0.5*(face_width+face_height)/2)
+        detector = FaceDetector(detector, self.img_shape, min_face_size=0.5 * ((width + height) * resize) / 2)
 
         absent_frames = 0
         frames = 0
@@ -495,7 +490,7 @@ class FaceNet:
         :param embedding: embedding vector
         :param dynamic_log: use dynamic database or not
         :param data_mutable: static data mutability or not
-        :param pbar: use pbar or not
+        :param pbar: LoggingLCDProgressBar object
         :param dist: distance between best match and current frame
         :param websocket: Websocket object
         """
@@ -511,7 +506,7 @@ class FaceNet:
         update_progress, update_recognized, update_unrecognized = log.update(is_recognized, best_match)
 
         if pbar and update_progress:
-            lcd.update_progress(update_recognized)
+            pbar.update_progress(update_recognized)
 
         if update_recognized and websocket:
             websocket.send(best_match=best_match)
@@ -519,13 +514,13 @@ class FaceNet:
 
         elif update_unrecognized:
             if pbar:
-                lcd.PROGRESS_BAR.reset(message="Recognizing...")
+                pbar.reset(message="Recognizing...")
 
             if dynamic_log:
                 visitor_num = len([person for person in self._db if "visitor" in person]) + 1
                 self.update_data("visitor_{}".format(visitor_num), [embedding])
 
-                lcd.PROGRESS_BAR.update(amt=np.inf, message="Visitor {} created".format(visitor_num))
+                pbar.update(amt=np.inf, message="Visitor {} created".format(visitor_num))
                 cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
 
         if data_mutable and (update_recognized or update_unrecognized):
@@ -550,7 +545,7 @@ class FaceNet:
                     cprint("'{}' is not in database".format(name), attrs=["bold"])
 
         if pbar:
-            lcd.check_clear()
+            pbar.check_clear()
 
         log.DISTS.append(dist)
         return absent_frames

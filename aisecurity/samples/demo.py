@@ -21,11 +21,13 @@ def demo(path=default_model, dist_metric=None, logging=None, dynamic_log=True, p
     cprint("...", attrs=["bold", "blink"])
 
     facenet = FaceNet(path, allow_gpu_growth=allow_gpu_growth)
+    if dist_metric:
+        facenet.set_dist_metric(dist_metric)
 
     input("\nPress ENTER to continue:")
 
     facenet.real_time_recognize(
-        dist_metric=dist_metric, logging=logging, dynamic_log=dynamic_log, resize=resize, pbar=pbar, detector=detector,
+        logging=logging, dynamic_log=dynamic_log, resize=resize, pbar=pbar, detector=detector,
         data_mutable=data_mutable, socket=socket, rotations=rotations
     )
 

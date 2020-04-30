@@ -13,12 +13,8 @@ import websocket
 
 
 ################################ Websocket ###############################
-
 class Websocket:
 
-    FAIL_THRESHOLD = 3
-
-    # CONNECT TO WEBSOCKET
     def __init__(self, socket):
         self.recv = None
         if not self._connect(socket):
