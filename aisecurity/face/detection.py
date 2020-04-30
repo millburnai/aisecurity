@@ -12,6 +12,7 @@ import numpy as np
 
 from aisecurity.utils.paths import config_home
 
+################################ Classes ###############################
 
 # FACE DETECTION
 class FaceDetector:
@@ -107,6 +108,8 @@ class FaceDetector:
 
         return np.array(resized_faces), face
 
+
+################################ Functions ###############################
 
 # IMAGE PROCESSING
 def normalize(imgs, mode="per_image"):

@@ -14,6 +14,8 @@ from termcolor import cprint
 from aisecurity.utils.paths import config_home, config
 
 
+################################ FaceNet ###############################
+
 # SETUP
 THRESHOLDS = {
     "num_recognized": 3,

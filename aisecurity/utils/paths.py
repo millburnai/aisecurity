@@ -8,10 +8,14 @@ import subprocess
 
 import aisecurity
 
+
+################################ Update to ~/.aisecurity ###############################
 subprocess.call(["make_config.sh"], shell=True)
 # apparently it's bad practice to use shell=True because security reasons
 # if anyone wants to remove shell=True and make it still work on Windows please do so
 
+
+################################ Paths ###############################
 config_home = os.path.expanduser("~") + "/.aisecurity"
 home = os.path.abspath(aisecurity.__file__).replace("/__init__.py", "")
 

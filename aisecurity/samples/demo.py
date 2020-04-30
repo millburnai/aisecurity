@@ -8,6 +8,7 @@ from aisecurity.facenet import FaceNet
 from aisecurity.utils.paths import default_model
 
 
+################################ Demo function ###############################
 def demo(path=default_model, dist_metric=None, logging=None, dynamic_log=True, pbar=False, resize=None,
          detector="mtcnn+haarcascade", data_mutable=True, socket="ws://67.205.155.37:8000/v1/nano", rotations=None,
          allow_gpu_growth=False):
@@ -28,6 +29,7 @@ def demo(path=default_model, dist_metric=None, logging=None, dynamic_log=True, p
     )
 
 
+################################ Testing ###############################
 if __name__ == "__main__":
     import argparse
 

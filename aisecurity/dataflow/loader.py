@@ -14,6 +14,7 @@ import tqdm
 from aisecurity.privacy.encryptions import encrypt_data, decrypt_data
 from aisecurity.utils.paths import db_info, db_loc, name_key_path, embed_key_path
 
+################################ Helpers ###############################
 
 # DECORATORS
 def print_time(message="Time elapsed"):
@@ -29,6 +30,8 @@ def print_time(message="Time elapsed"):
 
     return _timer
 
+
+################################ Data utils ###############################
 
 # LOAD ON THE FLY
 @print_time("Data embedding time")

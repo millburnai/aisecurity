@@ -12,6 +12,8 @@ from Crypto.Random import get_random_bytes
 from aisecurity.utils.paths import name_key_path, embed_key_path
 
 
+################################ Setup ###############################
+
 # CONSTANTS
 _BIT_ENCRYPTION = 16
 
@@ -27,6 +29,8 @@ def require_permission(func):
 
     return _func
 
+
+################################ Encryption helpers ###############################
 
 # GENERATING ENCRYPTION INFO
 @require_permission
@@ -74,7 +78,7 @@ def decrypt(cipher_text, position, key_file):
     return decrypt_cipher.decrypt(cipher_text)
 
 
-# DATA ENCRYPTION
+################################ Used in aisecurity ###############################
 def encrypt_data(data, ignore=None, decryptable=True, name_keys=name_key_path, embedding_keys=embed_key_path, **kwargs):
     if ignore is None:
         ignore = []

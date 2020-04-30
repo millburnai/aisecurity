@@ -10,6 +10,7 @@ import numpy as np
 from aisecurity.dataflow.loader import print_time
 from aisecurity.utils.paths import config_home
 
+
 ################################ Setup ################################
 
 # AUTOINIT
