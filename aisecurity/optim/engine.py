@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.optim.engine"
-
-CUDA engine management.
+"""PyCUDA + TensorRT engine management.
 
 """
 

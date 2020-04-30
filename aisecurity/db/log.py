@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.db.log"
-
-MySQL and Firebase database handling.
+"""MySQL and Firebase database handling.
 
 """
 

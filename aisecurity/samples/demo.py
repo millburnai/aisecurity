@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.samples.demo"
-
-Demonstration of facial recognition system.
+"""Demonstration of facial recognition system.
 
 """
 

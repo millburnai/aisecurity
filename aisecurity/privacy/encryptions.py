@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.privacy.encryptions"
-
-AES encryption for the image database.
+"""AES encryption for the image database.
 
 """
 

@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.face.detection"
-
-Haarcascade or MTCNN face detection.
+"""Haarcascade or MTCNN face detection.
 
 """
 

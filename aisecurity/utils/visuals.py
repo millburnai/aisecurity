@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.visuals.graphics"
-
-Graphics utils.
+"""Graphics utils.
 
 """
 

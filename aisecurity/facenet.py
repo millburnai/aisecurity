@@ -1,10 +1,4 @@
-"""
-
-"aisecurity.facenet"
-
-Facial recognition with FaceNet in Keras, TensorFlow, or TensorRT.
-
-Reference paper: https://arxiv.org/pdf/1503.03832.pdf
+"""Facial recognition with FaceNet in Keras, TensorFlow, or TensorRT.
 
 """
 

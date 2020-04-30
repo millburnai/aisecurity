@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.dataflow.graphs"
-
-Graph control and flow.
+"""Graph control and flow.
 
 """
 

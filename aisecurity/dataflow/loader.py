@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.dataflow.loader"
-
-Data loader and writer utils.
+"""Data loader and writer utils.
 
 """
 

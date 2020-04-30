@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.samples.paths"
-
-Common paths used throughout the repository.
+"""Common paths used throughout the package.
 
 """
 

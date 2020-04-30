@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.db.connection"
-
-Handles connection to websocket.
+"""Handles connection to websocket.
 
 """
 

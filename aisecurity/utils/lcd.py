@@ -1,8 +1,4 @@
-"""
-
-"aisecurity.hardware.lcd"
-
-LCD utils.
+"""LCD utils.
 
 """
 
