@@ -415,7 +415,7 @@ class FaceNet:
 
 
     # REAL-TIME FACIAL RECOGNITION
-    def real_time_recognize(self, width=640, height=360, logging=None, dynamic_log=False, pbar=False, resize=None,
+    def real_time_recognize(self, width=640, height=360, logging=None, dynamic_log=False, pbar=False, resize=1.,
                             detector="mtcnn+haarcascade", data_mutable=False, socket=None, rotations=None):
         """Real-time facial recognition
         :param width: width of frame (only matters if use_graphics is True) (default: 640)
@@ -423,7 +423,7 @@ class FaceNet:
         :param logging: logging type-- None, "firebase", or "mysql" (default: None)
         :param dynamic_log: use dynamic database for visitors or not (default: False)
         :param pbar: use progress bar or not. If Pi isn't reachable, will default to LCD simulation (default: False)
-        :param resize: resize scale (float between 0. and 1.) (default: None)
+        :param resize: resize scale (float between 0. and 1.) (default: 1. = no resize)
         :param detector: face detector type ("mtcnn", "haarcascade", "trt-mtcnn") (default: "mtcnn+haarcascade")
         :param data_mutable: if true, prompt for verification on recognition and update database (default: False)
         :param socket: socket address (dev only)
@@ -432,12 +432,11 @@ class FaceNet:
 
         # INITS
         assert self._db, "data must be provided"
-        assert not resize or 0. <= resize <= 1., "resize must be in [0., 1.]"
+        assert 0. <= resize <= 1., "resize must be in [0., 1.]"
 
         logger = Logger(logging)
         websocket = Websocket(socket) if socket else None
         pbar = LoggingLCDProgressBar(logger, websocket) if pbar else None
-        resize = resize if resize else 1.
 
         cap = Camera(width, height)
         detector = FaceDetector(detector, self.img_shape, min_face_size=0.5 * ((width + height) * resize) / 2)

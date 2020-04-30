@@ -9,7 +9,7 @@ from aisecurity.utils.paths import default_model
 
 
 ################################ Demo function ###############################
-def demo(path=default_model, dist_metric=None, logging=None, dynamic_log=True, pbar=False, resize=None,
+def demo(path=default_model, dist_metric=None, logging=None, dynamic_log=True, pbar=False, resize=1.,
          detector="mtcnn+haarcascade", data_mutable=True, socket="ws://67.205.155.37:8000/v1/nano", rotations=None,
          allow_gpu_growth=False):
 
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     parser.add_argument("--dynamic_log", help="use this flag to use dynamic database", action="store_true")
     parser.add_argument("--pbar", help="use this flag to use progress bar", action="store_true")
     parser.add_argument("--flip", help="flip method: +1 = +90º rotation (default: 0)", type=to_int, default=0)
-    parser.add_argument("--resize", help="resize frame for faster runtime (default: None)", type=float, default=None)
+    parser.add_argument("--resize", help="resize frame for faster runtime (default: 1.)", type=float, default=1.)
     parser.add_argument("--detector", help="type of face detector (default: mtcnn+haarcascade)", type=str,
                         default="mtcnn+haarcascade")
     parser.add_argument("--data_mutable", help="use this flag to allow a mutable db", action="store_true")
