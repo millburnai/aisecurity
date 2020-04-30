@@ -14,7 +14,9 @@ from termcolor import cprint
 from aisecurity.utils.paths import config_home, config
 
 
-################################ Logging class ###############################
+################################ Logging ###############################
+
+# BASIC LOGGER
 class Logger:
 
     # INIT
@@ -206,3 +208,83 @@ class Logger:
         self.flush_current(mode="unknown")
 
         cprint("Unknown activity logged with {}".format(self.mode), color="red", attrs=["bold"])
+
+
+# FACENET LOGGER
+class IntegratedLogger:
+
+    def __init__(self, facenet, logger, pbar=None, websocket=None, data_mutable=False, dynamic_log=False):
+        self.facenet = facenet
+        self.logger = logger
+        self.pbar = pbar
+        self.websocket = websocket
+        self.data_mutable = data_mutable
+        self.dynamic_log = dynamic_log
+
+        self.absent_frames = 0
+        self.frames = 0
+        self.start_time = timer()
+
+    def log_activity(self, best_match, embedding, dist):
+        if best_match is None:
+            self.absent_frames += 1
+            if self.absent_frames > self.logger.missed_frames:
+                self.absent_frames = 0
+                self.logger.flush_current(mode="known+unknown", flush_times=False)
+
+        else:
+            is_recognized = dist <= self.facenet.dist_metric.alpha
+            update_progress, update_recognized, update_unrecognized = self.logger.update(is_recognized, best_match)
+
+            if self.pbar and update_progress:
+                self.pbar.update_progress(update_recognized)
+
+            if update_recognized and self.websocket:
+                self.websocket.send(best_match=best_match)
+                self.websocket.receive()
+
+            elif update_unrecognized:
+                if self.pbar:
+                    self.pbar.reset(message="Recognizing...")
+
+                if self.dynamic_log:
+                    visitor_num = len([person for person in self.facenet.data if "visitor" in person]) + 1
+                    self.facenet.update_data("visitor_{}".format(visitor_num), [embedding])
+
+                    self.pbar.update(amt=self.pbar.amt, message="Visitor {} created".format(visitor_num))
+                    cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
+
+            if self.data_mutable and (update_recognized or update_unrecognized):
+                if self.websocket:
+                    is_correct = not bool(self.websocket.recv)
+                else:
+                    user_input = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
+                    is_correct = bool(len(user_input) == 0 or user_input[0] == "y")
+
+                if is_correct:
+                    self.facenet.update_data(best_match, [embedding])
+                else:
+                    if self.websocket:
+                        name, self.websocket.recv = self.websocket.recv, None
+                    else:
+                        name = input("Who are you? ").lower().replace(" ", "_")
+
+                    if name in self.facenet.data:
+                        self.facenet.update_data(name, [embedding])
+                        cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
+                    else:
+                        cprint("'{}' is not in database".format(name), attrs=["bold"])
+
+            if self.pbar:
+                self.pbar.check_clear()
+
+            self.logger.dists.append(dist)
+            self.frames += 1
+
+
+    def close(self):
+        elapsed = max(timer() - self.start_time, 1e-6)
+        ms_elapsed = round(elapsed * 1000., 2)
+        fps = round(self.frames / elapsed, 2)
+
+        print("{} ms elapsed, {} frames captured = {} fps".format(ms_elapsed, self.frames, fps))

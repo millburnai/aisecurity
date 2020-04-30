@@ -13,11 +13,10 @@ import keras
 import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
-from termcolor import cprint
 from keras import backend as K
 
 from aisecurity.dataflow.loader import print_time, retrieve_embeds
-from aisecurity.db.log import Logger
+from aisecurity.db.log import IntegratedLogger, Logger
 from aisecurity.db.connection import Websocket
 from aisecurity.optim.engine import CudaEngine
 from aisecurity.utils.lcd import LoggingLCDProgressBar
@@ -437,110 +436,32 @@ class FaceNet:
         logger = Logger(logging)
         websocket = Websocket(socket) if socket else None
         pbar = LoggingLCDProgressBar(logger, websocket) if pbar else None
+        ilogger = IntegratedLogger(self, logger, pbar, websocket, data_mutable, dynamic_log)
 
         cap = Camera(width, height)
         detector = FaceDetector(detector, self.img_shape, min_face_size=0.5 * ((width + height) * resize) / 2)
 
-        absent_frames = 0
-        frames = 0
-        start = timer()
-
         # CAM LOOP
         while True:
-            frame = cap.read()
+            _, frame = cap.read()
             original_frame = frame.copy()
 
-            if resize:
-                frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
+            # resize frame
+            frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize) if resize != 1. else frame
 
             # facial detection and recognition
             embed, is_recognized, best_match, dist, face, elapsed = self.recognize(frame, detector, rotations=rotations)
 
             # graphics, logging, lcd, etc.
-            absent_frames += self.log_activity(
-                logger, best_match, embed, dynamic_log, data_mutable, pbar, dist, absent_frames, websocket)
+            ilogger.log_activity(best_match, embed, dist)
             add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
 
             cv2.imshow("AI Security v0.9a", original_frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
-            frames += 1
-
         cap.release()
         cv2.destroyAllWindows()
+        ilogger.close()
 
-        elapsed = timer() - start
-        print("{} ms elapsed, {} frames = {} fps".format(round(elapsed * 1000., 2), frames, round(frames / elapsed, 2)))
-
-        return frames
-
-
-    # LOGGING
-    def log_activity(self, logger, best_match, embedding, dynamic_log, data_mutable, pbar, dist, absent_frames, websocket):
-        """Logs facial recognition activity
-        :param logger: Logger object
-        :param best_match: best match from database
-        :param mode: logging type: "firebase" or "mysql"
-        :param embedding: embedding vector
-        :param dynamic_log: use dynamic database or not
-        :param data_mutable: static data mutability or not
-        :param pbar: LoggingLCDProgressBar object
-        :param dist: distance between best match and current frame
-        :param websocket: Websocket object
-        """
-
-        if best_match is None:
-            absent_frames += 1
-            if absent_frames > logger.missed_frames:
-                absent_frames = 0
-                logger.flush_current(mode="known+unknown", flush_times=False)
-            return absent_frames
-
-        is_recognized = dist <= self.dist_metric.alpha
-        update_progress, update_recognized, update_unrecognized = logger.update(is_recognized, best_match)
-
-        if pbar and update_progress:
-            pbar.update_progress(update_recognized)
-
-        if update_recognized and websocket:
-            websocket.send(best_match=best_match)
-            websocket.receive()
-
-        elif update_unrecognized:
-            if pbar:
-                pbar.reset(message="Recognizing...")
-
-            if dynamic_log:
-                visitor_num = len([person for person in self._db if "visitor" in person]) + 1
-                self.update_data("visitor_{}".format(visitor_num), [embedding])
-
-                pbar.update(amt=np.inf, message="Visitor {} created".format(visitor_num))
-                cprint("Visitor {} activity logged".format(visitor_num), color="magenta", attrs=["bold"])
-
-        if data_mutable and (update_recognized or update_unrecognized):
-            if websocket:
-                is_correct = not bool(websocket.recv)
-            else:
-                user_input = input("Are you {}? ".format(best_match.replace("_", " ").title())).lower()
-                is_correct = bool(len(user_input) == 0 or user_input[0] == "y")
-
-            if is_correct:
-                self.update_data(best_match, [embedding])
-            else:
-                if websocket:
-                    name, websocket.recv = websocket.recv, None
-                else:
-                    name = input("Who are you? ").lower().replace(" ", "_")
-
-                if name in self.data:
-                    self.update_data(name, [embedding])
-                    cprint("Static entry for '{}' updated".format(name), color="blue", attrs=["bold"])
-                else:
-                    cprint("'{}' is not in database".format(name), attrs=["bold"])
-
-        if pbar:
-            pbar.check_clear()
-
-        logger.dists.append(dist)
-        return absent_frames
+        return ilogger
