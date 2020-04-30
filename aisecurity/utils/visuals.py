@@ -18,6 +18,7 @@ class Camera:
         self.dev = dev
 
         self.thread_running = False
+        self.retval = False
         self.img_handle = None
         self.thread = None
 
@@ -43,7 +44,7 @@ class Camera:
     def _start(self):
         def grab_img(cam):
             while cam.thread_running:
-                _, cam.img_handle = cam.cap.read()
+                cam.retval, cam.img_handle = cam.cap.read()
 
             cam.thread_running = False
 
@@ -53,7 +54,7 @@ class Camera:
         self.thread.start()
 
     def read(self):
-        return self.img_handle
+        return self.retval, self.img_handle
 
     def release(self):
         self.thread_running = False
@@ -132,7 +133,7 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
         features = person["keypoints"]
         x, y, height, width = person["box"]
 
-        if resize:
+        if resize != 1.:
             scale_factor = 1. / resize
 
             if features:
