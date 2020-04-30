@@ -1,4 +1,10 @@
-# Pycharm files
+# Compiled files
 *.pyc
+
+# Pycharm files
 .idea/
 .DS_STORE
+
+# Dist info (pip>=20.2)
+aisecurity.egg-info*
+build
