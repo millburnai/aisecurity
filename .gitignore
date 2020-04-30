@@ -5,6 +5,6 @@
 .idea/
 .DS_STORE
 
-# Dist info (pip>=20.2)
+# Dist info (pip>=20.1)
 aisecurity.egg-info*
 build
