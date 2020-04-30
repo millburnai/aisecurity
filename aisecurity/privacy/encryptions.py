@@ -13,7 +13,7 @@ import numpy as np
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-from aisecurity.utils.paths import NAME_KEYS, EMBEDDING_KEYS
+from aisecurity.utils.paths import name_key_path, embed_key_path
 
 
 # CONSTANTS
@@ -79,7 +79,7 @@ def decrypt(cipher_text, position, key_file):
 
 
 # DATA ENCRYPTION
-def encrypt_data(data, ignore=None, decryptable=True, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS, **kwargs):
+def encrypt_data(data, ignore=None, decryptable=True, name_keys=name_key_path, embedding_keys=embed_key_path, **kwargs):
     if ignore is None:
         ignore = []
 
@@ -108,7 +108,7 @@ def encrypt_data(data, ignore=None, decryptable=True, name_keys=NAME_KEYS, embed
     return encrypted
 
 
-def decrypt_data(data, ignore=None, name_keys=NAME_KEYS, embedding_keys=EMBEDDING_KEYS):
+def decrypt_data(data, ignore=None, name_keys=name_key_path, embedding_keys=embed_key_path):
     if ignore is None:
         ignore = []
 

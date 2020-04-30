@@ -9,10 +9,10 @@ Demonstration of facial recognition system.
 from termcolor import cprint
 
 from aisecurity.facenet import FaceNet
-from aisecurity.utils.paths import DEFAULT_MODEL
+from aisecurity.utils.paths import default_model
 
 
-def demo(path=DEFAULT_MODEL, dist_metric=None, logging=None, dynamic_log=True, pbar=False, resize=None,
+def demo(path=default_model, dist_metric=None, logging=None, dynamic_log=True, pbar=False, resize=None,
          detector="mtcnn+haarcascade", data_mutable=True, socket="ws://67.205.155.37:8000/v1/nano", rotations=None,
          allow_gpu_growth=False):
 
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     # ARG PARSE
     parser = argparse.ArgumentParser()
     parser.add_argument("--path_to_model", help="path to facenet model (default: ~/.aisecurity/models/ms_celeb_1m.h5)",
-                        type=str, default=DEFAULT_MODEL)
+                        type=str, default=default_model)
     parser.add_argument("--dist_metric", help="distance metric (default: auto)", type=str, default="auto")
     parser.add_argument("--logging", help="logging type, mysql or firebase (default: None)", type=str, default=None)
     parser.add_argument("--dynamic_log", help="use this flag to use dynamic database", action="store_true")

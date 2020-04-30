@@ -15,7 +15,7 @@ import mysql.connector
 import pyrebase
 from termcolor import cprint
 
-from aisecurity.utils.paths import CONFIG_HOME, CONFIG
+from aisecurity.utils.paths import config_home, config
 
 
 # SETUP
@@ -51,8 +51,8 @@ def init(logging, flush=False, thresholds=None):
         try:
             DATABASE = mysql.connector.connect(
                 host="localhost",
-                user=CONFIG["mysql_user"],
-                passwd=CONFIG["mysql_password"],
+                user=config["mysql_user"],
+                passwd=config["mysql_password"],
                 database="LOG"
             )
             CURSOR = DATABASE.cursor()
@@ -61,7 +61,7 @@ def init(logging, flush=False, thresholds=None):
             DATABASE.commit()
 
             if flush:
-                instructions = open(CONFIG_HOME + "/bin/drop.sql", encoding="utf-8")
+                instructions = open(config_home + "/bin/drop.sql", encoding="utf-8")
                 for cmd in instructions:
                     if not cmd.startswith(" ") and not cmd.startswith("*/") and not cmd.startswith("/*"):
                         CURSOR.execute(cmd)
@@ -74,13 +74,13 @@ def init(logging, flush=False, thresholds=None):
     elif logging == "firebase":
         try:
             FIREBASE = pyrebase.initialize_app(
-                json.load(open(CONFIG_HOME + "/logging/firebase.json", encoding="utf-8"))
+                json.load(open(config_home + "/logging/firebase.json", encoding="utf-8"))
             )
             DATABASE = FIREBASE.database()
 
         except (FileNotFoundError, json.JSONDecodeError):
             MODE = "<no database>"
-            warnings.warn(CONFIG_HOME + "/logging/firebase.json and a key file are needed to use firebase")
+            warnings.warn(config_home + "/logging/firebase.json and a key file are needed to use firebase")
 
     else:
         MODE = "<no database>"

@@ -12,7 +12,7 @@ import warnings
 import numpy as np
 
 from aisecurity.dataflow.loader import print_time
-from aisecurity.utils.paths import CONFIG_HOME
+from aisecurity.utils.paths import config_home
 
 ################################ Setup ################################
 
@@ -197,7 +197,7 @@ class CudaEngine:
     """Cuda engine manager wrapper for interfacing with FaceNet class"""
 
     # PREBUILT MODELS
-    MODELS = json.load(open(CONFIG_HOME + "/config/cuda_models.json", encoding="utf-8"))
+    MODELS = json.load(open(config_home + "/config/cuda_models.json", encoding="utf-8"))
 
 
     # INITS
