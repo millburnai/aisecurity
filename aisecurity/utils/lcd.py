@@ -7,8 +7,6 @@ import warnings
 
 from termcolor import cprint
 
-from aisecurity.db import log
-
 
 ################################ Classes ################################
 

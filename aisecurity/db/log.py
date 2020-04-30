@@ -281,7 +281,6 @@ class IntegratedLogger:
             self.logger.dists.append(dist)
             self.frames += 1
 
-
     def close(self):
         elapsed = max(timer() - self.start_time, 1e-6)
         ms_elapsed = round(elapsed * 1000., 2)

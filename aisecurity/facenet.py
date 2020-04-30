@@ -22,7 +22,7 @@ from aisecurity.optim.engine import CudaEngine
 from aisecurity.utils.lcd import LoggingLCDProgressBar
 from aisecurity.utils.distance import DistMetric
 from aisecurity.utils.paths import db_loc, db_info, default_model, config_home
-from aisecurity.utils.visuals import add_graphics, Camera
+from aisecurity.utils.visuals import Camera, GraphicsController
 from aisecurity.face.detection import FaceDetector, normalize
 
 
@@ -438,6 +438,7 @@ class FaceNet:
         pbar = LoggingLCDProgressBar(logger, websocket) if pbar else None
         ilogger = IntegratedLogger(self, logger, pbar, websocket, data_mutable, dynamic_log)
 
+        graphics_controller = GraphicsController(width, height, resize)
         cap = Camera(width, height)
         detector = FaceDetector(detector, self.img_shape, min_face_size=0.5 * ((width + height) * resize) / 2)
 
@@ -454,7 +455,7 @@ class FaceNet:
 
             # graphics, logging, lcd, etc.
             ilogger.log_activity(best_match, embed, dist)
-            add_graphics(original_frame, face, width, height, is_recognized, best_match, resize, elapsed)
+            graphics_controller.add_graphics(original_frame, face, is_recognized, best_match, elapsed)
 
             cv2.imshow("AI Security v0.9a", original_frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):

@@ -63,27 +63,24 @@ class Camera:
 
 
 ################################ Graphics ###############################
-def add_graphics(frame, person, width, height, is_recognized, best_match, resize, elapsed, margin=10):
-    """Adds graphics to a frame
+class GraphicsController:
 
-    :param frame: frame as array
-    :param person: MTCNN detection dict
-    :param width: width of frame
-    :param height: height of frame
-    :param is_recognized: whether face was recognized or not
-    :param best_match: best match from database
-    :param resize: resize scale factor, from 0. to 1.
-    :param elapsed: time it took to run face detection and recognition
-    :param margin: crop margin for face detection (default: 10)
+    def __init__(self, width, height, resize, margin=10, font=cv2.FONT_HERSHEY_DUPLEX):
+        self.width = width
+        self.height = height
+        self.resize = resize
+        self.margin = margin
+        self.font = font
 
-    """
+        # works for 6.25e4 pixel video cature to 1e6 pixel video capture
+        self.line_thickness = round(1e-6 * width * height + 1.5)
+        self.radius = round((1e-6 * width * height + 1.5) / 2.)
+        self.font_size = 4.5e-7 * width * height + 0.5
 
-    line_thickness = round(1e-6 * width * height + 1.5)
-    radius = round((1e-6 * width * height + 1.5) / 2.)
-    font_size = 4.5e-7 * width * height + 0.5
-    # works for 6.25e4 pixel video cature to 1e6 pixel video capture
 
-    def get_color(is_recognized, best_match):
+    # HELPERS
+    @staticmethod
+    def _get_color(is_recognized, best_match):
         if not is_recognized:
             return 0, 0, 255  # red
         elif "visitor" in best_match:
@@ -91,68 +88,68 @@ def add_graphics(frame, person, width, height, is_recognized, best_match, resize
         else:
             return 0, 255, 0  # green
 
-    def add_box_and_label(frame, origin, corner, color, line_thickness, best_match, font_size, thickness):
+    def _add_box_and_label(self, frame, origin, corner, best_match, color, thickness=1):
         # bounding box
-        cv2.rectangle(frame, origin, corner, color, line_thickness)
+        cv2.rectangle(frame, origin, corner, color, self.line_thickness)
 
         # label box
         label = best_match.replace("_", " ").title()
-        font = cv2.FONT_HERSHEY_DUPLEX
 
-        (width, height), __ = cv2.getTextSize(label, font, font_size, thickness)
+        (width, height), __ = cv2.getTextSize(label, self.font, self.font_size, thickness)
 
         box_x = max(corner[0], origin[0] + width + 6)
         cv2.rectangle(frame, (origin[0], corner[1] - 35), (box_x, corner[1]), color, cv2.FILLED)
 
         # label
-        cv2.putText(frame, label, (origin[0] + 6, corner[1] - 6), font, font_size, (255, 255, 255), thickness)
+        cv2.putText(frame, label, (origin[0] + 6, corner[1] - 6), self.font, self.font_size, (255, 255, 255), thickness)
 
+    def _add_features(self, overlay, features, color):
+        cv2.circle(overlay, (features["left_eye"]), self.radius, color, self.line_thickness)
+        cv2.circle(overlay, (features["right_eye"]), self.radius, color, self.line_thickness)
+        cv2.circle(overlay, (features["nose"]), self.radius, color, self.line_thickness)
+        cv2.circle(overlay, (features["mouth_left"]), self.radius, color, self.line_thickness)
+        cv2.circle(overlay, (features["mouth_right"]), self.radius, color, self.line_thickness)
 
-    def add_features(overlay, features, radius, color, line_thickness):
-        cv2.circle(overlay, (features["left_eye"]), radius, color, line_thickness)
-        cv2.circle(overlay, (features["right_eye"]), radius, color, line_thickness)
-        cv2.circle(overlay, (features["nose"]), radius, color, line_thickness)
-        cv2.circle(overlay, (features["mouth_left"]), radius, color, line_thickness)
-        cv2.circle(overlay, (features["mouth_right"]), radius, color, line_thickness)
+        cv2.line(overlay, features["left_eye"], features["nose"], color, self.radius)
+        cv2.line(overlay, features["right_eye"], features["nose"], color, self.radius)
+        cv2.line(overlay, features["mouth_left"], features["nose"], color, self.radius)
+        cv2.line(overlay, features["mouth_right"], features["nose"], color, self.radius)
 
-        cv2.line(overlay, features["left_eye"], features["nose"], color, radius)
-        cv2.line(overlay, features["right_eye"], features["nose"], color, radius)
-        cv2.line(overlay, features["mouth_left"], features["nose"], color, radius)
-        cv2.line(overlay, features["mouth_right"], features["nose"], color, radius)
-
-    def add_fps(frame, elapsed, font_size, thickness):
+    def _add_fps(self, frame, elapsed, thickness=2):
         text = "FPS: {}".format(round(1000. / elapsed, 2))  # elapsed is in ms, so *1000.
 
         x, y = 10, 20
-        font = cv2.FONT_HERSHEY_DUPLEX
         rgb = [255 * round((255 - np.mean(frame[:x, :y])) / 255)] * 3
 
-        cv2.putText(frame, text, (x, y), font, font_size, rgb, thickness)
+        cv2.putText(frame, text, (x, y), self.font, self.font_size, rgb, thickness)
 
-    if person is not None:
-        features = person["keypoints"]
-        x, y, height, width = person["box"]
 
-        if resize != 1.:
-            scale_factor = 1. / resize
+    # ADD GRAPHICS
+    def add_graphics(self, frame, person, is_recognized, best_match, elapsed):
+        if person is not None:
+            features = person["keypoints"]
+            x, y, height, width = person["box"]
+
+            if self.resize != 1.:
+                scale_factor = 1. / self.resize
+
+                if features:
+                    scale = lambda x: tuple(round(element * scale_factor) for element in x)
+                    features = {feature: scale(features[feature]) for feature in features}
+
+                scale = lambda *xs: tuple(int(round(x * scale_factor)) for x in xs)
+                x, y, height, width = scale(x, y, height, width)
+
+            color = self._get_color(is_recognized, best_match)
+            origin = (x - self.margin // 2, y - self.margin // 2)
+            corner = (x + height + self.margin // 2, y + width + self.margin // 2)
 
             if features:
-                scale = lambda x: tuple(round(element * scale_factor) for element in x)
-                features = {feature: scale(features[feature]) for feature in features}
+                overlay = frame.copy()
+                self._add_features(overlay, features, color)
+                cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
 
-            scale = lambda *xs: tuple(int(round(x * scale_factor)) for x in xs)
-            x, y, height, width = scale(x, y, height, width)
+            text = best_match if is_recognized else ""
+            self._add_box_and_label(frame, origin, corner, text, color, thickness=1)
 
-        color = get_color(is_recognized, best_match)
-        origin = (x - margin // 2, y - margin // 2)
-        corner = (x + height + margin // 2, y + width + margin // 2)
-
-        if features:
-            overlay = frame.copy()
-            add_features(overlay, features, radius, color, line_thickness)
-            cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
-
-        text = best_match if is_recognized else ""
-        add_box_and_label(frame, origin, corner, color, line_thickness, text, font_size, thickness=1)
-
-    add_fps(frame, elapsed, font_size, thickness=2)
+        self._add_fps(frame, elapsed)
