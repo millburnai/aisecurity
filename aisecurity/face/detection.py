@@ -33,8 +33,8 @@ class FaceDetector:
         if "min_face_size" not in self.kwargs:
             self.kwargs["min_face_size"] = 20
 
-        if "mtcnn" in mode:
-            self.mtcnn = MTCNN(min_face_size=self.kwargs["min_face_size"])
+        self.mtcnn = MTCNN(min_face_size=self.kwargs["min_face_size"])
+        # TODO: figure out why we need this for the threaded cam to work
 
         if "trt-mtcnn" in mode:
             self.trt_mtcnn = self.load_trt_mtcnn_plugin(os.path.join(config_home, "trt-mtcnn-plugin"))

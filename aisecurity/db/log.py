@@ -283,7 +283,7 @@ class IntegratedLogger:
 
     def close(self):
         elapsed = max(timer() - self.start_time, 1e-6)
-        ms_elapsed = round(elapsed * 1000., 2)
         fps = round(self.frames / elapsed, 2)
+        elapsed = round(elapsed, 2)
 
-        print("{} ms elapsed, {} frames captured = {} fps".format(ms_elapsed, self.frames, fps))
+        print("{}s elapsed, {} frames captured = {} fps".format(elapsed, self.frames, fps))
