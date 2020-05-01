@@ -12,6 +12,7 @@ import numpy as np
 
 from aisecurity.utils.paths import config_home
 
+
 ################################ Classes ###############################
 
 # FACE DETECTION
@@ -19,6 +20,8 @@ class FaceDetector:
 
     MODES = ["mtcnn", "haarcascade", "trt-mtcnn"]
 
+
+    # INITS
     def __init__(self, mode, img_shape=(160, 160), alpha=0.9, **kwargs):
         assert any(det in mode for det in self.MODES), "supported modes are 'mtcnn', 'haarcascade', and 'trt-mtcnn'"
 
@@ -34,18 +37,23 @@ class FaceDetector:
             self.mtcnn = MTCNN(min_face_size=self.kwargs["min_face_size"])
 
         if "trt-mtcnn" in mode:
-            trt_mtcnn_module = os.path.join(config_home, "trt-mtcnn")
-            engine_paths = [os.path.join(trt_mtcnn_module, "mtcnn/det{}.engine").format(net + 1) for net in range(3)]
-
-            assert all(os.path.exists(net) for net in engine_paths), "trt-mtcnn engines not found"
-            sys.path.insert(0, trt_mtcnn_module)
-
-            from trt_mtcnn_main import TrtMTCNNWrapper
-            self.trt_mtcnn = TrtMTCNNWrapper(*engine_paths)
+            self.trt_mtcnn = self.load_trt_mtcnn_plugin(os.path.join(config_home, "trt-mtcnn-plugin"))
 
         if "haarcascade" in mode:
             self.haarcascade = cv2.CascadeClassifier(config_home + "/models/haarcascade_frontalface_default.xml")
 
+    @staticmethod
+    def load_trt_mtcnn_plugin(module, engine_path="mtcnn/det{}.engine"):
+        engine_paths = [os.path.join(module, engine_path).format(net + 1) for net in range(3)]
+
+        assert all(os.path.exists(net) for net in engine_paths), "trt-mtcnn engines not found"
+        sys.path.insert(0, module)
+
+        from trt_mtcnn_main import TrtMTCNNWrapper
+        return TrtMTCNNWrapper(*engine_paths)
+
+
+    # FACE DETECTION
     def detect_faces(self, img):
         result = []
 
