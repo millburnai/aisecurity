@@ -5,6 +5,9 @@ class DistMetric:
 
     def __init__(self, metric, normalize=True, mean=None):
         assert metric in ("cosine", "euclidean"), f"{metric} not supported"
+        if metric == "cosine":
+            assert normalize, "normalize required for cosine"
+
         self.metric = metric
         self.normalize = normalize
         self.mean = mean
@@ -16,7 +19,7 @@ class DistMetric:
             axis = list(range(len(x.shape)))
             if batch:
                 del axis[0]
-            x /= np.linalg.norm(x, axis=axis)
+            x /= np.linalg.norm(x, axis=tuple(axis))
         return x
 
     def distance(self, u, v):
