@@ -1,37 +1,33 @@
 """PyCUDA + TensorRT engine management.
-
 """
 
 import json
-import warnings
+import sys
 
 import numpy as np
 
-from aisecurity.dataflow.loader import print_time
-from aisecurity.utils.paths import config_home
+sys.path.insert(1, "../")
+from utils.paths import config_home  # noqa
 
-
-################################ Setup ################################
-
-# AUTOINIT
-try:
-    import pycuda.autoinit
-    import pycuda.driver as cuda
-except (ModuleNotFoundError, ImportError) as e:  # don't know which exception
-    warnings.warn("cannot import pycuda.autoinit or pycuda.driver: '{}'".format(e))
 
 try:
-    import tensorrt as trt
-except (ModuleNotFoundError, ImportError) as e:  # don't know which exception
-    warnings.warn("cannot import tensorrt: '{}'".format(e))
+    import pycuda.autoinit  # noqa
+    import pycuda.driver as cuda  # noqa
+except (ModuleNotFoundError, ImportError) as e:
+    print(f"[DEBUG] cannot import pycuda.autoinit or pycuda.driver: '{e}'")
+
+try:
+    import tensorrt as trt  # noqa
+except (ModuleNotFoundError, ImportError) as e:
+    print(f"[DEBUG] cannot import tensorrt: '{e}'")
 
 
-################################ CUDA Engine Manager ################################
 class CudaEngineManager:
     """Cuda engine management and interface with GPU using pycuda, trt"""
 
     # INITS
-    def __init__(self, logger=None, dtype=None, max_batch_size=1, max_workspace_size=1 << 20):
+    def __init__(self, logger=None, dtype=None, max_batch_size=1,
+                 max_workspace_size=1 << 20):
         """Initializes CudaEngineManager
         :param logger: trt logger (default: trt.Logger(trt.Logger.ERROR))
         :param dtype: trt dtype (default: trt.float32)
@@ -53,20 +49,14 @@ class CudaEngineManager:
 
         self.network = self.builder.create_network()
 
-
-    # MEMORY ALLOCATION
     def allocate_buffers(self):
         """Allocates GPU memory for future use and creates an asynchronous stream"""
-
-        # determine dimensions and create page-locked memory buffers (i.e. won't be swapped to disk) to hold host i/o
         self.h_input = cuda.pagelocked_empty(
             trt.volume(self.engine.get_binding_shape(0)), dtype=trt.nptype(self.dtype)
         )
         self.h_output = cuda.pagelocked_empty(
             trt.volume(self.engine.get_binding_shape(1)), dtype=trt.nptype(self.dtype)
         )
-
-        # allocate device memory for inputs and outputs
         self.d_input = cuda.mem_alloc(self.h_input.nbytes)
         self.d_output = cuda.mem_alloc(self.h_output.nbytes)
 
@@ -76,8 +66,6 @@ class CudaEngineManager:
         """Creates execution context for engine"""
         self.context = self.engine.create_execution_context()
 
-
-    # INFERENCE
     def inference(self, imgs):
         """Run inference on given images
         :param imgs: input image arrays
@@ -95,7 +83,8 @@ class CudaEngineManager:
 
             cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
             self.context.execute_async(
-                batch_size=1, bindings=[int(self.d_input), int(self.d_output)], stream_handle=self.stream.handle
+                batch_size=1, bindings=[int(self.d_input), int(self.d_output)],
+                stream_handle=self.stream.handle
             )
             cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
             self.stream.synchronize()
@@ -104,8 +93,6 @@ class CudaEngineManager:
 
         return outputs
 
-
-    # CUDA ENGINE READ/WRITE
     def read_cuda_engine(self, engine_file):
         """Read and deserialize engine from file
         :param engine_file: path to engine file
@@ -114,18 +101,16 @@ class CudaEngineManager:
         with open(engine_file, "rb") as file, trt.Runtime(self.logger) as runtime:
             self.engine = runtime.deserialize_cuda_engine(file.read())
 
-    @print_time("Engine building and serializing time")
     def build_and_serialize_engine(self):
         """Builds and serializes a cuda engine"""
         self.engine = self.builder.build_cuda_engine(self.network).serialize()
 
-    @print_time(".uff model parsing time")
     def parse_uff(self, uff_file, input_name, input_shape, output_names):
         """Parses .uff file and prepares for serialization
         :param uff_file: path to uff model
         :param input_name: name of input
         :param input_shape: input shape (channels first)
-        :param output_name: name of outputs
+        :param output_names: names of outputs
         """
 
         parser = trt.UffParser()
@@ -140,7 +125,6 @@ class CudaEngineManager:
 
         self.parser = parser
 
-    @print_time(".caffe model parsing time")
     def parse_caffe(self, caffe_model_file, caffe_deploy_file, output_names):
         """Parses caffe model file and prepares for serialization
         :param caffe_model_file: path to caffe model file
@@ -151,7 +135,8 @@ class CudaEngineManager:
         parser = trt.CaffeParser()
 
         model_tensors = parser.parse(
-            deploy=caffe_deploy_file, model=caffe_model_file, network=self.network, dtype=self.dtype
+            deploy=caffe_deploy_file, model=caffe_model_file,
+            network=self.network, dtype=self.dtype
         )
 
         for output in output_names:
@@ -159,7 +144,8 @@ class CudaEngineManager:
 
         self.parser = parser
 
-    def uff_write_cuda_engine(self, uff_file, target_file, input_name, input_shape, output_names):
+    def uff_write_cuda_engine(self, uff_file, target_file, input_name,
+                              input_shape, output_names):
         """Parses a uff model and writes it as a serialized cuda engine
         :param uff_file: uff filepath
         :param target_file: target filepath for engine
@@ -174,7 +160,8 @@ class CudaEngineManager:
         with open(target_file, "wb") as file:
             file.write(self.engine)
 
-    def caffe_write_cuda_engine(self, caffe_model_file, caffe_deploy_file, output_names, target_file):
+    def caffe_write_cuda_engine(self, caffe_model_file, caffe_deploy_file,
+                                output_names, target_file):
         """Parses a caffe model and writes it as a serialized cuda engine
         :param caffe_model_file: path to caffe model
         :param caffe_deploy_file: path to caffe deploy file
@@ -189,16 +176,13 @@ class CudaEngineManager:
             file.write(self.engine)
 
 
-################################ CUDA Engine ################################
 class CudaEngine:
     """Cuda engine manager wrapper for interfacing with FaceNet class"""
+    MODELS = json.load(open(config_home + "/config/cuda_models.json",
+                            encoding="utf-8"))
 
-    # PREBUILT MODELS
-    MODELS = json.load(open(config_home + "/config/cuda_models.json", encoding="utf-8"))
-
-
-    # INITS
-    def __init__(self, filepath, input_name, output_name, input_shape, **kwargs):
+    def __init__(self, filepath, input_name, output_name, input_shape,
+                 **kwargs):
         """Initializes a cuda engine
         :param filepath: path to engine file
         :param input_name: name of input
@@ -224,7 +208,7 @@ class CudaEngine:
         :param input_name: provided name of input
         :param output_name: provided name of output
         :param input_shape: provided input shape
-        :raises: AssertionError: if I/O name and shape is not detected or provided
+        :raises: AssertionError: if I/O name and shape is not detected/provided
         """
 
         self.input_name, self.output_name, self.model_name = None, None, None
@@ -241,13 +225,16 @@ class CudaEngine:
             self.output_name = output_name
 
         if input_shape:
-            assert input_shape[0] == 3, "input shape to engine should be in channels-first mode"
+            assert input_shape[0] == 3, \
+                "input shape to engine should be in channels-first mode"
             self.input_shape = input_shape
         elif self.model_name is not None:
             self.input_shape = self.MODELS[self.model_name]["input_shape"]
 
-        assert self.input_name and self.output_name, "I/O names for {} not detected or provided".format(filepath)
-        assert self.input_shape, "input shape for {} not detected or provided".format(filepath)
+        assert self.input_name and self.output_name, \
+            f"I/O names for {filepath} not detected or provided"
+        assert self.input_shape, \
+            f"input shape for {filepath} not detected or provided"
 
 
     # INFERENCE

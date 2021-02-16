@@ -1,5 +1,4 @@
 """Handles connection to websocket.
-
 """
 
 import gc
@@ -8,7 +7,6 @@ import json
 import websocket
 
 
-################################ Websocket ###############################
 class Websocket:
 
     def __init__(self, socket):

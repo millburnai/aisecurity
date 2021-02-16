@@ -1,20 +1,16 @@
 """LCD utils.
-
 """
 
 from timeit import default_timer as timer
-import warnings
 
 from termcolor import cprint
 
 
-################################ Classes ################################
-
-# LCD PROGRESS BAR
 class LCDProgressBar:
 
     def __init__(self, mode, total, length=16, marker="#", websocket=None):
-        assert mode in ("pi", "sim"), "supported modes are physical (physical LCD) and dev (testing)"
+        assert mode in ("pi", "sim"), \
+            "supported modes are physical (physical LCD) and dev (testing)"
 
         try:
             assert websocket and "pi" == mode
@@ -23,7 +19,8 @@ class LCDProgressBar:
         except (ValueError, NameError, AssertionError):
             self.mode = "sim"
             if self.mode != mode:
-                warnings.warn("pi lcd mode requested but only simulation lcd available")
+                print("[DEBUG] pi lcd mode requested but "
+                      "only simulation lcd available")
 
         self.total = total
         self.bar_length = length - 2  # compensate for [] at beginning and end
@@ -47,7 +44,8 @@ class LCDProgressBar:
     def update(self, amt=1., message=None):
         self.progress += amt / self.total
 
-        done = (self.marker * round(min(1, self.progress) * self.bar_length) + self.blank)[:self.bar_length]
+        ct = self.marker * round(min(1, self.progress) * self.bar_length)
+        done = (ct + self.blank)[:self.bar_length]
 
         self.set_message("{}\n[{}]".format(message, done))
 
@@ -61,12 +59,18 @@ class IntegratedLCDProgressBar:
     def __init__(self, logger, websocket=None):
         self.logger = logger
 
-        self.pbar = LCDProgressBar(mode="pi", total=self.logger.num_recognized, websocket=websocket)
+        self.pbar = LCDProgressBar(mode="pi",
+                                   total=self.logger.num_recognized,
+                                   websocket=websocket)
         self.pbar.set_message("Loading...\n[ Initializing ]")
 
     def check_clear(self):
         lcd_clear = self.logger.num_recognized / self.logger.missed_frames
-        if self.logger.last_logged - timer() > lcd_clear or self.logger.unk_last_logged - timer() > lcd_clear:
+
+        ck_logged = self.logger.last_logged - timer() > lcd_clear
+        ck_unk_logged = self.logger.unk_last_logged - timer() > lcd_clear
+
+        if ck_logged or ck_unk_logged:
             self.pbar.reset()
 
     def update_progress(self, update_recognized):

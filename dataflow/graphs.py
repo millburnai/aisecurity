@@ -1,24 +1,21 @@
 """Graph control and flow.
-
 """
 
 import subprocess
 
 from keras import backend as K
-import tensorflow as tf
+import tensorflow.compat.v1 as tf  # noqa
 from tensorflow.python.framework import graph_io
 
-from aisecurity.dataflow.loader import print_time
+from dataflow.loader import print_time
 
 
-################################ Model conversions ###############################
-
-# freeze graph
 def _freeze_graph(graph, sess, output_names, save_dir=None, save_name=None):
     def freeze(graph, sess, output):
         with graph.as_default():
-            variable = tf.graph_util.remove_training_nodes(graph.as_graph_def())
-            frozen = tf.graph_util.convert_variables_to_constants(sess, variable, output)
+            var = tf.graph_util.remove_training_nodes(graph.as_graph_def())
+            frozen = tf.graph_util.convert_variables_to_constants(sess, var,
+                                                                  output)
             return frozen
 
     frozen_graph = freeze(graph, sess, output_names)
@@ -31,8 +28,9 @@ def _freeze_graph(graph, sess, output_names, save_dir=None, save_name=None):
 
 # .pb -> frozen .pb
 @print_time("Freeze TF model time")
-def freeze_graph(path_to_model, output_names, save_dir=".", save_name="frozen_graph.pb"):
-    assert path_to_model.endswith(".pb"), "{} must be a .pb file".format(path_to_model)
+def freeze_graph(path_to_model, output_names, save_dir=".",
+                 save_name="frozen_graph.pb"):
+    assert path_to_model.endswith(".pb"), f"{path_to_model} must be a .pb file"
 
     K.clear_session()
     K.set_learning_phase(0)
@@ -45,27 +43,30 @@ def freeze_graph(path_to_model, output_names, save_dir=".", save_name="frozen_gr
 
         tf.import_graph_def(graph_def, name="")
 
-        frozen_graph = _freeze_graph(sess.graph, sess, output_names, save_dir, save_name)
+        frozen_graph = _freeze_graph(sess.graph, sess, output_names,
+                                     save_dir, save_name)
 
         return frozen_graph
 
 
 # .h5 -> frozen .pb
 @print_time("Freeze Keras model time")
-def freeze_keras_model(path_to_model, save_dir=None, save_name="frozen_graph.pb"):
-    assert path_to_model.endswith(".h5"), "{} must be a .h5 file".format(path_to_model)
+def freeze_keras_model(path_to_model, save_dir=None,
+                       save_name="frozen_graph.pb"):
+    assert path_to_model.endswith(".h5"), f"{path_to_model} must be a .h5 file"
 
-    K.clear_session()
-    K.set_learning_phase(0)
+    tf.keras.backend.clear_session()
+    tf.keras.backend.set_learning_phase(0)
 
     model = tf.keras.models.load_model(path_to_model)
 
     input_names = [layer.op.name for layer in model.inputs]
     output_names = [layer.op.name for layer in model.outputs]
 
-    sess = K.get_session()
+    sess = tf.keras.backend.get_session()
 
-    frozen_graph = _freeze_graph(sess.graph, sess, output_names, save_dir, save_name)
+    frozen_graph = _freeze_graph(sess.graph, sess, output_names, save_dir,
+                                 save_name)
 
     return frozen_graph, (input_names, output_names)
 
@@ -81,12 +82,13 @@ def frozen_to_uff(path_to_model):
 
 # frozen .pb -> trt-optimizer .pb
 @print_time("Inference graph creation time")
-def optimize_graph(path_to_graph_def, output_names, save_dir=".", save_name="trt_graph.pb"):
+def optimize_graph(path_to_graph_def, output_names, save_dir=".",
+                   save_name="trt_graph.pb"):
     try:
         import tensorflow.contrib.tensorrt as trt
     except ModuleNotFoundError:
         # tf-trt not supported on windows and tensorflow>1.14
-        raise ValueError("tensorflow.contrib.tensorrt not available - optimize_graph cannot be used")
+        raise ValueError("tensorflow.contrib.tensorrt not available")
 
     with tf.gfile.FastGFile(path_to_graph_def, "rb") as graph_file:
         graph_def = tf.GraphDef()
