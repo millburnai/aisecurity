@@ -17,10 +17,11 @@ NVARGUS = "nvarguscamerasrc ! video/x-raw(memory:NVMM), " \
 class Camera:
     # https://github.com/jkjung-avt/tensorrt_demos/blob/master/utils/camera.py
 
-    def __init__(self, width=640, height=360, dev=0):
+    def __init__(self, width=640, height=360, dev=0, threaded=False):
         self.width = width
         self.height = height
         self.dev = dev
+        self.threaded = threaded
 
         self.thread_running = False
         self.retval = False
@@ -50,17 +51,22 @@ class Camera:
 
             cam.thread_running = False
 
-        assert not self.thread_running, "thread is already running"
-        self.thread_running = True
-        self.thread = threading.Thread(target=grab_img, args=(self,))
-        self.thread.start()
+        if self.threaded:
+            assert not self.thread_running, "thread is already running"
+            self.thread_running = True
+            self.thread = threading.Thread(target=grab_img, args=(self,))
+            self.thread.start()
 
     def read(self):
-        return self.retval, self.img_handle
+        if self.threaded:
+            return self.retval, self.img_handle
+        else:
+            return self.cap.read()
 
     def release(self):
-        self.thread_running = False
-        self.thread.join()
+        if self.threaded:
+            self.thread_running = False
+            self.thread.join()
         self.cap.release()
 
 
