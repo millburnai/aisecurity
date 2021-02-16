@@ -25,10 +25,10 @@ from face.detection import FaceDetector
 
 class FaceNet:
     """Class implementation of FaceNet"""
-    MODELS = json.load(open(config_home + "/config/models.json",
+    MODELS = json.load(open(config_home + "/defaults/models.json",
                             encoding="utf-8"))
 
-    @print_time("Model load time")
+    @print_time("model load time")
     def __init__(self, model_path=default_model, data_path=db_loc,
                  input_name=None, output_name=None, input_shape=None,
                  allow_gpu_growth=False):
