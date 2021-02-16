@@ -260,17 +260,19 @@ class FaceNet:
         return embeds.reshape(len(imgs), -1)
 
     def predict(self, img, detector, margin=10,
-                rotations=None, use_threading=False):
+                rotations=None, use_threading=False, verbose=True):
         """Embeds and normalizes an image from path or array
         :param img: image to be predicted on (BGR image)
         :param detector: FaceDetector object
         :param margin: margin for MTCNN face cropping (default: 10)
         :param rotations: array of rots to be applied to face (default: None)
         :param use_threading: use threading for embed or not (default: False)
+        :param verbose: verbosity (default: True)
         :returns: normalized embeddings, facial coordinates
         """
 
-        cropped_faces, face_coords = detector.crop_face(img, margin, rotations)
+        cropped_faces, face_coords = detector.crop_face(img, margin, rotations,
+                                                        verbose=verbose)
         start = timer()
 
         assert cropped_faces.shape[1:] == (*self.img_shape, 3), \
@@ -299,10 +301,11 @@ class FaceNet:
             np.array(raw_embeddings), batch=True
         )
 
-        message = f"{len(normalized_embeddings)} " \
-                  f"vector{'s' if len(normalized_embeddings) > 1 else ''}"
-        print(f"Embedding time ({message}): "
-              f"\033[1m{round(1000. * (timer() - start), 2)} ms\033[0m")
+        if verbose:
+            message = f"{len(normalized_embeddings)} " \
+                      f"vector{'s' if len(normalized_embeddings) > 1 else ''}"
+            print(f"Embedding time ({message}): "
+                  f"\033[1m{round(1000. * (timer() - start), 2)} ms\033[0m")
 
         return normalized_embeddings, face_coords
 
@@ -383,7 +386,6 @@ class FaceNet:
         :param rotations: rotations (-1 is horizontal flip) (default: None)
         """
 
-        # INITS
         assert self._db, "data must be provided"
         assert 0. <= resize <= 1., "resize must be in [0., 1.]"
 
@@ -397,9 +399,9 @@ class FaceNet:
         cap = Camera(width, height)
 
         msize = 0.5 * ((width + height) * resize) / 2
-        detector = FaceDetector(detector, self.img_shape, min_face_size=msize)
+        detector = FaceDetector(detector, self.img_shape, self.alpha,
+                                min_face_size=msize)
 
-        # CAM LOOP
         while True:
             _, frame = cap.read()
             original_frame = frame.copy()
