@@ -1,7 +1,6 @@
 """Haarcascade or MTCNN face detection.
 """
 
-import os
 import sys
 from timeit import default_timer as timer
 
@@ -13,23 +12,10 @@ sys.path.insert(1, "../")
 from utils.paths import config_home
 
 
-def load_trt_mtcnn_plugin(module, engine_path="mtcnn/det{}.engine"):
-    engine_paths = [os.path.join(module, engine_path).format(net + 1)
-                    for net in range(3)]
-
-    assert all(os.path.exists(net) for net in engine_paths), \
-        "trt-mtcnn engines not found"
-    sys.path.insert(0, module)
-
-    from trt_mtcnn_main import TrtMTCNNWrapper
-    return TrtMTCNNWrapper(*engine_paths)
-
-
 class FaceDetector:
     MODES = ["mtcnn", "haarcascade", "trt-mtcnn"]
 
-    def __init__(self, mode, img_shape=(160, 160), alpha=0.9,
-                 plugin_path=config_home + "/trt_mtcnn_plugin", **kwargs):
+    def __init__(self, mode, img_shape=(160, 160), alpha=0.9, **kwargs):
         assert any(det in mode for det in self.MODES), \
             "supported modes are 'mtcnn', 'haarcascade', and 'trt-mtcnn'"
 
@@ -45,10 +31,16 @@ class FaceDetector:
         # TODO: figure out why we need this for the threaded cam to work
 
         if "trt-mtcnn" in mode:
-            self.trt_mtcnn = load_trt_mtcnn_plugin(plugin_path)
+            sys.path.insert(1, "../face/trt_mtcnn_plugin")
+            from face.trt_mtcnn_plugin.trt_mtcnn import TrtMTCNNWrapper
+
+            engine_paths = [f"../face/trt_mtcnn_plugin/mtcnn/det{i+1}.engine"
+                            for i in range(3)]
+            self.trt_mtcnn = TrtMTCNNWrapper(*engine_paths)
 
         if "haarcascade" in mode:
-            self.haarcascade = cv2.CascadeClassifier(plugin_path)
+            hpath = config_home + "models/haarcascade_frontalface_default.xml"
+            self.haarcascade = cv2.CascadeClassifier(hpath)
 
     def detect_faces(self, img):
         result = []
