@@ -3,15 +3,20 @@
 
 import functools
 import struct
+import sys
 
 import numpy as np
 from Crypto.Cipher import AES  # noqa
 from Crypto.Random import get_random_bytes  # noqa
 
-from utils import name_key_path, embed_key_path  # noqa
+sys.path.insert(1, "../")
+from utils.paths import name_key_path, embed_key_path  # noqa
 
 
 NUM_BITS = 16
+ALL = 0
+EMBEDS = 1
+NAMES = 2
 
 
 def require_permission(func):
@@ -72,11 +77,8 @@ def decrypt(cipher_text, position, key_file):
     return decrypt_cipher.decrypt(cipher_text)
 
 
-def encrypt_data(data, ignore=None, decryptable=True,
+def encrypt_data(data, to_encrypt=ALL, decryptable=True,
                  name_keys=name_key_path, embedding_keys=embed_key_path):
-    if ignore is None:
-        ignore = []
-
     if decryptable:
         generate_key(name_keys)
         generate_key(embedding_keys)
@@ -87,13 +89,13 @@ def encrypt_data(data, ignore=None, decryptable=True,
             "embeds must have shape (number of embeds, dim(embed))"
         encrypted_name, encrypted_embeds = person, data[person].tolist()
 
-        if "names" not in ignore:
+        if to_encrypt in (ALL, NAMES):
             name_cipher = generate_cipher(name_keys, alloc_mem=decryptable)
             encrypted_name = list(encrypt(person.encode("utf-8"), name_cipher))
             encrypted_name = "".join(map(chr, encrypted_name))
             # bytes are not json-serializable
 
-        if "embeddings" not in ignore:
+        if to_encrypt in (ALL, EMBEDS):
             for idx, embed in enumerate(encrypted_embeds):
                 embed_cipher = generate_cipher(embedding_keys,
                                                alloc_mem=decryptable)
@@ -105,7 +107,7 @@ def encrypt_data(data, ignore=None, decryptable=True,
     return encrypted
 
 
-def decrypt_data(data, ignore=None, name_keys=name_key_path,
+def decrypt_data(data, to_encrypt=ALL, name_keys=name_key_path,
                  embedding_keys=embed_key_path):
     """Obviously, if the embedding sets have differing lengths, the lengths
     of the nonce groups associated with those embeddings will be different.
@@ -121,9 +123,6 @@ def decrypt_data(data, ignore=None, name_keys=name_key_path,
     the embeds in all of the embeddings prior to x (adj_nonce_pos).
     """
 
-    if ignore is None:
-        ignore = []
-
     adj_nonce_pos = 0
     decrypted = {}
     for nonce_pos, encrypted_name in enumerate(data):
@@ -131,11 +130,11 @@ def decrypt_data(data, ignore=None, name_keys=name_key_path,
         # assume embeds have shape (number of embeds, dim(embed) * 8)
         # because double = 8 bytes
 
-        if "names" not in ignore:
+        if to_encrypt in (ALL, NAMES):
             byte_name = bytes(map(ord, encrypted_name))
             name = decrypt(byte_name, nonce_pos, name_keys).decode("utf-8")
 
-        if "embeddings" not in ignore:
+        if to_encrypt in (ALL, EMBEDS):
             for idx, embed in enumerate(embeds):
                 byte_embed = decrypt(bytes(embed), adj_nonce_pos + idx,
                                      embedding_keys)

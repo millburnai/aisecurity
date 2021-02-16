@@ -4,6 +4,7 @@
 
 import functools
 import json
+import ntpath
 import os
 from timeit import default_timer as timer
 import sys
@@ -14,21 +15,20 @@ import tensorflow.compat.v1 as tf  # noqa
 from tqdm import tqdm
 
 sys.path.insert(1, "../")
-from privacy.encryptions import encrypt_data, decrypt_data  # noqa
+from privacy.encryptions import (ALL, NAMES, EMBEDS,  # noqa
+                                 encrypt_data, decrypt_data)
 from utils.paths import db_loc, name_key_path, embed_key_path  # noqa
 
 
-def print_time(message="Time elapsed"):
+def print_time(message):
     def _timer(func):
         @functools.wraps(func)
         def _func(*args, **kwargs):
             start = timer()
             result = func(*args, **kwargs)
-            print("{}: {}s".format(message, round(timer() - start, 4)))
+            print(f"[DEBUG] {message}: {round(timer() - start, 4)}s")
             return result
-
         return _func
-
     return _timer
 
 
@@ -61,10 +61,10 @@ def screen_data(key, value):
     return key, value
 
 
-@print_time("Data embedding time")
+@print_time("data embedding time")
 def online_load(facenet, img_dir, people=None, **kwargs):
     if people is None:
-        people = [f for f in os.listdir(img_dir)
+        people = [os.path.join(img_dir, f) for f in os.listdir(img_dir)
                   if f.endswith("jpg") or f.endswith("png")]
 
     data = {}
@@ -73,67 +73,66 @@ def online_load(facenet, img_dir, people=None, **kwargs):
     for person in tqdm(people):
         if not person.endswith("jpg") and not person.endswith("png"):
             print(f"[DEBUG] '{person}' not a jpg or png image")
-        elif os.path.getsize(person) < 1e6:
-            print(f"[DEBUG] '{person}' too large (> 1M bytes)")
+        elif os.path.getsize(person) > 1e8:
+            print(f"[DEBUG] '{person}' too large (> 100M bytes)")
+        else:
             no_faces.append(person)
 
-            img = cv2.imread(os.path.join(img_dir, person))
-            embeds, __ = facenet.predict(img, **kwargs)
+            try:
+                embeds, __ = facenet.predict(cv2.imread(person), **kwargs)
 
-            person = person.strip("jpg").strip("png")
-            data[person] = embeds.reshape(len(embeds), -1)
+                person = ntpath.basename(person)
+                person = person.replace(".jpg", "").replace(".png", "")
+                data[person] = embeds.reshape(len(embeds), -1)
+            except AssertionError as e:
+                print(f"[DEBUG] error ('{person}'): {e}")
 
+    print(data)
     return data, no_faces
 
 
-def encrypt_to_ignore(encrypt):
-    ignore = ["names", "embeddings"]
-    if encrypt == "all":
-        encrypt = ["names", "embeddings"]
-    if encrypt:
-        for item in encrypt:
-            ignore.remove(item)
-    return ignore
-
-
-def dump_and_encrypt(data, metadata, dump_path, encrypt=None,
+def dump_and_encrypt(data, metadata, dump_path, to_encrypt=ALL,
                      mode="w+", **kwargs):
-    ignore = encrypt_to_ignore(encrypt)
-    encrypted_data = encrypt_data(data, ignore=ignore, **kwargs)
+    encrypted_data = encrypt_data(data, to_encrypt=to_encrypt, **kwargs)
 
     with open(dump_path, mode, encoding="utf-8") as dump_file:
         data = {"metadata": metadata, "data": encrypted_data}
         json.dump(data, dump_file, ensure_ascii=False, indent=4)
 
 
-@print_time("Data embedding and dumping time")
+@print_time("data embedding and dumping time")
 def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None,
-                   full_overwrite=False, encrypt="all", **kwargs):
+                   full_overwrite=False, to_encrypt=ALL, **kwargs):
     metadata = facenet.metadata
-    metadata["encrypt"] = encrypt
+    metadata["to_encrypt"] = to_encrypt
 
     if not full_overwrite:
         path = retrieve_path if retrieve_path else dump_path
-        old_embeds, old_metadata = retrieve_embeds(path)
+        old_embeds, old_metadata = retrieve_embeds(path, name_key_path,
+                                                   embed_key_path)
 
         new_embeds, no_faces = online_load(facenet, img_dir, **kwargs)
         data = {**old_embeds, **new_embeds}
 
-        assert metadata == old_metadata, "metadata inconsistent"
+        assert not old_metadata or metadata == old_metadata, \
+            "metadata inconsistent"
 
     else:
         data, no_faces = online_load(facenet, img_dir, **kwargs)
 
-    dump_and_encrypt(data, metadata, dump_path, encrypt=encrypt)
+    dump_and_encrypt(data, metadata, dump_path, to_encrypt=to_encrypt)
 
 
-@print_time("Data retrieval time")
+@print_time("data retrieval time")
 def retrieve_embeds(path, name_keys, embedding_keys):
+    if path is None or name_keys is None or embedding_keys is None:
+        return {}, {}
+
     with open(path, "r", encoding="utf-8") as json_file:
         data = json.load(json_file)
         metadata = data["metadata"]
         encrypted_data = data["data"]
 
-    decrypted = decrypt_data(encrypted_data, metadata["ignore"],
+    decrypted = decrypt_data(encrypted_data, metadata["to_encrypt"],
                              name_keys, embedding_keys)
     return decrypted, metadata
