@@ -1,0 +1,3 @@
+[submodule "face/trt_mtcnn_plugin"]
+	path = face/trt_mtcnn_plugin
+	url = https://github.com/orangese/trt_mtcnn_plugin.git
