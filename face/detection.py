@@ -27,9 +27,6 @@ class FaceDetector:
         if "min_face_size" not in self.kwargs:
             self.kwargs["min_face_size"] = 20
 
-        self.mtcnn = MTCNN(min_face_size=self.kwargs["min_face_size"])
-        # TODO: figure out why we need this for the threaded cam to work
-
         if "trt-mtcnn" in mode:
             sys.path.insert(1, "../face/trt_mtcnn_plugin")
             from face.trt_mtcnn_plugin.trt_mtcnn import TrtMTCNNWrapper
@@ -37,6 +34,9 @@ class FaceDetector:
             engine_paths = [f"../face/trt_mtcnn_plugin/mtcnn/det{i+1}.engine"
                             for i in range(3)]
             self.trt_mtcnn = TrtMTCNNWrapper(*engine_paths)
+
+        if "mtcnn" in mode.replace("trt-mtcnn", ""):
+            self.mtcnn = MTCNN(min_face_size=self.kwargs["min_face_size"])
 
         if "haarcascade" in mode:
             hpath = config_home + "models/haarcascade_frontalface_default.xml"
@@ -49,7 +49,7 @@ class FaceDetector:
             minsize = max(40, int(self.kwargs["min_face_size"]))
             result = self.trt_mtcnn.detect_faces(img, minsize=minsize)
 
-        if "mtcnn" in self.mode and "trt-mtcnn" not in self.mode:
+        if "mtcnn" in self.mode.replace("trt-mtcnn", ""):
             result = self.mtcnn.detect_faces(img)
 
         no_result = (not result or result[0]["confidence"] < self.alpha)
@@ -67,7 +67,7 @@ class FaceDetector:
 
         return result
 
-    def crop_face(self, img_bgr, margin, rotations=None):
+    def crop_face(self, img_bgr, margin, rotations=None, verbose=True):
         def crop_and_rotate(img, img_shape, face_coords, rotation_angle):
             x, y, width, height = face_coords
             img = img[y - margin // 2:y + height + margin // 2,
@@ -101,13 +101,14 @@ class FaceDetector:
             if face["confidence"] >= self.alpha:
                 resized_faces = [crop_and_rotate(img, self.img_shape, face["box"], angle)
                                  for angle in rotations]
-                print(f"Detection time ({self.mode}): \033[1m"
-                      f"{round(1000. * (timer() - start), 2)} ms\033[0m")
-            else:
+                if verbose:
+                    print(f"Detection time ({self.mode}): \033[1m"
+                          f"{round(1000. * (timer() - start), 2)} ms\033[0m")
+            elif verbose:
                 print(f"{round(face['confidence'] * 100, 2)}% "
                       f"face detection confidence is too low")
 
-        else:
+        elif verbose:
             print("No face detected")
 
         return np.array(resized_faces), face

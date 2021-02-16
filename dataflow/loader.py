@@ -87,7 +87,6 @@ def online_load(facenet, img_dir, people=None, **kwargs):
             except AssertionError as e:
                 print(f"[DEBUG] error ('{person}'): {e}")
 
-    print(data)
     return data, no_faces
 
 
