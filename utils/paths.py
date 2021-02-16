@@ -2,8 +2,9 @@
 """
 
 import json
+import os
 
-config_home = "config"
+config_home = os.path.join(os.path.dirname(__file__), "../config")
 with open(config_home + "/config.json", encoding="utf-8") as config_file:
     config = json.load(config_file)
 

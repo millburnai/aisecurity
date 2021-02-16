@@ -27,7 +27,7 @@ def _freeze_graph(graph, sess, output_names, save_dir=None, save_name=None):
 
 
 # .pb -> frozen .pb
-@print_time("Freeze TF model time")
+@print_time("freeze TF model time")
 def freeze_graph(path_to_model, output_names, save_dir=".",
                  save_name="frozen_graph.pb"):
     assert path_to_model.endswith(".pb"), f"{path_to_model} must be a .pb file"
@@ -50,7 +50,7 @@ def freeze_graph(path_to_model, output_names, save_dir=".",
 
 
 # .h5 -> frozen .pb
-@print_time("Freeze Keras model time")
+@print_time("freeze Keras model time")
 def freeze_keras_model(path_to_model, save_dir=None,
                        save_name="frozen_graph.pb"):
     assert path_to_model.endswith(".h5"), f"{path_to_model} must be a .h5 file"
@@ -72,7 +72,7 @@ def freeze_keras_model(path_to_model, save_dir=None,
 
 
 # .pb -> .uff
-@print_time("Conversion to .uff time")
+@print_time("conversion to .uff time")
 def frozen_to_uff(path_to_model):
     bash_cmd = "convert-to-uff \"{}\"".format(path_to_model)
     process = subprocess.Popen(bash_cmd.split(), stdout=subprocess.PIPE)
@@ -81,7 +81,7 @@ def frozen_to_uff(path_to_model):
 
 
 # frozen .pb -> trt-optimizer .pb
-@print_time("Inference graph creation time")
+@print_time("inference graph creation time")
 def optimize_graph(path_to_graph_def, output_names, save_dir=".",
                    save_name="trt_graph.pb"):
     try:
