@@ -23,8 +23,8 @@ class DistMetric:
         return x
 
     def distance(self, u, v):
-        u = self.apply_norms(u)
-        v = self.apply_norms(v)
+        u = self.apply_norms(u)[0]
+        v = self.apply_norms(v)[0]
 
         if self.metric == "cosine":
             return 1. - np.dot(u, v) / (np.linalg.norm(v) * np.linalg.norm(v))
