@@ -9,7 +9,7 @@ from mtcnn import MTCNN
 import numpy as np
 
 sys.path.insert(1, "../")
-from utils.paths import CONFIG_HOME
+from util.paths import CONFIG_HOME
 
 
 class FaceDetector:

@@ -16,11 +16,11 @@ from dataflow.loader import (print_time, screen_data,
 from db.log import IntegratedLogger, Logger
 from db.connection import Websocket
 from optim.engine import CudaEngine
-from utils.lcd import IntegratedLCDProgressBar
-from utils.distance import DistMetric
-from utils.paths import (DB_LOB, DEFAULT_MODEL, CONFIG_HOME,
+from util.lcd import IntegratedLCDProgressBar
+from util.distance import DistMetric
+from util.paths import (DB_LOB, DEFAULT_MODEL, CONFIG_HOME,
                          EMBED_KEY_PATH, NAME_KEY_PATH)
-from utils.visuals import Camera, GraphicsRenderer
+from util.visuals import Camera, GraphicsRenderer
 from face.detection import FaceDetector
 
 

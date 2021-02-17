@@ -17,7 +17,7 @@ from tqdm import tqdm
 sys.path.insert(1, "../")
 from privacy.encryptions import (ALL, NAMES, EMBEDS,  # noqa
                                  encrypt_data, decrypt_data)
-from utils.paths import DB_LOB, NAME_KEY_PATH, EMBED_KEY_PATH  # noqa
+from util.paths import DB_LOB, NAME_KEY_PATH, EMBED_KEY_PATH  # noqa
 
 
 def print_time(message):
