@@ -32,4 +32,5 @@ class DistMetric:
             return np.linalg.norm(u - v)
 
     def __str__(self):
-        return f"{self.metric}+{'normalize' if self.normalize else ''}"
+        constr = f"{self.metric}+{'normalize' if self.normalize else ''}"
+        return f"Distance ({constr})"

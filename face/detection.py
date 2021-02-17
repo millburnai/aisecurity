@@ -5,8 +5,7 @@ import sys
 from timeit import default_timer as timer
 
 import cv2
-from mtcnn import MTCNN
-import numpy as np
+from termcolor import colored
 
 sys.path.insert(1, "../")
 from util.paths import CONFIG_HOME
@@ -36,6 +35,7 @@ class FaceDetector:
             self.trt_mtcnn = TrtMTCNNWrapper(*engine_paths)
 
         if "mtcnn" in mode.replace("trt-mtcnn", ""):
+            from mtcnn import MTCNN
             self.mtcnn = MTCNN(min_face_size=self.kwargs["min_face_size"])
 
         if "haarcascade" in mode:
@@ -67,49 +67,36 @@ class FaceDetector:
 
         return result
 
-    def crop_face(self, img_bgr, margin, rotations=None, verbose=True):
-        def crop_and_rotate(img, img_shape, face_coords, rotation_angle):
-            x, y, width, height = face_coords
-            img = img[y - margin // 2:y + height + margin // 2,
-                      x - margin // 2:x + width + margin // 2, :]
-
-            resized = cv2.resize(img, img_shape)
-            if rotation_angle == 0:
-                return resized
-            elif rotation_angle == -1:
-                return cv2.flip(resized, 1)
-            else:
-                rot = tuple(np.array(resized.shape[1::-1]) / 2)
-                mat = cv2.getRotationMatrix2D(rot, rotation_angle, 1.)
-                return cv2.warpAffine(resized, mat, resized.shape[1::-1],
-                                      flags=cv2.INTER_LINEAR)
-
+    def crop_face(self, img_bgr, margin, flip=False, verbose=True):
         start = timer()
-        resized_faces, face = [], None
+        resized_faces, face = None, None
 
-        img = img_bgr[:, :, ::-1]
+        img = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         result = self.detect_faces(img)
-
-        if rotations is None:
-            rotations = [0.]
-        if 0. not in rotations:
-            rotations.insert(0, 0.)
 
         if len(result) != 0:
             face = max(result, key=lambda person: person["confidence"])
 
             if face["confidence"] >= self.alpha:
-                resized_faces = [crop_and_rotate(img, self.img_shape,
-                                                 face["box"], angle)
-                                 for angle in rotations]
+                x, y, width, height = face["box"]
+                img = img[y - margin // 2:y + height + margin // 2,
+                          x - margin // 2:x + width + margin // 2, :]
+                resized_faces = [cv2.resize(img, self.img_shape)]
+
+                if flip:
+                    flipped = cv2.flip(resized_faces[0], 1)
+                    resized_faces.append(flipped)
+
                 if verbose:
-                    print(f"Detection time ({self.mode}): \033[1m"
-                          f"{round(1000. * (timer() - start), 2)} ms\033[0m")
+                    elapsed = round(1000. * (timer() - start), 2)
+                    time = colored(f"{elapsed} ms", attrs=["bold"])
+                    print(f"Detection time ({self.mode}): " + time)
+
             elif verbose:
-                print(f"{round(face['confidence'] * 100, 2)}% "
-                      f"face detection confidence is too low")
+                confidence = round(face['confidence'] * 100, 2)
+                print(f"{confidence}% face detection confidence is too low")
 
         elif verbose:
             print("No face detected")
 
-        return np.array(resized_faces), face
+        return resized_faces, face

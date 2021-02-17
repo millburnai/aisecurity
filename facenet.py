@@ -3,13 +3,13 @@
 
 import json
 import os
-import threading
 from timeit import default_timer as timer
 
 import cv2
 import numpy as np
 from sklearn import neighbors
 import tensorflow.compat.v1 as tf  # noqa
+from termcolor import colored
 
 from dataflow.loader import (print_time, screen_data, strip_id,
                              retrieve_embeds, get_frozen_graph)
@@ -246,59 +246,38 @@ class FaceNet:
 
         return embeds.reshape(len(imgs), -1)
 
-    def predict(self, img, detector, margin=10,
-                rotations=None, use_threading=False, verbose=True):
+    def predict(self, img, detector, margin=10, flip=False, verbose=True):
         """Embeds and normalizes an image from path or array
         :param img: image to be predicted on (BGR image)
         :param detector: FaceDetector object
         :param margin: margin for MTCNN face cropping (default: 10)
-        :param rotations: array of rots to be applied to face (default: None)
-        :param use_threading: use threading for embed or not (default: False)
+        :param flip: flip and concatenate or not (default: False)
         :param verbose: verbosity (default: True)
         :returns: normalized embeddings, facial coordinates
         """
 
-        cropped_faces, face_coords = detector.crop_face(img, margin, rotations,
-                                                        verbose=verbose)
+        cropped_faces, face_coords = detector.crop_face(img, margin,
+                                                        flip, verbose)
+        assert cropped_faces is not None, "no face detected"
+
         start = timer()
 
-        assert cropped_faces.shape[1:] == (*self.img_shape, 3), \
-            "no face detected"
-
-        if use_threading:
-            raw_embeddings, threads = [], []
-            for cropped_face in cropped_faces:
-                normalized_face = self.normalize(cropped_face)
-                args = (normalized_face[None, ...],)
-
-                target = lambda arg: raw_embeddings.append(self.embed(arg))
-                thread = threading.Thread(target=target, args=args)
-
-                threads.append(thread)
-                thread.start()
-
-            for thread in threads:
-                thread.join()
-
-        else:
-            normalized = self.normalize(cropped_faces)
-            raw_embeddings = np.expand_dims(self.embed(normalized), axis=1)
-
-        normalized_embeddings = self.dist_metric.apply_norms(
-            np.array(raw_embeddings), batch=True
-        )
+        normalized = self.normalize(np.array(cropped_faces))
+        embeds = np.expand_dims(self.embed(normalized), axis=1)
+        embeds = self.dist_metric.apply_norms(embeds, batch=True)
 
         if verbose:
-            message = f"{len(normalized_embeddings)} " \
-                      f"vector{'s' if len(normalized_embeddings) > 1 else ''}"
-            print(f"Embedding time ({message}): "
-                  f"\033[1m{round(1000. * (timer() - start), 2)} ms\033[0m")
+            elapsed = round(1000. * (timer() - start), 2)
+            time = colored(f"{elapsed} ms", attrs=["bold"])
+            vecs = f"{len(embeds)} vector{'s' if len(embeds) > 1 else ''}"
+            print(f"Embedding time ({vecs}): " + time)
 
-        return normalized_embeddings, face_coords
+        return embeds, face_coords
 
-    def recognize(self, img, *args, **kwargs):
+    def recognize(self, img, *args, verbose=True, **kwargs):
         """Facial recognition
         :param img: image array in BGR mode
+        :param verbose: verbose or not (default: True)
         :param args: will be passed to self.predict
         :param kwargs: will be passed to self.predict
         :returns: embedding, is recognized, best match, distance
@@ -320,9 +299,10 @@ class FaceNet:
             dist = self.dist_metric.distance(embed, self.data[best_match])
             is_recognized = dist <= self.alpha
 
-            print_info = (self.dist_metric, dist, best_match,
-                          "" if is_recognized else " !")
-            print("%s: \033[1m%.4f (%s)%s\033[0m" % print_info)
+            if verbose:
+                info = colored(f"{round(dist, 4)} ({best_match})",
+                               color="green" if is_recognized else "red")
+                print(f"{self.dist_metric}: {info}")
 
         except (ValueError, AssertionError, cv2.error) as error:
             incompatible = "query data dimension"
@@ -338,7 +318,7 @@ class FaceNet:
 
     def real_time_recognize(self, width=640, height=360, dynamic_log=False,
                             pbar=False, resize=1., detector="mtcnn+haarcascade",
-                            data_mutable=False, socket=None, rotations=None):
+                            data_mutable=False, socket=None, flip=False):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
         :param height: height of frame (default: 360)
@@ -348,7 +328,7 @@ class FaceNet:
         :param detector: face detector type (default: "mtcnn+haarcascade")
         :param data_mutable: update database iff requested (default: False)
         :param socket: socket address (dev only)
-        :param rotations: rotations (-1 is horizontal flip) (default: None)
+        :param flip: whether to flip horizontally or not (default: False)
         """
 
         assert self._db, "data must be provided"
@@ -374,7 +354,7 @@ class FaceNet:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
             # facial detection and recognition
-            result = self.recognize(frame, detector, rotations=rotations)
+            result = self.recognize(frame, detector, flip=flip)
             embed, is_recognized, best_match, dist, face, elapsed = result
 
             # graphics, logging, lcd, etc.
