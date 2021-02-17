@@ -19,12 +19,12 @@ class DistMetric:
             axis = list(range(len(x.shape)))
             if batch:
                 del axis[0]
-            x /= np.linalg.norm(x, axis=tuple(axis))
+            x /= np.linalg.norm(x, axis=tuple(axis), keepdims=True)
         return x
 
     def distance(self, u, v):
-        u = self.apply_norms(u)[0]
-        v = self.apply_norms(v)[0]
+        u = self.apply_norms(u)
+        v = self.apply_norms(v)
 
         if self.metric == "cosine":
             return 1. - np.dot(u, v) / (np.linalg.norm(v) * np.linalg.norm(v))

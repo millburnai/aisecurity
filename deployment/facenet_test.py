@@ -6,4 +6,4 @@ from facenet import FaceNet
 
 if __name__ == "__main__":
     facenet = FaceNet()
-    facenet.real_time_recognize(detector="trt-mtcnn")
+    facenet.real_time_recognize(detector="trt-mtcnn", flip=False)

@@ -263,7 +263,7 @@ class FaceNet:
         start = timer()
 
         normalized = self.normalize(np.array(cropped_faces))
-        embeds = np.expand_dims(self.embed(normalized), axis=1)
+        embeds = self.embed(normalized)
         embeds = self.dist_metric.apply_norms(embeds, batch=True)
 
         if verbose:
@@ -295,8 +295,9 @@ class FaceNet:
             embeds, face = self.predict(img, *args, **kwargs)
             embed = embeds[0]
 
-            best_match = self._knn.predict(embed)[0]
-            dist = self.dist_metric.distance(embed, self.data[best_match])
+            best_match = self._knn.predict(embed[None, ...])[0]
+            nearest_embed = np.squeeze(self.data[best_match], 0)
+            dist = self.dist_metric.distance(embed, nearest_embed)
             is_recognized = dist <= self.alpha
 
             if verbose:
