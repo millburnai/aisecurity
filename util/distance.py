@@ -23,14 +23,13 @@ class DistMetric:
         return x
 
     def distance(self, u, v):
-        u = self.apply_norms(u)
-        v = self.apply_norms(v)
-
         if self.metric == "cosine":
             return 1. - np.dot(u, v) / (np.linalg.norm(v) * np.linalg.norm(v))
         else:
             return np.linalg.norm(u - v)
 
     def __str__(self):
-        constr = f"{self.metric}+{'normalize' if self.normalize else ''}"
+        constr = f"{self.metric}" \
+                 f"+{'normalize' if self.normalize else ''}" \
+                 f"+{'mean' if self.mean else ''}"
         return f"Distance ({constr})"

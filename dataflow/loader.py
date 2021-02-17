@@ -103,7 +103,8 @@ def dump_and_encrypt(data, metadata, dump_path, to_encrypt=ALL,
 
 @print_time("data embedding and dumping time")
 def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None,
-                   full_overwrite=False, to_encrypt=ALL, **kwargs):
+                   full_overwrite=False, to_encrypt=ALL, use_mean=False,
+                   **kwargs):
     metadata = facenet.metadata
     metadata["to_encrypt"] = to_encrypt
 
@@ -120,6 +121,10 @@ def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None,
 
     else:
         data, no_faces = online_load(facenet, img_dir, **kwargs)
+
+    if use_mean:
+        embeds = np.array(list(data.values()))
+        metadata["mean"] = np.average(embeds, axis=(0, 1, 2))
 
     dump_and_encrypt(data, metadata, dump_path, to_encrypt=to_encrypt)
 

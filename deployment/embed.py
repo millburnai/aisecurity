@@ -13,6 +13,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--img_dir", help="image dir to embed")
     parser.add_argument("--dump_path", help="dump path for embeddings")
+    parser.add_argument("--mean", help="use mean or not", action="store_true")
     args = parser.parse_args()
 
     facenet = FaceNet(data_path=None, allow_gpu_growth=True)
@@ -23,4 +24,5 @@ if __name__ == "__main__":
     detector = FaceDetector("trt-mtcnn", facenet.img_shape)
     dump_and_embed(facenet, args.img_dir, args.dump_path,
                    to_encrypt=NAMES, detector=detector,
-                   full_overwrite=True, verbose=False)
+                   full_overwrite=True, use_mean=args.mean,
+                   verbose=False)
