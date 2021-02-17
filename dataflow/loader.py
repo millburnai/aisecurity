@@ -58,7 +58,9 @@ def screen_data(key, value):
         assert is_vector, f"each value must be a vectorized " \
                           f"embedding, got shape {embed.shape}"
 
-    return key, value
+
+def strip_id(name, split="-"):
+    return name[:name.rfind(split)]
 
 
 @print_time("data embedding time")

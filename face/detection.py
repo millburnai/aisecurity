@@ -15,7 +15,7 @@ from util.paths import CONFIG_HOME
 class FaceDetector:
     MODES = ["mtcnn", "haarcascade", "trt-mtcnn"]
 
-    def __init__(self, mode, img_shape=(160, 160), alpha=0.9, **kwargs):
+    def __init__(self, mode, img_shape=(160, 160), alpha=0.8, **kwargs):
         assert any(det in mode for det in self.MODES), \
             "supported modes are 'mtcnn', 'haarcascade', and 'trt-mtcnn'"
 

@@ -11,7 +11,7 @@ import numpy as np
 from sklearn import neighbors
 import tensorflow.compat.v1 as tf  # noqa
 
-from dataflow.loader import (print_time, screen_data,
+from dataflow.loader import (print_time, screen_data, strip_id,
                              retrieve_embeds, get_frozen_graph)
 from db.log import IntegratedLogger, Logger
 from db.connection import Websocket
@@ -161,28 +161,18 @@ class FaceNet:
             raise ValueError("trt mode not available")
         self.img_shape = list(reversed(self.facenet.input_shape))[:-1]
 
-    def update_data(self, person, embeddings, flush_entry=False,
-                    train_knn=True):
+    def update_data(self, person, embeddings, train_knn=True):
         """Updates data property
         :param person: new entry
         :param embeddings: new entry's list of embeddings
-        :param flush_entry: overwrite previous embeddings (default: False)
         :param train_knn: train K-NN (default: True)
         """
+        screen_data(person, embeddings)
 
-        person, embeddings = screen_data(person, embeddings)
-        embeddings = np.array(embeddings).reshape(len(embeddings), -1)
+        self._db[person] = np.array(embeddings).reshape(len(embeddings), -1)
 
-        if not self.data:
-            self._db = {}
-
-        if person in self.data and not flush_entry:
-            concat = [embeddings, self._db[person]]
-            self._db[person] = np.concatenate(concat, axis=0)
-        else:
-            self._db[person] = embeddings
-
-        self._db[person] = np.array(self._db[person])
+        stripped = strip_id(person)
+        self._unique[stripped] = self._unique.get(stripped, 0) + 1
 
         if train_knn:
             self._train_knn()
@@ -194,7 +184,8 @@ class FaceNet:
         """
         assert metadata, "metadata must be provided"
 
-        self._db = None
+        self._db = {}
+        self._unique = {}
         self.data_cfg = metadata
 
         if data:
@@ -205,8 +196,8 @@ class FaceNet:
         self.dist_metric = DistMetric(self.data_cfg["metric"],
                                       self.data_cfg["normalize"],
                                       self.data_cfg.get("mean"))
-        self.alpha = self.data_cfg.get("alpha", 0.75)
-        self.img_norm = self.data_cfg.get("img_norm", "per_image")
+        self.alpha = self.data_cfg["alpha"]
+        self.img_norm = self.data_cfg["img_norm"]
 
     @property
     def metadata(self):
@@ -218,19 +209,12 @@ class FaceNet:
     def _train_knn(self):
         """Trains K-Nearest-Neighbors"""
         try:
-            self.expanded_names = []
-            self.expanded_embeds = []
+            n_neighbors = max(self._unique.values())
+            embeds = np.array(list(self.data.values()))[:, 0, :]
+            names = list(self.data.keys())
 
-            for name, embeddings in self.data.items():
-                for embed in embeddings:
-                    self.expanded_names.append(name)
-                    self.expanded_embeds.append(embed)
-
-            n = len(self.expanded_names) // len(set(self.expanded_names))
-            self._knn = neighbors.KNeighborsClassifier(n_neighbors=n)
-            # always use minkowski distance, other metrics are just normalizing
-            # to act as the desired metric
-            self._knn.fit(self.expanded_embeds, self.expanded_names)
+            self._knn = neighbors.KNeighborsClassifier(n_neighbors)
+            self._knn.fit(embeds, names)
 
         except (AttributeError, ValueError):
             raise ValueError("Current model incompatible with database")
@@ -330,33 +314,11 @@ class FaceNet:
 
         try:
             embeds, face = self.predict(img, *args, **kwargs)
+            embed = embeds[0]
 
-            info = {"best_match": [], "dists": [], "is_recognized": []}
-            for embed in embeds:
-                info["best_match"].append(self._knn.predict(embed)[0])
-                best_embed = self.expanded_embeds[
-                    self.expanded_names.index(info["best_match"][-1])
-                ]
-
-                dist = self.dist_metric.distance(embed, best_embed)
-                info["dists"].append(dist)
-
-                ok = info["dists"][-1] <= self.alpha
-                info["is_recognized"].append(ok)
-
-            if len(embeds) > 1:
-                best_match = max(info["best_match"],
-                                 key=info["best_match"].count)
-                idxs = [idx for idx, person in enumerate(info["best_match"])
-                        if person == best_match]
-                min_index = min(idxs, key=lambda idx: info["dists"][idx])
-            else:
-                best_match = info["best_match"][0]
-                min_index = 0
-
-            embed = embeds[min_index]
-            dist = info["dists"][min_index]
-            is_recognized = info["is_recognized"][min_index]
+            best_match = self._knn.predict(embed)[0]
+            dist = self.dist_metric.distance(embed, self.data[best_match])
+            is_recognized = dist <= self.alpha
 
             print_info = (self.dist_metric, dist, best_match,
                           "" if is_recognized else " !")
@@ -401,9 +363,7 @@ class FaceNet:
         graphics_controller = GraphicsRenderer(width, height, resize)
         cap = Camera(width, height)
 
-        # msize = 0.5 * ((width + height) * resize) / 2
-        detector = FaceDetector(detector, self.img_shape, self.alpha,
-                                min_face_size=240)
+        detector = FaceDetector(detector, self.img_shape, min_face_size=240)
 
         while True:
             _, frame = cap.read()
