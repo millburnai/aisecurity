@@ -46,8 +46,7 @@ class FaceDetector:
         result = []
 
         if "trt-mtcnn" in self.mode:
-            minsize = max(40, int(self.kwargs["min_face_size"]))
-            result = self.trt_mtcnn.detect_faces(img, minsize=minsize)
+            result = self.trt_mtcnn.detect_faces(img)
 
         if "mtcnn" in self.mode.replace("trt-mtcnn", ""):
             result = self.mtcnn.detect_faces(img)
