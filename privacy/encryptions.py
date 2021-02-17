@@ -10,7 +10,7 @@ from Crypto.Cipher import AES  # noqa
 from Crypto.Random import get_random_bytes  # noqa
 
 sys.path.insert(1, "../")
-from utils.paths import name_key_path, embed_key_path  # noqa
+from utils.paths import NAME_KEY_PATH, EMBED_KEY_PATH  # noqa
 
 
 NUM_BITS = 16
@@ -78,7 +78,7 @@ def decrypt(cipher_text, position, key_file):
 
 
 def encrypt_data(data, to_encrypt=ALL, decryptable=True,
-                 name_keys=name_key_path, embedding_keys=embed_key_path):
+                 name_keys=NAME_KEY_PATH, embedding_keys=EMBED_KEY_PATH):
     if decryptable:
         generate_key(name_keys)
         generate_key(embedding_keys)
@@ -107,8 +107,8 @@ def encrypt_data(data, to_encrypt=ALL, decryptable=True,
     return encrypted
 
 
-def decrypt_data(data, to_encrypt=ALL, name_keys=name_key_path,
-                 embedding_keys=embed_key_path):
+def decrypt_data(data, to_encrypt=ALL, name_keys=NAME_KEY_PATH,
+                 embedding_keys=EMBED_KEY_PATH):
     """Obviously, if the embedding sets have differing lengths, the lengths
     of the nonce groups associated with those embeddings will be different.
 

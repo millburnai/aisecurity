@@ -18,23 +18,24 @@ from db.connection import Websocket
 from optim.engine import CudaEngine
 from utils.lcd import IntegratedLCDProgressBar
 from utils.distance import DistMetric
-from utils.paths import db_loc, default_model, config_home
+from utils.paths import (DB_LOB, DEFAULT_MODEL, CONFIG_HOME,
+                         EMBED_KEY_PATH, NAME_KEY_PATH)
 from utils.visuals import Camera, GraphicsRenderer
 from face.detection import FaceDetector
 
 
 class FaceNet:
     """Class implementation of FaceNet"""
-    MODELS = json.load(open(config_home + "/defaults/models.json",
+    MODELS = json.load(open(CONFIG_HOME + "/defaults/models.json",
                             encoding="utf-8"))
 
     @print_time("model load time")
-    def __init__(self, model_path=default_model, data_path=db_loc,
+    def __init__(self, model_path=DEFAULT_MODEL, data_path=DB_LOB,
                  input_name=None, output_name=None, input_shape=None,
                  allow_gpu_growth=False):
         """Initializes FaceNet object
-        :param model_path: path to model (default: utils.paths.default_model)
-        :param data_path: path to data (default: utils.paths.db_loc)
+        :param model_path: path to model (default: utils.paths.DEFAULT_MODEL)
+        :param data_path: path to data (default: utils.paths.DB_LOB)
         :param input_name: name of input tensor (default: None)
         :param output_name: name of output tensor (default: None)
         :param input_shape: input shape (default: None)
@@ -64,7 +65,9 @@ class FaceNet:
         self._knn = None
 
         if data_path:
-            self.set_data(*retrieve_embeds(data_path))
+            self.set_data(*retrieve_embeds(data_path,
+                                           name_keys=NAME_KEY_PATH,
+                                           embedding_keys=EMBED_KEY_PATH))
         else:
             print("[DEBUG] data not set. Set it manually with set_data")
 
@@ -199,7 +202,7 @@ class FaceNet:
                 self.update_data(person, embed, train_knn=False)
             self._train_knn()
 
-        self.dist_metric = DistMetric(self.data_cfg["dist_metric"],
+        self.dist_metric = DistMetric(self.data_cfg["metric"],
                                       self.data_cfg["normalize"],
                                       self.data_cfg.get("mean"))
         self.alpha = self.data_cfg.get("alpha", 0.75)
@@ -398,9 +401,9 @@ class FaceNet:
         graphics_controller = GraphicsRenderer(width, height, resize)
         cap = Camera(width, height)
 
-        msize = 0.5 * ((width + height) * resize) / 2
+        # msize = 0.5 * ((width + height) * resize) / 2
         detector = FaceDetector(detector, self.img_shape, self.alpha,
-                                min_face_size=msize)
+                                min_face_size=240)
 
         while True:
             _, frame = cap.read()

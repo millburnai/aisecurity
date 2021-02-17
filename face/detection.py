@@ -9,7 +9,7 @@ from mtcnn import MTCNN
 import numpy as np
 
 sys.path.insert(1, "../")
-from utils.paths import config_home
+from utils.paths import CONFIG_HOME
 
 
 class FaceDetector:
@@ -39,7 +39,7 @@ class FaceDetector:
             self.mtcnn = MTCNN(min_face_size=self.kwargs["min_face_size"])
 
         if "haarcascade" in mode:
-            hpath = config_home + "models/haarcascade_frontalface_default.xml"
+            hpath = CONFIG_HOME + "models/haarcascade_frontalface_default.xml"
             self.haarcascade = cv2.CascadeClassifier(hpath)
 
     def detect_faces(self, img):
@@ -92,14 +92,15 @@ class FaceDetector:
 
         if rotations is None:
             rotations = [0.]
-        elif 0. not in rotations:
+        if 0. not in rotations:
             rotations.insert(0, 0.)
 
         if len(result) != 0:
             face = max(result, key=lambda person: person["confidence"])
 
             if face["confidence"] >= self.alpha:
-                resized_faces = [crop_and_rotate(img, self.img_shape, face["box"], angle)
+                resized_faces = [crop_and_rotate(img, self.img_shape,
+                                                 face["box"], angle)
                                  for angle in rotations]
                 if verbose:
                     print(f"Detection time ({self.mode}): \033[1m"

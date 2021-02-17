@@ -7,7 +7,7 @@ import sys
 import numpy as np
 
 sys.path.insert(1, "../")
-from utils.paths import config_home  # noqa
+from utils.paths import CONFIG_HOME  # noqa
 
 
 try:
@@ -50,12 +50,16 @@ class CudaEngineManager:
         self.network = self.builder.create_network()
 
     def allocate_buffers(self):
-        """Allocates GPU memory for future use and creates an asynchronous stream"""
+        """Allocates GPU memory for future use and creates
+        an asynchronous stream
+        """
         self.h_input = cuda.pagelocked_empty(
-            trt.volume(self.engine.get_binding_shape(0)), dtype=trt.nptype(self.dtype)
+            trt.volume(self.engine.get_binding_shape(0)),
+            dtype=trt.nptype(self.dtype)
         )
         self.h_output = cuda.pagelocked_empty(
-            trt.volume(self.engine.get_binding_shape(1)), dtype=trt.nptype(self.dtype)
+            trt.volume(self.engine.get_binding_shape(1)),
+            dtype=trt.nptype(self.dtype)
         )
         self.d_input = cuda.mem_alloc(self.h_input.nbytes)
         self.d_output = cuda.mem_alloc(self.h_output.nbytes)
@@ -83,7 +87,8 @@ class CudaEngineManager:
 
             cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
             self.context.execute_async(
-                batch_size=1, bindings=[int(self.d_input), int(self.d_output)],
+                batch_size=1,
+                bindings=[int(self.d_input), int(self.d_output)],
                 stream_handle=self.stream.handle
             )
             cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
@@ -98,7 +103,8 @@ class CudaEngineManager:
         :param engine_file: path to engine file
         """
 
-        with open(engine_file, "rb") as file, trt.Runtime(self.logger) as runtime:
+        with open(engine_file, "rb") as file, \
+                trt.Runtime(self.logger) as runtime:
             self.engine = runtime.deserialize_cuda_engine(file.read())
 
     def build_and_serialize_engine(self):
@@ -178,7 +184,7 @@ class CudaEngineManager:
 
 class CudaEngine:
     """Cuda engine manager wrapper for interfacing with FaceNet class"""
-    MODELS = json.load(open(config_home + "/defaults/cuda_models.json",
+    MODELS = json.load(open(CONFIG_HOME + "/defaults/cuda_models.json",
                             encoding="utf-8"))
 
     def __init__(self, filepath, input_name, output_name, input_shape,
@@ -208,7 +214,7 @@ class CudaEngine:
         :param input_name: provided name of input
         :param output_name: provided name of output
         :param input_shape: provided input shape
-        :raises: AssertionError: if I/O name and shape is not detected/provided
+        :raises: AssertionError: if I/O name and shape is not provided
         """
 
         self.input_name, self.output_name, self.model_name = None, None, None

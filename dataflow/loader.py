@@ -17,7 +17,7 @@ from tqdm import tqdm
 sys.path.insert(1, "../")
 from privacy.encryptions import (ALL, NAMES, EMBEDS,  # noqa
                                  encrypt_data, decrypt_data)
-from utils.paths import db_loc, name_key_path, embed_key_path  # noqa
+from utils.paths import DB_LOB, NAME_KEY_PATH, EMBED_KEY_PATH  # noqa
 
 
 def print_time(message):
@@ -107,8 +107,8 @@ def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None,
 
     if not full_overwrite:
         path = retrieve_path if retrieve_path else dump_path
-        old_embeds, old_metadata = retrieve_embeds(path, name_key_path,
-                                                   embed_key_path)
+        old_embeds, old_metadata = retrieve_embeds(path, NAME_KEY_PATH,
+                                                   EMBED_KEY_PATH)
 
         new_embeds, no_faces = online_load(facenet, img_dir, **kwargs)
         data = {**old_embeds, **new_embeds}

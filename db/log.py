@@ -9,7 +9,8 @@ from termcolor import cprint
 
 
 def get_now(seconds):
-    return time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(seconds)).split(" ")
+    return time.strftime('%Y-%m-%d %H:%M:%S',
+                         time.localtime(seconds)).split(" ")
 
 
 def get_id(name):
@@ -159,7 +160,7 @@ class IntegratedLogger:
                 self.logger.flush_current(mode="known+unknown", flush_times=False)
 
         else:
-            is_recognized = dist <= self.facenet.dist_metric.alpha
+            is_recognized = dist <= self.facenet.alpha
             update_progress, update_recognized, update_unrecognized = \
                 self.logger.update(is_recognized, best_match)
 
