@@ -7,7 +7,7 @@ import sys
 import numpy as np
 
 sys.path.insert(1, "../")
-from utils.paths import config_home  # noqa
+from util.paths import config_home  # noqa
 
 
 try:

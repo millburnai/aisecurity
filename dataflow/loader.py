@@ -1,4 +1,4 @@
-"""Data loader and writer utils.
+"""Data loader and writer util.
 
 """
 
@@ -17,7 +17,7 @@ from tqdm import tqdm
 sys.path.insert(1, "../")
 from privacy.encryptions import (ALL, NAMES, EMBEDS,  # noqa
                                  encrypt_data, decrypt_data)
-from utils.paths import db_loc, name_key_path, embed_key_path  # noqa
+from util.paths import db_loc, name_key_path, embed_key_path  # noqa
 
 
 def print_time(message):

@@ -10,7 +10,7 @@ from Crypto.Cipher import AES  # noqa
 from Crypto.Random import get_random_bytes  # noqa
 
 sys.path.insert(1, "../")
-from utils.paths import name_key_path, embed_key_path  # noqa
+from util.paths import name_key_path, embed_key_path  # noqa
 
 
 NUM_BITS = 16

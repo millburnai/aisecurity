@@ -1,4 +1,4 @@
-"""Graphics utils.
+"""Graphics util.
 """
 
 import threading

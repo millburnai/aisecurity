@@ -6,7 +6,7 @@ from dataflow.loader import dump_and_embed
 from face.detection import FaceDetector
 from facenet import FaceNet
 from privacy.encryptions import NAMES
-from utils.distance import DistMetric
+from util.distance import DistMetric
 
 
 if __name__ == "__main__":

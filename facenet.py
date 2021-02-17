@@ -16,10 +16,10 @@ from dataflow.loader import (print_time, screen_data,
 from db.log import IntegratedLogger, Logger
 from db.connection import Websocket
 from optim.engine import CudaEngine
-from utils.lcd import IntegratedLCDProgressBar
-from utils.distance import DistMetric
-from utils.paths import db_loc, default_model, config_home
-from utils.visuals import Camera, GraphicsRenderer
+from util.lcd import IntegratedLCDProgressBar
+from util.distance import DistMetric
+from util.paths import db_loc, default_model, config_home
+from util.visuals import Camera, GraphicsRenderer
 from face.detection import FaceDetector
 
 
@@ -33,8 +33,8 @@ class FaceNet:
                  input_name=None, output_name=None, input_shape=None,
                  allow_gpu_growth=False):
         """Initializes FaceNet object
-        :param model_path: path to model (default: utils.paths.default_model)
-        :param data_path: path to data (default: utils.paths.db_loc)
+        :param model_path: path to model (default: util.paths.default_model)
+        :param data_path: path to data (default: util.paths.db_loc)
         :param input_name: name of input tensor (default: None)
         :param output_name: name of output tensor (default: None)
         :param input_shape: input shape (default: None)
