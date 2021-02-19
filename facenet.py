@@ -62,7 +62,7 @@ class FaceNet:
             raise TypeError("model must be an .h5, .pb, or .engine file")
 
         self._db = {}
-        self._knn = None
+        self.classifier = None
 
         if data_path:
             self.set_data(*retrieve_embeds(data_path,
@@ -170,12 +170,10 @@ class FaceNet:
         screen_data(person, embeddings)
 
         self._db[person] = np.array(embeddings).reshape(len(embeddings), -1)
-
-        stripped = strip_id(person)
-        self._unique[stripped] = self._unique.get(stripped, 0) + 1
+        self._stripped_names.append(strip_id(person))
 
         if train_knn:
-            self._train_knn()
+            self._train_classifier()
 
     def set_data(self, data, metadata):
         """Sets data property
@@ -185,19 +183,19 @@ class FaceNet:
         assert metadata, "metadata must be provided"
 
         self._db = {}
-        self._unique = {}
+        self._stripped_names = []
         self.data_cfg = metadata
-
-        if data:
-            for person, embed in data.items():
-                self.update_data(person, embed, train_knn=False)
-            self._train_knn()
 
         self.dist_metric = DistMetric(self.data_cfg["metric"],
                                       self.data_cfg["normalize"],
                                       self.data_cfg.get("mean"))
         self.alpha = self.data_cfg["alpha"]
         self.img_norm = self.data_cfg["img_norm"]
+
+        if data:
+            for person, embed in data.items():
+                self.update_data(person, embed, train_knn=False)
+            self._train_classifier()
 
     @property
     def metadata(self):
@@ -206,16 +204,12 @@ class FaceNet:
                 "alpha": self.alpha,
                 "img_norm": self.img_norm}
 
-    def _train_knn(self):
-        """Trains K-Nearest-Neighbors"""
+    def _train_classifier(self):
+        """Trains person classifier"""
         try:
-            n_neighbors = max(self._unique.values())
-            embeds = np.array(list(self.data.values()))[:, 0, :]
-            names = list(self.data.keys())
-
-            self._knn = neighbors.KNeighborsClassifier(n_neighbors)
-            self._knn.fit(embeds, names)
-
+            self.classifier = neighbors.NearestNeighbors(
+                radius=self.alpha, metric=self.dist_metric.metric, n_jobs=-1)
+            self.classifier.fit(np.squeeze(list(self.data.values()), axis=1))
         except (AttributeError, ValueError):
             raise ValueError("Current model incompatible with database")
 
@@ -274,15 +268,15 @@ class FaceNet:
 
         return embeds, face_coords
 
-    def recognize(self, img, *args, verbose=True, **kwargs):
+    def recognize(self, img, *args, eps=2.0, verbose=True, **kwargs):
         """Facial recognition
         :param img: image array in BGR mode
+        :param eps: controls inv dist sensitivity (default: 2.0)
         :param verbose: verbose or not (default: True)
         :param args: will be passed to self.predict
         :param kwargs: will be passed to self.predict
         :returns: embedding, is recognized, best match, distance
         """
-
         start = timer()
 
         embed = None
@@ -293,16 +287,24 @@ class FaceNet:
 
         try:
             embeds, face = self.predict(img, *args, **kwargs)
-            embed = embeds[0]
+            dists, idxs = self.classifier.radius_neighbors(embeds)
+            dists = dists.flatten()[0]
+            idxs = idxs.flatten()[0]
 
-            best_match = self._knn.predict(embed[None, ...])[0]
-            nearest_embed = np.squeeze(self.data[best_match], 0)
-            dist = self.dist_metric.distance(embed, nearest_embed)
-            is_recognized = dist <= self.alpha
+            if len(idxs) != 0:
+                matches = np.take(self._stripped_names, idxs).tolist()
+                key = lambda i: matches.count(matches[i]) + eps / dists[i]
+                best_idx = max(range(len(matches)), key=key)
+
+                best_match, dist = matches[best_idx], dists[best_idx]
+                is_recognized = dist <= self.alpha
+                info = colored(f"{best_match} - {round(dist, 4)}",
+                               color="green" if is_recognized else "red")
+
+            else:
+                info = colored("no match found", color="red")
 
             if verbose:
-                info = colored(f"{round(dist, 4)} ({best_match})",
-                               color="green" if is_recognized else "red")
                 print(f"{self.dist_metric}: {info}")
 
         except (ValueError, AssertionError, cv2.error) as error:

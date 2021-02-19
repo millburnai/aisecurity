@@ -60,7 +60,8 @@ def screen_data(key, value):
 
 
 def strip_id(name, split="-"):
-    return name[:name.rfind(split)]
+    idx = name.rfind(split)
+    return name[:idx] if idx != -1 else name
 
 
 @print_time("data embedding time")
