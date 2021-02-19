@@ -1,14 +1,39 @@
 """Haarcascade or MTCNN face detection.
 """
 
+from functools import partial
 import sys
 from timeit import default_timer as timer
 
 import cv2
+import tensorflow.compat.v1 as tf  # noqa
 from termcolor import colored
 
 sys.path.insert(1, "../")
 from util.paths import CONFIG_HOME
+
+
+def get_mtcnn(mtcnn_path, min_size=40.0, factor=0.709, thresholds=(0.6, 0.7, 0.7)):
+    def mtcnn(img, mtcnn_path, min_size, factor, thresholds):
+        with tf.gfile.GFile(mtcnn_path, "rb") as f:
+            graph_def = tf.GraphDef.FromString(f.read())
+
+        prob, landmarks, box = tf.import_graph_def(graph_def,
+            input_map={
+                "input:0": img,
+                "min_size:0": min_size,
+                "thresholds:0": thresholds,
+                "factor:0": factor
+            },
+            return_elements=["prob:0", "landmarks:0", "box:0"])
+
+        return box, prob, landmarks
+
+    return partial(mtcnn,
+                   mtcnn_path=mtcnn_path,
+                   min_size=min_size,
+                   factor=factor,
+                   thresholds=thresholds)
 
 
 class FaceDetector:
@@ -24,19 +49,22 @@ class FaceDetector:
         self.kwargs = kwargs
 
         if "min_face_size" not in self.kwargs:
-            self.kwargs["min_face_size"] = 20
+            self.kwargs["min_face_size"] = 40
 
         if "trt-mtcnn" in mode:
             sys.path.insert(1, "../face/trt_mtcnn_plugin")
-            from face.trt_mtcnn_plugin.trt_mtcnn import TrtMTCNNWrapper
+            from face.trt_mtcnn_plugin.trt_mtcnn import TrtMTCNNWrapper  # noqa
 
             engine_paths = [f"../face/trt_mtcnn_plugin/mtcnn/det{i+1}.engine"
                             for i in range(3)]
             self.trt_mtcnn = TrtMTCNNWrapper(*engine_paths)
 
         if "mtcnn" in mode.replace("trt-mtcnn", ""):
-            from mtcnn import MTCNN
-            self.mtcnn = MTCNN(min_face_size=self.kwargs["min_face_size"])
+            mpath = CONFIG_HOME + "/models/mtcnn.pb"
+            self.mtcnn = tf.wrap_function(
+                get_mtcnn(mpath, min_size=float(self.kwargs["min_face_size"])),
+                [tf.TensorSpec(shape=[None, None, 3], dtype=tf.float32)]
+            )
 
         if "haarcascade" in mode:
             hpath = CONFIG_HOME + "models/haarcascade_frontalface_default.xml"
@@ -49,7 +77,22 @@ class FaceDetector:
             result = self.trt_mtcnn.detect_faces(img)
 
         if "mtcnn" in self.mode.replace("trt-mtcnn", ""):
-            result = self.mtcnn.detect_faces(img)
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            bboxes, scores, landmarks = map(lambda x: x.numpy(), self.mtcnn(img))
+
+            for face, score, pts in zip(bboxes, scores, landmarks):
+                x, y = int(face[1]), int(face[0])
+                width, height = int(face[3] - x), int(face[2] - y)
+
+                pts = list(map(int, pts))
+                result.append({"box": (x, y, width, height),
+                               "confidence": score,
+                               "keypoints": {
+                                   "left_eye": (pts[5], pts[0]),
+                                   "right_eye": (pts[6], pts[1]),
+                                   "nose": (pts[7], pts[2]),
+                                   "mouth_left": (pts[8], pts[3]),
+                                   "mouth_right": (pts[9], pts[4])}})
 
         no_result = (not result or result[0]["confidence"] < self.alpha)
         if "haarcascade" in self.mode and no_result:
