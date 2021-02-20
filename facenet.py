@@ -54,6 +54,8 @@ class FaceNet:
 
         if ".h5" in model_path:
             self._keras_init(model_path)
+        elif ".tflite" in model_path:
+            self._tflite_init(model_path)
         elif ".pb" in model_path:
             self._tf_init(model_path, input_name, output_name, input_shape)
         elif ".engine" in model_path:
@@ -87,6 +89,15 @@ class FaceNet:
         self.MODE = "keras"
         self.facenet = tf.keras.models.load_model(filepath)
         self.img_shape = self.facenet.input_shape[1:3]
+
+    def _tflite_init(self, filepath):
+        self.MODE = "tflite"
+        self.facenet = tf.lite.Interpreter(model_path=filepath)
+        self.facenet.allocate_tensors()
+
+        self.input_details = self.facenet.get_input_details()
+        self.output_details = self.facenet.get_output_details()
+        self.img_shape = self.input_details[0]["shape"].tolist()[1:-1]
 
     def _tf_init(self, filepath, input_name, output_name, input_shape):
         """Initializes a TensorFlow model
@@ -235,9 +246,13 @@ class FaceNet:
         elif self.MODE == "tf":
             out = self.facenet.get_tensor_by_name(self.output_name)  # noqa
             embeds = self.sess.run(out, feed_dict={self.input_name: imgs})
+        elif self.MODE == "tflite":
+            imgs = imgs.astype(np.float32)
+            self.facenet.set_tensor(self.input_details[0]["index"], imgs)
+            self.facenet.invoke()
+            embeds = self.facenet.get_tensor(self.output_details[0]["index"])
         else:
             embeds = self.facenet.inference(imgs)
-
         return embeds.reshape(len(imgs), -1)
 
     def predict(self, img, detector, margin=10, flip=False, verbose=True):
