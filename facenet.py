@@ -172,18 +172,39 @@ class FaceNet:
             raise ValueError("trt mode not available")
         self.img_shape = list(reversed(self.facenet.input_shape))[:-1]
 
-    def update_data(self, person, embeddings, train_knn=True):
+    def update_data(self, person, embeddings, train_classifier=True):
         """Updates data property
         :param person: new entry
         :param embeddings: new entry's list of embeddings
-        :param train_knn: train K-NN (default: True)
+        :param train_classifier: train classifier (default: True)
         """
         screen_data(person, embeddings)
 
         self._db[person] = np.array(embeddings).reshape(len(embeddings), -1)
         self._stripped_names.append(strip_id(person))
 
-        if train_knn:
+        if train_classifier:
+            self._train_classifier()
+
+    def remove_entry(self, person, rm_all=False, train_classifier=True):
+        """Removes person from database.
+        :param person: entry to remove
+        :param rm_all: rm all entries or not (default: False)
+        :param train_classifier: train classifier (default: True)
+        """
+        keys = list(self.data.keys())
+
+        if not rm_all:
+            i = keys.index(person)
+            del self._db[person]
+            del self._stripped_names[i]
+        else:
+            stripped = strip_id(person)
+            for i, name in enumerate(keys):
+                if strip_id(name) == stripped:
+                    self.remove_entry(name, False, False)
+
+        if train_classifier:
             self._train_classifier()
 
     def set_data(self, data, metadata):
@@ -205,7 +226,7 @@ class FaceNet:
 
         if data:
             for person, embed in data.items():
-                self.update_data(person, embed, train_knn=False)
+                self.update_data(person, embed, train_classifier=False)
             self._train_classifier()
 
     @property
