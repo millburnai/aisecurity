@@ -13,10 +13,7 @@ from termcolor import colored
 
 from dataflow.loader import (print_time, screen_data, strip_id,
                              retrieve_embeds, get_frozen_graph)
-from db.log import IntegratedLogger, Logger
-from db.connection import Websocket
 from optim.engine import CudaEngine
-from util.lcd import IntegratedLCDProgressBar
 from util.distance import DistMetric
 from util.paths import (DB_LOB, DEFAULT_MODEL, CONFIG_HOME,
                          EMBED_KEY_PATH, NAME_KEY_PATH)
@@ -373,11 +370,6 @@ class FaceNet:
         assert self._db, "data must be provided"
         assert 0. <= resize <= 1., "resize must be in [0., 1.]"
 
-        logger = Logger()
-        websocket = Websocket(socket) if socket else None
-        ipbar = IntegratedLCDProgressBar(logger, websocket) if pbar else None
-        ilogger = IntegratedLogger(self, logger, ipbar, websocket,
-                                   data_mutable, dynamic_log)
 
         graphics_controller = GraphicsRenderer(width, height, resize)
         cap = Camera(width, height)
@@ -397,7 +389,6 @@ class FaceNet:
             embed, is_recognized, best_match, dist, face, elapsed = result
 
             # graphics, logging, lcd, etc.
-            ilogger.log_activity(best_match, embed, dist)
             graphics_controller.add_graphics(original_frame, face,
                                              is_recognized, best_match,
                                              elapsed)
@@ -408,6 +399,4 @@ class FaceNet:
 
         cap.release()
         cv2.destroyAllWindows()
-        ilogger.close()
 
-        return ilogger
