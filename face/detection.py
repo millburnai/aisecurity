@@ -61,6 +61,7 @@ class FaceDetector:
             self.trt_mtcnn = TrtMTCNNWrapper(*engine_paths)
 
         if "mtcnn" in mode.replace("trt-mtcnn", ""):
+            import tensorflow.compat.v1 as tf  # noqa
             mpath = CONFIG_HOME + "/models/mtcnn.pb"
             self.mtcnn = tf.wrap_function(
                 get_mtcnn(mpath, min_size=float(self.kwargs["min_face_size"])),

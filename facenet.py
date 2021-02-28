@@ -83,11 +83,17 @@ class FaceNet:
         :param filepath: path to model (.h5)
         """
 
+        import tensorflow.compat.v1 as tf  # noqa
         self.MODE = "keras"
         self.facenet = tf.keras.models.load_model(filepath)
         self.img_shape = self.facenet.input_shape[1:3]
 
     def _tflite_init(self, filepath):
+        """Initializes a tflite model interpreter
+        :param filepath: path to model (.tflite)
+        """
+
+        import tensorflow.compat.v1 as tf  # noqa
         self.MODE = "tflite"
         self.facenet = tf.lite.Interpreter(model_path=filepath)
         self.facenet.allocate_tensors()
@@ -104,6 +110,7 @@ class FaceNet:
         :param input_shape: input shape for facenet
         """
 
+        import tensorflow.compat.v1 as tf  # noqa
         self.MODE = "tf"
 
         graph_def = get_frozen_graph(filepath)
