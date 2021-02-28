@@ -21,7 +21,7 @@ if __name__ == "__main__":
     facenet.img_norm = "fixed"
     facenet.alpha = 0.3
 
-    detector = FaceDetector("trt-mtcnn", facenet.img_shape)
+    detector = FaceDetector("mtcnn", facenet.img_shape)
     dump_and_embed(facenet, args.img_dir, args.dump_path,
                    to_encrypt=NAMES, detector=detector,
                    full_overwrite=True, use_mean=args.mean,
