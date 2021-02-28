@@ -8,7 +8,6 @@ from timeit import default_timer as timer
 import cv2
 import numpy as np
 from sklearn import neighbors
-import tensorflow.compat.v1 as tf  # noqa
 from termcolor import colored
 
 from dataflow.loader import (print_time, screen_data, strip_id,
@@ -43,7 +42,8 @@ class FaceNet:
         assert not data_path or os.path.exists(data_path), \
             f"{data_path} not found"
 
-        if allow_gpu_growth or ".engine" in model_path:
+        if allow_gpu_growth:
+            import tensorflow.compat.v1 as tf  # noqa
             options = tf.GPUOptions(allow_growth=True)
             config = tf.ConfigProto(gpu_options=options)
             self.sess = tf.Session(config=config)

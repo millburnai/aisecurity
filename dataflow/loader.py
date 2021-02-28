@@ -11,7 +11,6 @@ import sys
 
 import cv2
 import numpy as np
-import tensorflow.compat.v1 as tf  # noqa
 from tqdm import tqdm
 
 sys.path.insert(1, "../")
@@ -37,7 +36,7 @@ def get_frozen_graph(path):
     :param path: path to .pb frozen graph file
     :returns: tf.GraphDef object
     """
-
+    import tensorflow.compat.v1 as tf  # noqa
     with tf.gfile.FastGFile(path, "rb") as graph_file:
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(graph_file.read())

@@ -6,7 +6,6 @@ import sys
 from timeit import default_timer as timer
 
 import cv2
-import tensorflow.compat.v1 as tf  # noqa
 from termcolor import colored
 
 sys.path.insert(1, "../")
@@ -14,6 +13,8 @@ from util.paths import CONFIG_HOME
 
 
 def get_mtcnn(mtcnn_path, min_size=40.0, factor=0.709, thresholds=(0.6, 0.7, 0.7)):
+    import tensorflow.compat.v1 as tf  # noqa
+
     def mtcnn(img, mtcnn_path, min_size, factor, thresholds):
         with tf.gfile.GFile(mtcnn_path, "rb") as f:
             graph_def = tf.GraphDef.FromString(f.read())
