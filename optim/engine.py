@@ -30,13 +30,13 @@ class CudaEngineManager:
                  max_workspace_size=1 << 20):
         """Initializes CudaEngineManager
         :param logger: trt logger (default: trt.Logger(trt.Logger.ERROR))
-        :param dtype: trt dtype (default: trt.float32)
+        :param dtype: trt dtype (default: trt.float16)
         :param max_batch_size: max batch size (default: 1)
         :param max_workspace_size: max workspace size (default: 1 << 20)
         """
 
         self.logger = logger if logger else trt.Logger(trt.Logger.ERROR)
-        self.dtype = dtype if dtype else trt.float32
+        self.dtype = dtype if dtype else trt.float16
         self.max_workspace_size = max_workspace_size
 
         # builder and netork
