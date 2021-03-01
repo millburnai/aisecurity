@@ -11,4 +11,4 @@ from facenet import FaceNet
 
 if __name__ == "__main__":
     facenet = FaceNet()
-    facenet.real_time_recognize(detector="mtcnn", flip=False)
+    facenet.real_time_recognize(detector="trt-mtcnn", graphics=False)
