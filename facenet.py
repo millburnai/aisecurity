@@ -361,7 +361,8 @@ class FaceNet:
 
     def real_time_recognize(self, width=640, height=360, dynamic_log=False,
                             pbar=False, resize=1., detector="mtcnn+haarcascade",
-                            data_mutable=False, socket=None, flip=False):
+                            data_mutable=False, socket=None, flip=False,
+                            graphics=True):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
         :param height: height of frame (default: 360)
@@ -372,6 +373,7 @@ class FaceNet:
         :param data_mutable: update database iff requested (default: False)
         :param socket: socket address (dev only)
         :param flip: whether to flip horizontally or not (default: False)
+        :param graphics: whether or not to use graphics (default: True)
         """
 
         assert self._db, "data must be provided"
@@ -396,13 +398,15 @@ class FaceNet:
             embed, is_recognized, best_match, dist, face, elapsed = result
 
             # graphics, logging, lcd, etc.
-            graphics_controller.add_graphics(original_frame, face,
-                                             is_recognized, best_match,
-                                             elapsed)
+            if graphics:
+                graphics_controller.add_graphics(original_frame, face,
+                                                 is_recognized, best_match,
+                                                 elapsed)
 
-            cv2.imshow("AI Security v2021.0.1", original_frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
+                cv2.imshow("AI Security v2021.0.1", original_frame)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+
 
         cap.release()
         cv2.destroyAllWindows()
