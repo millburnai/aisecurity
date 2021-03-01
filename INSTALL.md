@@ -22,14 +22,14 @@ After general installation...
 Follow these for Jetson-specific instructions, tested with Jetpack 4.5 (CUDA 10.2).
 
 ### Regular installation
-**Only applicable if `.engine`s are available.**
+*Only applicable if `.engine`s are available.*
 
 #### Install dependencies
 1. `sudo apt-get update`
 2. `sudo apt-get install python3-pip`
 3. `sudo pip3 install -U pip testresources setuptools==49.6.0`
 4. `export PATH=/usr/local/cuda/bin:$PATH ; export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH`
-5. `sudo pip3 install -U opencv-python scikit-learn tqdm websocket Cython pycryptodome numpy==1.19.4`
+5. `sudo pip3 install -U scikit-learn tqdm websocket Cython pycryptodome numpy==1.19.4`
 
 #### Install `aisecurity`
 1. `cd ~/ ; git clone https://github.com/orangese/aisecurity.git`
@@ -41,7 +41,7 @@ Follow these for Jetson-specific instructions, tested with Jetpack 4.5 (CUDA 10.
 7. Edit `facenet_test.py` to use `detector="trt-mtcnn"` and then run `python3 facenet_test.py` to ensure that everything works.
 
 ### Full installation
-**Only follow these instructions if the `.engine` files aren't available yet`.**
+*Only follow these instructions if the `.engine` files aren't available yet.*
 
 #### Install dependencies
 1. `sudo apt-get update`
@@ -52,7 +52,7 @@ Follow these for Jetson-specific instructions, tested with Jetpack 4.5 (CUDA 10.
 6. `sudo pip3 install --pre --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v45 tensorflow`
 7. `sudo pip3 install scikit-learn`
 8. `export PATH=/usr/local/cuda/bin:$PATH ; export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH`
-9. `python3 -m pip install pycuda pycryptodome tqdm websocket opencv-python Cython`
+9. `python3 -m pip install pycuda pycryptodome tqdm websocket Cython`
 10. `sudo pip3 install -U numpy==1.19.4` (this step might not be necessary, just make sure that `numpy` version is `1.19.4` after step 8)
 
 #### Install aisecurity and `mtcnn` models
