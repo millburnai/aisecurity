@@ -1,6 +1,11 @@
 import argparse
+import platform
 import sys
 sys.path.insert(1, "../")
+
+if platform.machine() == "arm64":
+    from tensorflow.python.compiler.mlcompute import mlcompute
+    mlcompute.set_mlc_device(device_name="gpu")
 
 from dataflow.loader import dump_and_embed
 from face.detection import FaceDetector
@@ -16,7 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("--mean", help="use mean or not", action="store_true")
     args = parser.parse_args()
 
-    facenet = FaceNet(data_path=None, allow_gpu_growth=True)
+    facenet = FaceNet(data_path=None)
     facenet.dist_metric = DistMetric("cosine", normalize=True)
     facenet.img_norm = "fixed"
     facenet.alpha = 0.3
