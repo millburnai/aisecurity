@@ -7,7 +7,7 @@ from timeit import default_timer as timer
 
 import cv2
 import numpy as np
-from sklearn import svm
+from sklearn import neighbors, svm
 from termcolor import colored
 
 from dataflow.loader import (print_time, screen_data, strip_id,
@@ -62,6 +62,7 @@ class FaceNet:
 
         self._db = {}
         self.classifier = None
+        self.classifier_type = "knn"
 
         if data_path:
             self.set_data(*retrieve_embeds(data_path,
@@ -243,11 +244,16 @@ class FaceNet:
     def _train_classifier(self):
         """Trains person classifier"""
         try:
-            embeds = np.array(list(self.data.values()))[:, 0, :]
-            names = list(self.data.keys())
+            if self.classifier_type == "svm":
+                embeds = np.array(list(self.data.values()))[:, 0, :]
+                names = list(self.data.keys())
 
-            self.classifier = svm.SVC(kernel="linear", decision_function_shape='ovo')
-            self.classifier.fit(embeds, names)
+                self.classifier = svm.SVC(kernel="linear", decision_function_shape='ovo')
+                self.classifier.fit(embeds, names)
+            elif self.classifier_type == "knn":
+                self.classifier = neighbors.NearestNeighbors(
+                    radius=self.alpha, metric=self.dist_metric.metric, n_jobs=-1)
+                self.classifier.fit(np.squeeze(list(self.data.values()), axis=1))
         except (AttributeError, ValueError):
             raise ValueError("Current model incompatible with database")
 
@@ -328,18 +334,35 @@ class FaceNet:
         face = None
 
         try:
-            embeds, face = self.predict(img, *args, **kwargs)
-            embed = embeds[0]
+            if self.classifier_type == "svm":
+                embeds, face = self.predict(img, *args, **kwargs)
+                embed = embeds[0]
 
-            best_match = self.classifier.predict(embed[None, ...])[0]
-            nearest_embed = np.squeeze(self.data[best_match], 0)
-            dist = self.dist_metric.distance(embed, nearest_embed)
-            is_recognized = dist <= self.alpha
+                best_match = self.classifier.predict(embed[None, ...])[0]
+                nearest_embed = np.squeeze(self.data[best_match], 0)
+                dist = self.dist_metric.distance(embed, nearest_embed)
+                is_recognized = dist <= self.alpha
 
-            if verbose:
-                info = colored(f"{round(dist, 4)} ({best_match})",
-                               color="green" if is_recognized else "red")
-                print(f"{self.dist_metric}: {info}")
+                if verbose:
+                    info = colored(f"{round(dist, 4)} ({best_match})",
+                                   color="green" if is_recognized else "red")
+                    print(f"{self.dist_metric}: {info}")
+            elif self.classifier_type == "knn":
+                embeds, face = self.predict(img, *args, **kwargs)
+                dists, idxs = self.classifier.radius_neighbors(embeds)
+                dists = dists.flatten()[0]
+                idxs = idxs.flatten()[0]
+
+                if len(idxs) != 0:
+                    matches = np.take(self._stripped_names, idxs).tolist()
+                    key = lambda i: matches.count(matches[i]) + eps / dists[i]
+                    best_idx = max(range(len(matches)), key=key)
+
+                    best_match, dist = matches[best_idx], dists[best_idx]
+                    is_recognized = dist <= self.alpha
+                    info = colored(f"{best_match} - {round(dist, 4)}",
+                                   color="green" if is_recognized else "red")
+
         except (ValueError, AssertionError, cv2.error) as error:
             incompatible = "query data dimension"
             if isinstance(error, ValueError) and incompatible in str(error):
