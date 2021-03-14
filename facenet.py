@@ -80,6 +80,13 @@ class FaceNet:
 
         return self._db
 
+    @property
+    def metadata(self):
+        return {"metric": self.dist_metric.metric,
+                "normalize": self.dist_metric.normalize,
+                "alpha": self.alpha,
+                "img_norm": self.img_norm}
+
     def _keras_init(self, filepath):
         """Initializes a Keras model
         :param filepath: path to model (.h5)
@@ -131,7 +138,8 @@ class FaceNet:
                     "input shape must be channels-last for tensorflow mode"
                 self.img_shape = input_shape[:-1]
             else:
-                input_tensor = self.facenet.get_tensor_by_name(self.input_name)
+                input_tensor = self.facenet.get_tensor_by_name(
+                        self.input_name)
                 self.img_shape = input_tensor.get_shape().as_list()[1:3]
 
         except ValueError:
@@ -178,37 +186,46 @@ class FaceNet:
             raise ValueError("trt mode not available")
         self.img_shape = list(reversed(self.facenet.input_shape))[:-1]
 
-    def update_data(self, person, embeddings, train_classifier=True):
-        """Updates data property
+    def add_entry(self, person, embeddings, train_classifier=True):
+        """Adds entry (person, embeddings) to database
         :param person: new entry
         :param embeddings: new entry's list of embeddings
         :param train_classifier: train classifier (default: True)
         """
         screen_data(person, embeddings)
 
-        self._db[person] = np.array(embeddings).reshape(len(embeddings), -1)
-        self._stripped_names.append(strip_id(person))
+        embeds = np.array(embeddings).reshape(len(embeddings), -1)
+        self._db[person] = embeds
+
+        stripped = strip_id(person)
+        self._stripped_names.append(stripped)
+
+        try:
+            embeds = np.concatenate([self._stripped_db[stripped], embeds])
+        except KeyError:
+            pass
+        self._stripped_db[stripped] = embeds
 
         if train_classifier:
             self._train_classifier()
 
-    def remove_entry(self, person, rm_all=False, train_classifier=True):
-        """Removes person from database.
+    def remove_entry(self, person, train_classifier=True):
+        """Removes all embeds of person from database.
         :param person: entry to remove
-        :param rm_all: rm all entries or not (default: False)
         :param train_classifier: train classifier (default: True)
         """
         keys = list(self.data.keys())
+        stripped = strip_id(person)
 
-        if not rm_all:
-            i = keys.index(person)
-            del self._db[person]
-            del self._stripped_names[i]
-        else:
-            stripped = strip_id(person)
-            for i, name in enumerate(keys):
-                if strip_id(name) == stripped:
-                    self.remove_entry(name, False, False)
+        for name in keys:
+            if strip_id(name) == stripped:
+                del self._db[name]
+                del self._stripped_names[keys.index(name)]
+
+                try:
+                    del self._stripped_db[stripped]
+                except KeyError:
+                    pass
 
         if train_classifier:
             self._train_classifier()
@@ -221,6 +238,7 @@ class FaceNet:
         assert metadata, "metadata must be provided"
 
         self._db = {}
+        self._stripped_db = {}
         self._stripped_names = []
         self.data_cfg = metadata
 
@@ -232,15 +250,8 @@ class FaceNet:
 
         if data:
             for person, embed in data.items():
-                self.update_data(person, embed, train_classifier=False)
+                self.add_entry(person, embed, train_classifier=False)
             self._train_classifier()
-
-    @property
-    def metadata(self):
-        return {"metric": self.dist_metric.metric,
-                "normalize": self.dist_metric.normalize,
-                "alpha": self.alpha,
-                "img_norm": self.img_norm}
 
     def _train_classifier(self):
         """Trains person classifier"""
@@ -327,23 +338,23 @@ class FaceNet:
         :param verbose: verbose or not (default: True)
         :param args: will be passed to self.predict
         :param kwargs: will be passed to self.predict
-        :returns: embedding, is recognized, best match, distance
+        :returns: face, is recognized, best match, time elapsed
         """
         start = timer()
 
-        embed = None
         is_recognized = None
         best_match = None
-        dist = None
         face = None
 
         try:
             if self.classifier_type == "svm":
                 embeds, face = self.predict(img, *args, **kwargs)
-                embed = embeds[0]
+                best_match = self.classifier.predict(embeds)[0]
 
-                best_match = self.classifier.predict(embed[None, ...])[0]
-                dist = self.dist_metric.distance(embed, self.data[best_match + "-1"][0])
+                nearest = self._stripped_db[best_match]
+                dists = self.dist_metric.distance(embeds, nearest, True)
+                dist = np.average(dists)
+
                 is_recognized = dist <= self.alpha
 
             elif self.classifier_type == "knn":
@@ -354,7 +365,7 @@ class FaceNet:
 
                 if len(idxs) != 0:
                     matches = np.take(self._stripped_names, idxs).tolist()
-                    key = lambda i: matches.count(matches[i]) + eps / dists[i]
+                    key = lambda i: matches.count(matches[i]) + eps/dists[i]
                     best_idx = max(range(len(matches)), key=key)
 
                     best_match, dist = matches[best_idx], dists[best_idx]
@@ -375,7 +386,7 @@ class FaceNet:
                 raise error
 
         elapsed = round(1000. * (timer() - start), 4)
-        return embed, is_recognized, best_match, dist, face, elapsed
+        return face, is_recognized, best_match, elapsed
 
     def real_time_recognize(self, width=640, height=360, resize=1., detector="mtcnn",
                             flip=False, graphics=True):
@@ -405,12 +416,11 @@ class FaceNet:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
             # facial detection and recognition
-            result = self.recognize(frame, detector, flip=flip)
-            embed, rec, best_match, dist, face, elapsed = result
+            info = self.recognize(frame, detector, flip=flip)
 
             # graphics
             if graphics:
-                graphics.add_graphics(cframe, face, rec, best_match, elapsed)
+                graphics.add_graphics(cframe, *info)
                 cv2.imshow("AI Security v2021.0.1", cframe)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break

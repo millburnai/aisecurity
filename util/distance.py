@@ -16,17 +16,16 @@ class DistMetric:
         if self.mean:
             x -= self.mean
         if self.normalize:
-            axis = list(range(len(x.shape)))
-            if batch:
-                del axis[0]
-            x /= np.linalg.norm(x, axis=tuple(axis), keepdims=True)
+            axis = (1,) if batch else (0, 1)
+            x /= np.linalg.norm(x, axis=axis, keepdims=True)
         return x
 
-    def distance(self, u, v):
+    def distance(self, u, v, batch=False):
         if self.metric == "cosine":
-            return 1. - np.dot(u, v) / (np.linalg.norm(v) * np.linalg.norm(v))
+            return 1. - np.dot(u, v.T)
         else:
-            return np.linalg.norm(u - v)
+            axis = (1,) if batch else (0, 1)
+            return np.linalg.norm(u - v, axis=axis, keepdims=True)
 
     def __str__(self):
         return f"{self.metric}" \
