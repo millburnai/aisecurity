@@ -10,7 +10,7 @@ import numpy as np
 from sklearn import neighbors, svm
 from termcolor import colored
 
-from face.detection import FaceDetector
+from util.detection import FaceDetector
 from util.distance import DistMetric
 from util.engine import CudaEngine
 from util.loader import (print_time, screen_data, strip_id,
