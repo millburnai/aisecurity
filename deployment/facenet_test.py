@@ -10,5 +10,5 @@ from facenet import FaceNet
 
 
 if __name__ == "__main__":
-    facenet = FaceNet()
+    facenet = FaceNet(classifier="svm")
     facenet.real_time_recognize(detector="mtcnn", graphics=True)

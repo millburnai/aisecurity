@@ -28,13 +28,14 @@ class FaceNet:
     @print_time("model load time")
     def __init__(self, model_path=DEFAULT_MODEL, data_path=DB_LOB,
                  input_name=None, output_name=None, input_shape=None,
-                 allow_gpu_growth=False):
+                 classifier="knn", allow_gpu_growth=False):
         """Initializes FaceNet object
         :param model_path: path to model (default: utils.paths.DEFAULT_MODEL)
         :param data_path: path to data (default: utils.paths.DB_LOB)
         :param input_name: name of input tensor (default: None)
         :param output_name: name of output tensor (default: None)
         :param input_shape: input shape (default: None)
+        :param classifier: classifier type (default: 'knn')
         :param allow_gpu_growth: allow GPU growth (default: False)
         """
 
@@ -62,7 +63,7 @@ class FaceNet:
 
         self._db = {}
         self.classifier = None
-        self.classifier_type = "knn"
+        self.classifier_type = classifier
 
         if data_path:
             self.set_data(*retrieve_embeds(data_path,
@@ -244,16 +245,22 @@ class FaceNet:
     def _train_classifier(self):
         """Trains person classifier"""
         try:
+            embeds = np.squeeze(list(self.data.values()), axis=1)
+
             if self.classifier_type == "svm":
-                embeds = np.array(list(self.data.values()))[:, 0, :]
                 names = list(self.data.keys())
 
-                self.classifier = svm.SVC(kernel="linear", decision_function_shape='ovo')
-                self.classifier.fit(embeds, names)
+                self.classifier = svm.SVC(kernel="linear",
+                                          decision_function_shape="ovo")
+                self.classifier.fit(embeds, self._stripped_names)
+
             elif self.classifier_type == "knn":
                 self.classifier = neighbors.NearestNeighbors(
-                    radius=self.alpha, metric=self.dist_metric.metric, n_jobs=-1)
-                self.classifier.fit(np.squeeze(list(self.data.values()), axis=1))
+                    radius=self.alpha,
+                    metric=self.dist_metric.metric,
+                    n_jobs=-1)
+                self.classifier.fit(embeds)
+
         except (AttributeError, ValueError):
             raise ValueError("Current model incompatible with database")
 
@@ -339,14 +346,9 @@ class FaceNet:
                 embed = embeds[0]
 
                 best_match = self.classifier.predict(embed[None, ...])[0]
-                nearest_embed = np.squeeze(self.data[best_match], 0)
-                dist = self.dist_metric.distance(embed, nearest_embed)
+                dist = self.dist_metric.distance(embed, self.data[best_match + "-1"][0])
                 is_recognized = dist <= self.alpha
 
-                if verbose:
-                    info = colored(f"{round(dist, 4)} ({best_match})",
-                                   color="green" if is_recognized else "red")
-                    print(f"{self.dist_metric}: {info}")
             elif self.classifier_type == "knn":
                 embeds, face = self.predict(img, *args, **kwargs)
                 dists, idxs = self.classifier.radius_neighbors(embeds)
@@ -360,8 +362,11 @@ class FaceNet:
 
                     best_match, dist = matches[best_idx], dists[best_idx]
                     is_recognized = dist <= self.alpha
-                    info = colored(f"{best_match} - {round(dist, 4)}",
-                                   color="green" if is_recognized else "red")
+
+            if verbose:
+                info = colored(f"{round(dist, 4)} ({best_match})",
+                               color="green" if is_recognized else "red")
+                print(f"{self.dist_metric}: {info}")
 
         except (ValueError, AssertionError, cv2.error) as error:
             incompatible = "query data dimension"
