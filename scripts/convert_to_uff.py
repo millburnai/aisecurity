@@ -16,5 +16,5 @@ if __name__ == "__main__":
             dump.write(uff.from_tensorflow_frozen_model(args.infile,
                                                         output_nodes=["embeddings"]))
         else:
-             dump.write(uff.from_tensorflow_model(args.infile,
-                                                  output_nodes=["embeddings"]))
+             dump.write(uff.from_tensorflow(args.infile,
+                                            output_nodes=["embeddings"]))
