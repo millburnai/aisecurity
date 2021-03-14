@@ -51,10 +51,10 @@ class FaceDetector:
             self.kwargs["min_face_size"] = 40
 
         if "trt-mtcnn" in mode:
-            sys.path.insert(1, "../face/trt_mtcnn_plugin")
-            from face.trt_mtcnn_plugin.trt_mtcnn import TrtMTCNNWrapper  # noqa
+            sys.path.insert(1, "../util/trt_mtcnn_plugin")
+            from util.trt_mtcnn_plugin.trt_mtcnn import TrtMTCNNWrapper  # noqa
 
-            engine_paths = [f"../face/trt_mtcnn_plugin/mtcnn/det{i+1}.engine"
+            engine_paths = [f"../util/trt_mtcnn_plugin/mtcnn/det{i+1}.engine"
                             for i in range(3)]
             self.trt_mtcnn = TrtMTCNNWrapper(*engine_paths)
 

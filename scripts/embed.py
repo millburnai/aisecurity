@@ -7,10 +7,10 @@ if platform.machine() == "arm64":
     from tensorflow.python.compiler.mlcompute import mlcompute
     mlcompute.set_mlc_device(device_name="gpu")
 
-from dataflow.loader import dump_and_embed
-from face.detection import FaceDetector
 from facenet import FaceNet
-from privacy.encryptions import NAMES
+from util.loader import dump_and_embed
+from util.detection import FaceDetector
+from util.encryptions import NAMES
 from util.distance import DistMetric
 
 
