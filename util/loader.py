@@ -87,18 +87,18 @@ def online_load(facenet, img_dir, people=None, **kwargs):
     for person in tqdm(people):
         if not person.endswith("jpg") and not person.endswith("png"):
             print(f"[DEBUG] '{person}' not a jpg or png image")
+            no_faces.append(person)
         elif os.path.getsize(person) > 1e8:
             print(f"[DEBUG] '{person}' too large (> 100M bytes)")
-        else:
             no_faces.append(person)
-
+        else:
             try:
                 embeds, __ = facenet.predict(cv2.imread(person), **kwargs)
-
                 person = ntpath.basename(person)
                 person = person.replace(".jpg", "").replace(".png", "")
                 data[person] = embeds.reshape(len(embeds), -1)
             except AssertionError as e:
+                no_faces.append(person)
                 print(f"[DEBUG] error ('{person}'): {e}")
 
     return data, no_faces
