@@ -139,6 +139,7 @@ def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None,
         metadata["mean"] = np.average(embeds, axis=(0, 1, 2))
 
     dump_and_encrypt(data, metadata, dump_path, to_encrypt=to_encrypt)
+    return no_faces
 
 
 @print_time("data retrieval time")

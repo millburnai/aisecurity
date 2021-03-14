@@ -24,10 +24,11 @@ if __name__ == "__main__":
     facenet = FaceNet(data_path=None)
     facenet.dist_metric = DistMetric("cosine", normalize=True)
     facenet.img_norm = "fixed"
-    facenet.alpha = 0.3
+    facenet.alpha = 0.27
 
     detector = FaceDetector("mtcnn", facenet.img_shape)
-    dump_and_embed(facenet, args.img_dir, args.dump_path,
-                   to_encrypt=NAMES, detector=detector,
-                   full_overwrite=True, use_mean=args.mean,
-                   verbose=False)
+    no_faces = dump_and_embed(facenet, args.img_dir, args.dump_path,
+                              to_encrypt=NAMES, detector=detector,
+                              full_overwrite=True, use_mean=args.mean,
+                              verbose=False)
+    print(f"[DEBUG] Faces not detected for {no_faces}")
