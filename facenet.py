@@ -10,14 +10,14 @@ import numpy as np
 from sklearn import neighbors, svm
 from termcolor import colored
 
-from dataflow.loader import (print_time, screen_data, strip_id,
-                             retrieve_embeds, get_frozen_graph)
-from optim.engine import CudaEngine
-from util.distance import DistMetric
-from util.paths import (DB_LOB, DEFAULT_MODEL, CONFIG_HOME,
-                         EMBED_KEY_PATH, NAME_KEY_PATH)
-from util.visuals import Camera, GraphicsRenderer
 from face.detection import FaceDetector
+from util.distance import DistMetric
+from util.engine import CudaEngine
+from util.loader import (print_time, screen_data, strip_id,
+                         retrieve_embeds, get_frozen_graph)
+from util.paths import (DB_LOB, DEFAULT_MODEL, CONFIG_HOME,
+                        EMBED_KEY_PATH, NAME_KEY_PATH)
+from util.visuals import Camera, GraphicsRenderer
 
 
 class FaceNet:
@@ -248,10 +248,7 @@ class FaceNet:
             embeds = np.squeeze(list(self.data.values()), axis=1)
 
             if self.classifier_type == "svm":
-                names = list(self.data.keys())
-
-                self.classifier = svm.SVC(kernel="linear",
-                                          decision_function_shape="ovo")
+                self.classifier = svm.SVC(kernel="linear")
                 self.classifier.fit(embeds, self._stripped_names)
 
             elif self.classifier_type == "knn":
@@ -380,19 +377,13 @@ class FaceNet:
         elapsed = round(1000. * (timer() - start), 4)
         return embed, is_recognized, best_match, dist, face, elapsed
 
-    def real_time_recognize(self, width=640, height=360, dynamic_log=False,
-                            pbar=False, resize=1., detector="mtcnn+haarcascade",
-                            data_mutable=False, socket=None, flip=False,
-                            graphics=True):
+    def real_time_recognize(self, width=640, height=360, resize=1., detector="mtcnn",
+                            flip=False, graphics=True):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
         :param height: height of frame (default: 360)
-        :param dynamic_log: use dynamic database (default: False)
-        :param pbar: use progress bar or not (default: False)
         :param resize: resize scale (default: 1. = no resize)
-        :param detector: face detector type (default: "mtcnn+haarcascade")
-        :param data_mutable: update database iff requested (default: False)
-        :param socket: socket address (dev only)
+        :param detector: face detector type (default: "mtcnn")
         :param flip: whether to flip horizontally or not (default: False)
         :param graphics: whether or not to use graphics (default: True)
         """
@@ -400,15 +391,14 @@ class FaceNet:
         assert self._db, "data must be provided"
         assert 0. <= resize <= 1., "resize must be in [0., 1.]"
 
-
-        graphics_controller = GraphicsRenderer(width, height, resize)
+        graphics = GraphicsRenderer(width, height, resize)
         cap = Camera(width, height)
 
         detector = FaceDetector(detector, self.img_shape, min_face_size=240)
 
         while True:
             _, frame = cap.read()
-            original_frame = frame.copy()
+            cframe = frame.copy()
 
             # resize frame
             if resize != 1:
@@ -416,18 +406,14 @@ class FaceNet:
 
             # facial detection and recognition
             result = self.recognize(frame, detector, flip=flip)
-            embed, is_recognized, best_match, dist, face, elapsed = result
+            embed, rec, best_match, dist, face, elapsed = result
 
-            # graphics, logging, lcd, etc.
+            # graphics
             if graphics:
-                graphics_controller.add_graphics(original_frame, face,
-                                                 is_recognized, best_match,
-                                                 elapsed)
-
-                cv2.imshow("AI Security v2021.0.1", original_frame)
+                graphics.add_graphics(cframe, face, rec, best_match, elapsed)
+                cv2.imshow("AI Security v2021.0.1", cframe)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
-
 
         cap.release()
         cv2.destroyAllWindows()

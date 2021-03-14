@@ -38,11 +38,9 @@ def get_mtcnn(mtcnn_path, min_size=40.0, factor=0.709, thresholds=(0.6, 0.7, 0.7
 
 
 class FaceDetector:
-    MODES = ["mtcnn", "haarcascade", "trt-mtcnn"]
 
     def __init__(self, mode, img_shape=(160, 160), alpha=0.8, **kwargs):
-        assert any(det in mode for det in self.MODES), \
-            "supported modes are 'mtcnn', 'haarcascade', and 'trt-mtcnn'"
+        assert mode in ("mtcnn", "trt-mtcnn"), f"{mode} not supported"
 
         self.mode = mode
         self.alpha = alpha
@@ -70,10 +68,6 @@ class FaceDetector:
                 [tf.TensorSpec(shape=[None, None, 3], dtype=tf.float32)]
             )
 
-        if "haarcascade" in mode:
-            hpath = CONFIG_HOME + "models/haarcascade_frontalface_default.xml"
-            self.haarcascade = cv2.CascadeClassifier(hpath)
-
     def detect_faces(self, img):
         result = []
 
@@ -97,19 +91,6 @@ class FaceDetector:
                                    "nose": (pts[7], pts[2]),
                                    "mouth_left": (pts[8], pts[3]),
                                    "mouth_right": (pts[9], pts[4])}})
-
-        no_result = (not result or result[0]["confidence"] < self.alpha)
-        if "haarcascade" in self.mode and no_result:
-            min_face_size = int(self.kwargs["min_face_size"])
-            faces = self.haarcascade.detectMultiScale(
-                img, scaleFactor=1.1, minSize=(min_face_size, min_face_size)
-            )
-            for x, y, width, height in faces:
-                result.append({
-                    "box": [x, y, width, height],
-                    "keypoints": None,
-                    "confidence": 1.
-                })
 
         return result
 
