@@ -388,8 +388,8 @@ class FaceNet:
         elapsed = round(1000. * (timer() - start), 4)
         return face, is_recognized, best_match, elapsed
 
-    def real_time_recognize(self, width=640, height=360, resize=1., detector="mtcnn",
-                            flip=False, graphics=True):
+    def real_time_recognize(self, width=640, height=360, resize=1.,
+                            detector="mtcnn", flip=False, graphics=True):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
         :param height: height of frame (default: 360)
@@ -402,7 +402,7 @@ class FaceNet:
         assert self._db, "data must be provided"
         assert 0. <= resize <= 1., "resize must be in [0., 1.]"
 
-        graphics = GraphicsRenderer(width, height, resize)
+        graphics_controller = GraphicsRenderer(width, height, resize)
         cap = Camera(width, height)
 
         detector = FaceDetector(detector, self.img_shape, min_face_size=240)
@@ -420,7 +420,7 @@ class FaceNet:
 
             # graphics
             if graphics:
-                graphics.add_graphics(cframe, *info)
+                graphics_controller.add_graphics(cframe, *info)
                 cv2.imshow("AI Security v2021.0.1", cframe)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
