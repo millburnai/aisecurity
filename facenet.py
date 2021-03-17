@@ -419,7 +419,7 @@ class FaceNet:
             info = self.recognize(frame, detector, flip=flip)
 
             if socket: 
-                socket.send(json.dumps{"best_match":info[2]})
+                socket.send(json.dumps({"best_match":info[2]}))
 
             # graphics
             if graphics:
