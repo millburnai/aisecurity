@@ -12,5 +12,5 @@ from util.websocket import WebSocket
 
 if __name__ == "__main__":
     facenet = FaceNet()
-    ws = WebSocket("127.0.0.1:8000", 1, facenet)
+    ws = WebSocket("172.104.17.15:8000", 1, facenet)
     ws.connect()

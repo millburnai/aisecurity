@@ -31,7 +31,7 @@ class WebSocket():
                               on_close = self.on_close)
         def on_open(ws):
             def run(*args):
-                ws.send(json.dumps({"id":self.id}))
+                ws.send(json.dumps({"id":str(self.id)}))
                 self.facenet.real_time_recognize(detector="mtcnn", graphics=True, socket=ws)
             thread.start_new_thread(run, ())
             #print("thread terminating...")

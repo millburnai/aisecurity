@@ -345,6 +345,7 @@ class FaceNet:
         is_recognized = None
         best_match = None
         face = None
+        dist = None
 
         try:
             if self.classifier_type == "svm":
@@ -371,7 +372,7 @@ class FaceNet:
                     best_match, dist = matches[best_idx], dists[best_idx]
                     is_recognized = dist <= self.alpha
 
-            if verbose:
+            if verbose and dist:
                 info = colored(f"{round(dist, 4)} ({best_match})",
                                color="green" if is_recognized else "red")
                 print(f"{self.dist_metric}: {info}")
@@ -419,7 +420,7 @@ class FaceNet:
             info = self.recognize(frame, detector, flip=flip)
 
             if socket: 
-                socket.send(json.dumps{"best_match":info[2]})
+                socket.send(json.dumps({"best_match":info[2]}))
 
             # graphics
             if graphics:
