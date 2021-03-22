@@ -18,6 +18,7 @@ from util.loader import (print_time, screen_data, strip_id,
 from util.paths import (DB_LOB, DEFAULT_MODEL, CONFIG_HOME,
                         EMBED_KEY_PATH, NAME_KEY_PATH)
 from util.visuals import Camera, GraphicsRenderer
+from util.log import Logger
 
 
 class FaceNet:
@@ -390,7 +391,7 @@ class FaceNet:
         return face, is_recognized, best_match, elapsed
 
     def real_time_recognize(self, width=640, height=360, resize=1.,
-                            detector="mtcnn", flip=False, graphics=True, socket=None):
+                            detector="mtcnn", flip=False, graphics=True, logging=True, socket=None):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
         :param height: height of frame (default: 360)
@@ -404,6 +405,7 @@ class FaceNet:
         assert 0. <= resize <= 1., "resize must be in [0., 1.]"
 
         graphics_controller = GraphicsRenderer(width, height, resize)
+        logger = Logger(15, 5)
         cap = Camera(width, height)
 
         detector = FaceDetector(detector, self.img_shape, min_face_size=240)
@@ -419,7 +421,7 @@ class FaceNet:
             # facial detection and recognition
             info = self.recognize(frame, detector, flip=flip)
 
-            if socket: 
+            if socket:
                 socket.send(json.dumps({"best_match":info[2]}))
 
             # graphics
@@ -429,6 +431,8 @@ class FaceNet:
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 
+            if logging:
+                print("Logged:",logger.log(info[2]))
+
         cap.release()
         cv2.destroyAllWindows()
-
