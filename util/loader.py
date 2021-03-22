@@ -75,7 +75,6 @@ def strip_id(name, split="-"):
     return name[:idx] if idx != -1 else name
 
 
-@print_time("data embedding time")
 def online_load(facenet, img_dir, people=None, **kwargs):
     if people is None:
         people = [os.path.join(img_dir, f) for f in os.listdir(img_dir)

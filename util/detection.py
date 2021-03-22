@@ -1,4 +1,4 @@
-"""Haarcascade or MTCNN face detection.
+"""MTCNN face detection.
 """
 
 from functools import partial

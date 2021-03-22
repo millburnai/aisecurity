@@ -37,7 +37,7 @@ class FaceNet:
         :param input_shape: input shape (default: None)
         :param classifier: classifier type (default: 'knn')
         :param allow_gpu_growth: allow GPU growth (default: False)
-        :param kwargs: params for init
+        :param kwargs: params for cuda init
         """
 
         assert os.path.exists(model_path), f"{model_path} not found"
@@ -54,17 +54,17 @@ class FaceNet:
                 print(err)
 
         if ".h5" in model_path:
-            self._keras_init(model_path, **kwargs)
+            self._keras_init(model_path)
         elif ".tflite" in model_path:
-            self._tflite_init(model_path, **kwargs)
+            self._tflite_init(model_path)
         elif ".pb" in model_path:
-            self._tf_init(model_path, input_name, output_name, input_shape, 
-                          **kwargs)
+            self._tf_init(model_path, input_name, output_name, input_shape)
         elif ".engine" in model_path:
             self._trt_init(model_path, input_name, output_name, input_shape,
                            **kwargs)
         else:
             raise TypeError("model must be an .h5, .pb, or .engine file")
+        print(f"[DEBUG] inference backend is {self.mode}")
 
         self._db = {}
         self.classifier = None
@@ -92,23 +92,23 @@ class FaceNet:
                 "alpha": self.alpha,
                 "img_norm": self.img_norm}
 
-    def _keras_init(self, filepath, **kwargs):
+    def _keras_init(self, filepath):
         """Initializes a Keras model
         :param filepath: path to model (.h5)
         """
 
         import tensorflow.compat.v1 as tf  # noqa
-        self.MODE = "keras"
+        self.mode = "keras"
         self.facenet = tf.keras.models.load_model(filepath)
         self.img_shape = self.facenet.input_shape[1:3]
 
-    def _tflite_init(self, filepath, **kwargs):
+    def _tflite_init(self, filepath):
         """Initializes a tflite model interpreter
         :param filepath: path to model (.tflite)
         """
 
         import tensorflow.compat.v1 as tf  # noqa
-        self.MODE = "tflite"
+        self.mode = "tflite"
         self.facenet = tf.lite.Interpreter(model_path=filepath)
         self.facenet.allocate_tensors()
 
@@ -125,7 +125,7 @@ class FaceNet:
         """
 
         import tensorflow.compat.v1 as tf  # noqa
-        self.MODE = "tf"
+        self.mode = "tf"
 
         self.model_config = self.MODELS["_default"]
 
@@ -142,7 +142,7 @@ class FaceNet:
             self.output_name = output_name
 
         assert self.input_name and self.output_name, \
-            f"I/O tensors for {model_name} not detected or provided"
+            f"I/O tensors for '{filepath}' not detected or provided"
         
         graph_def = get_frozen_graph(filepath)
         self.sess = tf.keras.backend.get_session()
@@ -165,21 +165,22 @@ class FaceNet:
             self.img_shape = (160, 160)
             print(f"[DEBUG] using default size of {self.img_shape}")
 
-    def _trt_init(self, filepath, input_name, output_name, input_shape, fp16):
+    def _trt_init(self, filepath, input_name, output_name, input_shape,
+                  **kwargs):
         """TensorRT initialization
         :param filepath: path to serialized engine
         :param input_name: name of input to network
         :param output_name: name of output to network
         :param input_shape: input shape (channels first)
-        :param fp16: use half precision float or not
+        :param kwargs: kwargs for CudaEngine init
         """
 
-        self.MODE = "trt"
+        self.mode = "trt"
         try:
-            self.facenet = CudaEngine(filepath, input_name,
-                                      output_name, input_shape, fp16=fp16)
+            self.facenet = CudaEngine(filepath, input_name, output_name,
+                                      input_shape, **kwargs)
         except NameError:
-            raise ValueError("trt mode not available")
+            raise ValueError("trt mode requested but not available")
         self.img_shape = list(reversed(self.facenet.input_shape))[:-1]
 
     def add_entry(self, person, embeddings, train_classifier=True):
@@ -282,19 +283,18 @@ class FaceNet:
         :returns: embedding as array with shape (1, -1)
         """
 
-        if self.MODE == "keras":
+        if self.mode == "keras":
             embeds = self.facenet.predict(imgs, batch_size=len(imgs))  # noqa
-        elif self.MODE == "tf":
+        elif self.mode == "tf":
             out = self.facenet.get_tensor_by_name(self.output_name)  # noqa
             embeds = self.sess.run(out, feed_dict={self.input_name: imgs})
-        elif self.MODE == "tflite":
+        elif self.mode == "tflite":
             imgs = imgs.astype(np.float32)
             self.facenet.set_tensor(self.input_details[0]["index"], imgs)
             self.facenet.invoke()
             embeds = self.facenet.get_tensor(self.output_details[0]["index"])
         else:
             embeds = self.facenet.inference(imgs)
-            #print(embeds)
         return embeds.reshape(len(imgs), -1)
 
     def predict(self, img, detector, margin=10, flip=False, verbose=True):
@@ -325,12 +325,11 @@ class FaceNet:
 
         return embeds, face_coords
 
-    def recognize(self, img, *args, eps=2.0, verbose=True, **kwargs):
+    def recognize(self, img, *args, verbose=True, **kwargs):
         """Facial recognition
         :param img: image array in BGR mode
-        :param eps: controls inv dist sensitivity (default: 2.0)
-        :param verbose: verbose or not (default: True)
         :param args: will be passed to self.predict
+        :param verbose: verbose or not (default: True)
         :param kwargs: will be passed to self.predict
         :returns: face, is recognized, best match, time elapsed
         """
@@ -339,7 +338,6 @@ class FaceNet:
         is_recognized = None
         best_match = None
         face = None
-        dist = None
 
         try:
             embeds, face = self.predict(img, *args, **kwargs)
@@ -348,7 +346,6 @@ class FaceNet:
             nearest = self._stripped_db[best_match]
             dists = self.dist_metric.distance(embeds, nearest, True)
             dist = np.average(dists)
-
             is_recognized = dist <= self.alpha
 
             if verbose and dist:
@@ -369,7 +366,8 @@ class FaceNet:
         return face, is_recognized, best_match, elapsed
 
     def real_time_recognize(self, width=640, height=360, resize=1.,
-                            detector="mtcnn", flip=False, graphics=True, socket=None):
+                            detector="mtcnn", flip=False, graphics=True,
+                            socket=None):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
         :param height: height of frame (default: 360)
@@ -377,6 +375,7 @@ class FaceNet:
         :param detector: face detector type (default: "mtcnn")
         :param flip: whether to flip horizontally or not (default: False)
         :param graphics: whether or not to use graphics (default: True)
+        :param socket: socket (dev) (default: False)
         """
 
         assert self._db, "data must be provided"
@@ -399,7 +398,7 @@ class FaceNet:
             info = self.recognize(frame, detector, flip=flip)
 
             if socket: 
-                socket.send(json.dumps({"best_match":info[2]}))
+                socket.send(json.dumps({"best_match": info[2]}))
 
             # graphics
             if graphics:

@@ -14,12 +14,12 @@ try:
     import pycuda.autoinit  # noqa
     import pycuda.driver as cuda  # noqa
 except (ModuleNotFoundError, ImportError) as e:
-    print(f"[DEBUG] cannot import pycuda.autoinit or pycuda.driver: '{e}'")
+    print(f"[DEBUG] '{e}'. Ignore if GPU is not set up")
 
 try:
     import tensorrt as trt  # noqa
 except (ModuleNotFoundError, ImportError) as e:
-    print(f"[DEBUG] cannot import tensorrt: '{e}'")
+    print(f"[DEBUG] '{e}'. Ignore if GPU is not set up")
 
 
 class CudaEngineManager:
