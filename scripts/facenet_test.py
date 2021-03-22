@@ -10,5 +10,10 @@ from facenet import FaceNet
 
 
 if __name__ == "__main__":
-    facenet = FaceNet(classifier="svm")
-    facenet.real_time_recognize(detector="mtcnn", graphics=True)
+    on_jetson = platform.machine() == "aarch64"
+    try:
+        facenet = FaceNet(classifier="svm", fp16=on_jetson)
+    except TypeError:
+        facenet = FaceNet(classifier="svm")
+    facenet.real_time_recognize(detector="trt-mtcnn" if on_jetson else "mtcnn",
+                                graphics=not on_jetson)

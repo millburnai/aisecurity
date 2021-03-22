@@ -28,7 +28,7 @@ class FaceNet:
     @print_time("model load time")
     def __init__(self, model_path=DEFAULT_MODEL, data_path=DB_LOB,
                  input_name=None, output_name=None, input_shape=None,
-                 classifier="knn", gpu_alloc=False):
+                 classifier="knn", gpu_alloc=False, **kwargs):
         """Initializes FaceNet object
         :param model_path: path to model (default: utils.paths.DEFAULT_MODEL)
         :param data_path: path to data (default: utils.paths.DB_LOB)
@@ -36,7 +36,8 @@ class FaceNet:
         :param output_name: name of output tensor (default: None)
         :param input_shape: input shape (default: None)
         :param classifier: classifier type (default: 'knn')
-        :param gpu_alloc: allow GPU growth (default: False)
+        :param allow_gpu_growth: allow GPU growth (default: False)
+        :param kwargs: params for init
         """
 
         assert os.path.exists(model_path), f"{model_path} not found"
@@ -53,13 +54,15 @@ class FaceNet:
                 print(err)
 
         if ".h5" in model_path:
-            self._keras_init(model_path)
+            self._keras_init(model_path, **kwargs)
         elif ".tflite" in model_path:
-            self._tflite_init(model_path)
+            self._tflite_init(model_path, **kwargs)
         elif ".pb" in model_path:
-            self._tf_init(model_path, input_name, output_name, input_shape)
+            self._tf_init(model_path, input_name, output_name, input_shape, 
+                          **kwargs)
         elif ".engine" in model_path:
-            self._trt_init(model_path, input_name, output_name, input_shape)
+            self._trt_init(model_path, input_name, output_name, input_shape,
+                           **kwargs)
         else:
             raise TypeError("model must be an .h5, .pb, or .engine file")
 
@@ -89,7 +92,7 @@ class FaceNet:
                 "alpha": self.alpha,
                 "img_norm": self.img_norm}
 
-    def _keras_init(self, filepath):
+    def _keras_init(self, filepath, **kwargs):
         """Initializes a Keras model
         :param filepath: path to model (.h5)
         """
@@ -99,7 +102,7 @@ class FaceNet:
         self.facenet = tf.keras.models.load_model(filepath)
         self.img_shape = self.facenet.input_shape[1:3]
 
-    def _tflite_init(self, filepath):
+    def _tflite_init(self, filepath, **kwargs):
         """Initializes a tflite model interpreter
         :param filepath: path to model (.tflite)
         """
@@ -124,14 +127,28 @@ class FaceNet:
         import tensorflow.compat.v1 as tf  # noqa
         self.MODE = "tf"
 
+        self.model_config = self.MODELS["_default"]
+
+        for model in self.MODELS:
+            if model in filepath:
+                self.model_config = self.MODELS[model]
+
+        self.input_name = self.model_config["input"]
+        self.output_name = self.model_config["output"]
+
+        if not self.input_name:
+            self.input_name = input_name
+        elif not self.output_name:
+            self.output_name = output_name
+
+        assert self.input_name and self.output_name, \
+            f"I/O tensors for {model_name} not detected or provided"
+        
         graph_def = get_frozen_graph(filepath)
         self.sess = tf.keras.backend.get_session()
 
         tf.import_graph_def(graph_def, name="")
 
-        self._tensor_init(model_name=filepath,
-                          input_name=input_name,
-                          output_name=output_name)
         self.facenet = self.sess.graph
 
         try:
@@ -148,42 +165,19 @@ class FaceNet:
             self.img_shape = (160, 160)
             print(f"[DEBUG] using default size of {self.img_shape}")
 
-    def _tensor_init(self, model_name, input_name, output_name):
-        """Initializes tensors (TF or TRT modes only)
-        :param model_name: name of model
-        :param input_name: input tensor name
-        :param output_name: output tensor name
-        """
-
-        self.model_config = self.MODELS["_default"]
-
-        for model in self.MODELS:
-            if model in model_name:
-                self.model_config = self.MODELS[model]
-
-        self.input_name = self.model_config["input"]
-        self.output_name = self.model_config["output"]
-
-        if not self.input_name:
-            self.input_name = input_name
-        elif not self.output_name:
-            self.output_name = output_name
-
-        assert self.input_name and self.output_name, \
-            f"I/O tensors for {model_name} not detected or provided"
-
-    def _trt_init(self, filepath, input_name, output_name, input_shape):
+    def _trt_init(self, filepath, input_name, output_name, input_shape, fp16):
         """TensorRT initialization
         :param filepath: path to serialized engine
         :param input_name: name of input to network
         :param output_name: name of output to network
         :param input_shape: input shape (channels first)
+        :param fp16: use half precision float or not
         """
 
         self.MODE = "trt"
         try:
             self.facenet = CudaEngine(filepath, input_name,
-                                      output_name, input_shape)
+                                      output_name, input_shape, fp16=fp16)
         except NameError:
             raise ValueError("trt mode not available")
         self.img_shape = list(reversed(self.facenet.input_shape))[:-1]
@@ -300,6 +294,7 @@ class FaceNet:
             embeds = self.facenet.get_tensor(self.output_details[0]["index"])
         else:
             embeds = self.facenet.inference(imgs)
+            #print(embeds)
         return embeds.reshape(len(imgs), -1)
 
     def predict(self, img, detector, margin=10, flip=False, verbose=True):

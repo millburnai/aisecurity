@@ -26,28 +26,35 @@ class CudaEngineManager:
     """Cuda engine management and interface with GPU using pycuda, trt"""
 
     # INITS
-    def __init__(self, logger=None, dtype=None, max_batch_size=1,
-                 max_workspace_size=1 << 20):
+    def __init__(self, fp16=True, max_batch_size=1,
+                 max_workspace_size=1 << 20, explicit_precision=False):
         """Initializes CudaEngineManager
-        :param logger: trt logger (default: trt.Logger(trt.Logger.ERROR))
-        :param dtype: trt dtype (default: trt.float16)
+        :param fp16: use fp16 or not (default: True)
         :param max_batch_size: max batch size (default: 1)
         :param max_workspace_size: max workspace size (default: 1 << 20)
+        :param explicit_precision: explicit precision or not (default: False)
         """
 
-        self.logger = logger if logger else trt.Logger(trt.Logger.ERROR)
-        self.dtype = dtype if dtype else trt.float16
+        self.logger = trt.Logger(trt.Logger.ERROR)
+        self.dtype = trt.float16 if fp16 else trt.float32
         self.max_workspace_size = max_workspace_size
 
-        # builder and netork
+        # builder and network
         self.builder = trt.Builder(self.logger)
         self.builder.max_batch_size = max_batch_size
         self.builder.max_workspace_size = max_workspace_size
 
-        if self.dtype == trt.float16:
+        print(f"[DEBUG] using {str(self.dtype)} precision")
+        if fp16:
             self.builder.fp16_mode = True
 
-        self.network = self.builder.create_network()
+        if explicit_precision:
+            flag = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_PRECISION)
+            self.network = self.builder.create_network(flag)
+            print("[DEBUG] created explicit precision network")
+        else:
+            self.network = self.builder.create_network()
+            print("[DEBUG] no explicit precision set")
 
     def allocate_buffers(self):
         """Allocates GPU memory for future use and creates
@@ -78,8 +85,8 @@ class CudaEngineManager:
 
         def buffer_ready(arr, dtype):
             arr = arr.astype(dtype)
-            arr = arr.transpose(0, 3, 1, 2).ravel()
-            return arr
+            #arr = arr.transpose(0, 3, 1, 2).ravel()
+            return arr.ravel()
 
         outputs = np.empty((len(imgs), *self.h_output.shape))
         for idx, img in enumerate(np.expand_dims(imgs, axis=1)):
