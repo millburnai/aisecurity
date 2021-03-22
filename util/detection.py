@@ -60,7 +60,9 @@ class FaceDetector:
 
         if "mtcnn" in mode.replace("trt-mtcnn", ""):
             import tensorflow.compat.v1 as tf  # noqa
-            assert tf.executing_eagerly(), "[internal] launch failed, tf not eager"
+            assert tf.executing_eagerly(), \
+                    "[internal] launch failed, tf not eager."\
+                    "Check that tensorflow>=2.3 and that eager exec is enabled"
 
             mpath = CONFIG_HOME + "/models/mtcnn.pb"
             self.mtcnn = tf.wrap_function(
