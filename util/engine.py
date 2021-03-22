@@ -126,17 +126,17 @@ class CudaEngineManager:
         :param output_names: names of outputs
         """
 
-        parser = trt.UffParser()
+        self.parser = trt.UffParser()
 
-        # input shape must always be channels-first
-        parser.register_input(input_name, input_shape)
-
+        self.parser.register_input(input_name, input_shape)
         for output in output_names:
-            parser.register_output(output)
+            self.parser.register_output(output)
 
-        parser.parse(uff_file, self.network, self.dtype)
+        self.parser.parse(uff_file, self.network, self.dtype)
 
-        self.parser = parser
+    def parse_onnx(self, infile):
+        self.parser = trt.OnnxParser(self.network, self.logger)
+        assert self.parser.parse_from_file(infile), "model parse failed"
 
     def parse_caffe(self, caffe_model_file, caffe_deploy_file, output_names):
         """Parses caffe model file and prepares for serialization
@@ -171,6 +171,13 @@ class CudaEngineManager:
         self.build_and_serialize_engine()
 
         with open(target_file, "wb") as file:
+            file.write(self.engine)
+
+    def onnx_write_cuda_engine(self, infile, outfile):
+        self.parse_onnx(infile)
+        self.build_and_serialize_engine()
+
+        with open(outfile, "wb") as file:
             file.write(self.engine)
 
     def caffe_write_cuda_engine(self, caffe_model_file, caffe_deploy_file,
@@ -248,7 +255,6 @@ class CudaEngine:
             f"I/O names for {filepath} not detected or provided"
         assert self.input_shape, \
             f"input shape for {filepath} not detected or provided"
-
 
     # INFERENCE
     def inference(self, *args, **kwargs):

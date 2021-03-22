@@ -28,7 +28,7 @@ class FaceNet:
     @print_time("model load time")
     def __init__(self, model_path=DEFAULT_MODEL, data_path=DB_LOB,
                  input_name=None, output_name=None, input_shape=None,
-                 classifier="knn", allow_gpu_growth=False, **kwargs):
+                 classifier="knn", gpu_alloc=False, **kwargs):
         """Initializes FaceNet object
         :param model_path: path to model (default: utils.paths.DEFAULT_MODEL)
         :param data_path: path to data (default: utils.paths.DB_LOB)
@@ -44,12 +44,14 @@ class FaceNet:
         assert not data_path or os.path.exists(data_path), \
             f"{data_path} not found"
 
-        if allow_gpu_growth:
-            import tensorflow.compat.v1 as tf  # noqa
-            options = tf.GPUOptions(allow_growth=True)
-            config = tf.ConfigProto(gpu_options=options)
-            self.sess = tf.Session(config=config)
-            self.sess.__enter__()
+        if gpu_alloc:
+            import tensorflow as tf  # noqa
+            try:
+                gpus = tf.config.experimental.list_physical_devices("GPU")
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+            except RuntimeError as err:
+                print(err)
 
         if ".h5" in model_path:
             self._keras_init(model_path, **kwargs)
@@ -250,18 +252,13 @@ class FaceNet:
     def _train_classifier(self):
         """Trains person classifier"""
         try:
-            embeds = np.squeeze(list(self.data.values()), axis=1)
-
             if self.classifier_type == "svm":
                 self.classifier = svm.SVC(kernel="linear")
-                self.classifier.fit(embeds, self._stripped_names)
-
             elif self.classifier_type == "knn":
-                self.classifier = neighbors.NearestNeighbors(
-                    radius=self.alpha,
-                    metric=self.dist_metric.metric,
-                    n_jobs=-1)
-                self.classifier.fit(embeds)
+                self.classifier = neighbors.KNeighborsClassifier()
+
+            embeds = np.squeeze(list(self.data.values()), axis=1)
+            self.classifier.fit(embeds, self._stripped_names)
 
         except (AttributeError, ValueError):
             raise ValueError("Current model incompatible with database")
@@ -276,6 +273,8 @@ class FaceNet:
         elif self.img_norm == "fixed":
             # scales x to [-1, 1]
             return (imgs - 127.5) / 128.
+        else:
+            return imgs
 
     def embed(self, imgs):
         """Embeds cropped face
@@ -343,29 +342,14 @@ class FaceNet:
         dist = None
 
         try:
-            if self.classifier_type == "svm":
-                embeds, face = self.predict(img, *args, **kwargs)
-                best_match = self.classifier.predict(embeds)[0]
+            embeds, face = self.predict(img, *args, **kwargs)
+            best_match = self.classifier.predict(embeds)[0]
 
-                nearest = self._stripped_db[best_match]
-                dists = self.dist_metric.distance(embeds, nearest, True)
-                dist = np.average(dists)
+            nearest = self._stripped_db[best_match]
+            dists = self.dist_metric.distance(embeds, nearest, True)
+            dist = np.average(dists)
 
-                is_recognized = dist <= self.alpha
-
-            elif self.classifier_type == "knn":
-                embeds, face = self.predict(img, *args, **kwargs)
-                dists, idxs = self.classifier.radius_neighbors(embeds)
-                dists = dists.flatten()[0]
-                idxs = idxs.flatten()[0]
-
-                if len(idxs) != 0:
-                    matches = np.take(self._stripped_names, idxs).tolist()
-                    key = lambda i: matches.count(matches[i]) + eps/dists[i]
-                    best_idx = max(range(len(matches)), key=key)
-
-                    best_match, dist = matches[best_idx], dists[best_idx]
-                    is_recognized = dist <= self.alpha
+            is_recognized = dist <= self.alpha
 
             if verbose and dist:
                 info = colored(f"{round(dist, 4)} ({best_match})",
@@ -426,4 +410,3 @@ class FaceNet:
 
         cap.release()
         cv2.destroyAllWindows()
-
