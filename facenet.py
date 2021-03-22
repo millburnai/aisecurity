@@ -344,6 +344,7 @@ class FaceNet:
         is_recognized = None
         best_match = None
         face = None
+        dist = None
 
         try:
             embeds, face = self.predict(img, *args, **kwargs)
@@ -355,7 +356,7 @@ class FaceNet:
 
             is_recognized = dist <= self.alpha
 
-            if verbose:
+            if verbose and dist:
                 info = colored(f"{round(dist, 4)} ({best_match})",
                                color="green" if is_recognized else "red")
                 print(f"{self.dist_metric}: {info}")
@@ -373,7 +374,7 @@ class FaceNet:
         return face, is_recognized, best_match, elapsed
 
     def real_time_recognize(self, width=640, height=360, resize=1.,
-                            detector="mtcnn", flip=False, graphics=True):
+                            detector="mtcnn", flip=False, graphics=True, socket=None):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
         :param height: height of frame (default: 360)
@@ -401,6 +402,9 @@ class FaceNet:
 
             # facial detection and recognition
             info = self.recognize(frame, detector, flip=flip)
+
+            if socket: 
+                socket.send(json.dumps({"best_match":info[2]}))
 
             # graphics
             if graphics:
