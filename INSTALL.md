@@ -4,7 +4,7 @@ This instructions will only work for `v2021.0`.
 ## General installation
 1. Install `tensorflow>=2`, `scikit-learn`, `opencv-python`, `pycryptodome`, `websocket`, `tqdm`, `dropbox`
 2. Clone this repo (branch `v2021.0`) to `aisecurity`
-3. `cd aisecurity/scripts && python3 download.py <TOKEN>`, see Discord server (`announcements` channel) for token
+3. `cd aisecurity/scripts && python3 download.py <TOKEN>`, see Discord server (`announcements` channel) for `<TOKEN>`
 4. `python3 facenet_test.py` - should recognize you if you are a junior
 
 ## GPU installation
@@ -15,30 +15,30 @@ After general installation...
 2. Run `make` in `util/trt_mtcnn_plugin/mtcnn`
 3. Run `./create_engines` in the same directory
 4. Run `make` in `util/trt_mtcnn_plugin`
-5. See ["Install `facenet` engine section"](####install-`facenet`-engine)
+5. See ["Install `facenet` engine"](#install-facenet-engine) section
 
 ## Jetson Nano installation
 Follow these for Jetson-specific instructions, tested with Jetpack 4.5 (CUDA 10.2).
 
 ### Regular installation
-*Only applicable if `.engine`s are available.*
+*Only applicable if `.engine`s are available.* Use this if developing on an SD card != `a1`.
 
 #### Install dependencies
 1. `sudo apt-get update`
 2. `sudo apt-get install python3-pip`
 3. `sudo pip3 install -U pip testresources setuptools==49.6.0`
-4. `sudo pip3 install -U scikit-learn tqdm websocket Cython pycryptodome numpy==1.19.4 dropbox`
-5. `export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}`
-6. `export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}`
+4. `sudo pip3 install -U scikit-learn tqdm websocket Cython pycryptodome dropbox`
+5. `sudo pip3 install -U numpy==1.19.4`
+6. `export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}`
+7. `export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}`
 
 #### Install `aisecurity`
-1. `cd ~/ ; git clone https://github.com/orangese/aisecurity.git`
-2. `cd aisecurity ; git submodule update --init`
-3. `cd util/trt_mtcnn_plugin ; make`
-4. `cd ~/aisecurity/scripts && python3 download.py <TOKEN>`, see Discord server (`announcements` channel) for token
-5. `cd ~/aisecurity/config/models/ && mv det* ~/aisecurity/util/trt_mtcnn_plugin/mtcnn/`.
-6. Change the paths in `~/aisecurity/config/config.json` so that `default_model` points to `20180402-114759.engine`.
-7. `cd ~/aisecurity/scripts && python3 facenet_test.py` to ensure that everything works.
+1. `cd ~/ && git clone https://github.com/orangese/aisecurity.git`
+2. `cd aisecurity && git submodule update --init`
+3. `cd util/trt_mtcnn_plugin && make`
+4. `cd ~/aisecurity/scripts && python3 download.py <TOKEN>`, see Discord server (`announcements` channel) for `<TOKEN>`
+5. `cd ~/aisecurity/config/models/ && mv det* ~/aisecurity/util/trt_mtcnn_plugin/mtcnn/`
+6. `cd ~/aisecurity/scripts && python3 facenet_test.py` to ensure that everything works
 
 ### Full installation
 *Only follow these instructions if the `.engine` files aren't available yet.* 
@@ -59,13 +59,14 @@ Unless developing on the `a1` Jetson, do not use these instructions.
 13. `export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}`
 
 #### Install aisecurity and `mtcnn` models
-1. `cd ~/ ; git clone https://github.com/orangese/aisecurity.git`
-2. `cd aisecurity ; git submodule update --init`
-3. `cd face/trt_mtcnn_plugin/mtcnn ; make ; ./create_engines`
-4. `cd .. ; make`
-5. Change the paths in `config/config.json` so that the prefixes (`/home/../aisecurity`) are correct, and so that the `default_model` points to `20180402-114759.engine`. Change database and key paths as necessary as well.
+1. `cd ~/ && git clone https://github.com/orangese/aisecurity.git`
+2. `cd aisecurity && git submodule update --init`
+3. `cd face/trt_mtcnn_plugin/mtcnn && make && ./create_engines`. Change engine params in `det1_relu.prototxt` or `create_engines.cpp` (before `make`) if necessary
+4. `cd .. && make`
+5. Change the paths in `config/config.json` so that `default_model` points to `20180402-114759.engine`.
 
 #### Install `facenet` engine
 1. `cd /usr/src/tensorrt/samples/trtexec && make`
 2. `export PATH=$PATH:/usr/src/tensorrt/bin`
 3. `cd ~/aisecurity/config/models && trtexec --saveEngine=20180402-114759.engine --uffNHWC --uff=20180402-114759.uff --uffInput=input,160,160,3 --fp16 --output=embeddings`
+4. `cd ~/aisecurity/scripts && python3 facenet_test.py` to ensure that everything works
