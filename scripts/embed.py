@@ -1,11 +1,6 @@
 import argparse
-import platform
 import sys
 sys.path.insert(1, "../")
-
-if platform.machine() == "arm64":
-    from tensorflow.python.compiler.mlcompute import mlcompute
-    mlcompute.set_mlc_device(device_name="gpu")
 
 from facenet import FaceNet
 from util.loader import dump_and_embed
