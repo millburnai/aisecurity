@@ -1,3 +1,4 @@
+import os
 import platform
 import sys
 
@@ -10,10 +11,15 @@ from facenet import FaceNet
 
 
 if __name__ == "__main__":
-    on_jetson = platform.machine() == "aarch64"
-    try:
-        facenet = FaceNet(classifier="svm", fp16=on_jetson)
-    except TypeError:
-        facenet = FaceNet(classifier="svm")
-    facenet.real_time_recognize(detector="trt-mtcnn" if on_jetson else "mtcnn",
-                                graphics=not on_jetson)
+    jetson = platform.machine() == "aarch64"
+
+    print("[DEBUG] checking for CUDA...")
+    cuda = not bool(os.system("nvcc --version"))
+    if cuda:
+        print("[DEBUG] CUDA found... using tensorrt")
+    else:
+        print("[DEBUG] CUDA not found... defaulting to tensorflow")
+
+    facenet = FaceNet()
+    facenet.real_time_recognize(detector="trt-mtcnn" if cuda else "mtcnn",
+                                graphics=not jetson)
