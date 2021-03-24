@@ -287,6 +287,9 @@ class FaceNet:
             self.facenet.invoke()
             embeds = self.facenet.get_tensor(self.output_details[0]["index"])
         else:
+            if len(imgs) != 1:
+                raise NotImplementedError("trt batch not yet suppported")
+
             imgs = imgs.astype(np.float32)
             np.copyto(self.h_input, imgs.ravel())
             cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
