@@ -373,7 +373,7 @@ class FaceNet:
 
     def real_time_recognize(self, width=640, height=360, resize=1.,
                             detector="mtcnn", flip=False, graphics=True,
-                            socket=None):
+                            socket=None, stride=1):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
         :param height: height of frame (default: 360)
@@ -382,6 +382,7 @@ class FaceNet:
         :param flip: whether to flip horizontally or not (default: False)
         :param graphics: whether or not to use graphics (default: True)
         :param socket: socket (dev) (default: False)
+        :param stride: mtcnn frame stride (default: 1)
         """
 
         assert self._db, "data must be provided"
@@ -390,7 +391,8 @@ class FaceNet:
         graphics_controller = GraphicsRenderer(width, height, resize)
         cap = Camera(width, height)
 
-        detector = FaceDetector(detector, self.img_shape, min_face_size=240)
+        detector = FaceDetector(detector, self.img_shape,
+                                min_face_size=240, stride=stride)
 
         while True:
             _, frame = cap.read()
@@ -403,7 +405,7 @@ class FaceNet:
             # facial detection and recognition
             info = self.recognize(frame, detector, flip=flip)
 
-            if socket: 
+            if socket:
                 socket.send(json.dumps({"best_match": info[2]}))
 
             # graphics
