@@ -15,7 +15,7 @@ After general installation...
 2. Run `make` in `util/trt_mtcnn_plugin/mtcnn`
 3. Run `./create_engines` in the same directory
 4. Run `make` in `util/trt_mtcnn_plugin`
-5. See ["Install `facenet` engine section"](####install-facenet-engine)
+5. See ["Install `facenet` engine section"](####install-`facenet`-engine)
 
 ## Jetson Nano installation
 Follow these for Jetson-specific instructions, tested with Jetpack 4.5 (CUDA 10.2).
