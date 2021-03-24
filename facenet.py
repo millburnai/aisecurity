@@ -27,6 +27,7 @@ from util.loader import (print_time, screen_data, strip_id,
                          retrieve_embeds, get_frozen_graph)
 from util.common import (DB_LOB, DEFAULT_MODEL, EMBED_KEY_PATH, NAME_KEY_PATH)
 from util.visuals import Camera, GraphicsRenderer
+from util.log import Logger
 
 
 class FaceNet:
@@ -391,6 +392,7 @@ class FaceNet:
         assert 0. <= resize <= 1., "resize must be in [0., 1.]"
 
         graphics_controller = GraphicsRenderer(width, height, resize)
+        logger = Logger(15, 5)
         cap = Camera(width, height)
 
         detector = FaceDetector(detector, self.img_shape,
@@ -416,6 +418,9 @@ class FaceNet:
                 cv2.imshow("AI Security v2021.0.1", cframe)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
+
+            if logging:
+                print("Logged:", logger.log(info[2]))
 
         cap.release()
         cv2.destroyAllWindows()
