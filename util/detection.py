@@ -9,10 +9,11 @@ import cv2
 from termcolor import colored
 
 sys.path.insert(1, "../")
-from util.paths import CONFIG_HOME
+from util.common import CONFIG_HOME
 
 
-def get_mtcnn(mtcnn_path, min_size=40.0, factor=0.709, thresholds=(0.6, 0.7, 0.7)):
+def get_mtcnn(mtcnn_path, min_size=40.0, factor=0.709,
+              thresholds=(0.6, 0.7, 0.7)):
     import tensorflow.compat.v1 as tf  # noqa
 
     def mtcnn(img, mtcnn_path, min_size, factor, thresholds):
@@ -131,7 +132,7 @@ class FaceDetector:
 
             elif verbose:
                 confidence = round(face['confidence'] * 100, 2)
-                print(f"{confidence}% face detection confidence is too low")
+                print(f"{confidence}% detect confidence (too low)")
 
         elif verbose:
             print("No face detected")
