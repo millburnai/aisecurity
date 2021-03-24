@@ -1,14 +1,12 @@
 import json
 import os
 from pathlib import Path
+import platform
 import sys
 import re
 
 import dropbox
 from tqdm import tqdm
-
-sys.path.insert(1, "../")
-from util.common import ON_GPU, ON_JETSON
 
 
 def get_files(dbx, prefix, ignore):
@@ -61,11 +59,19 @@ if __name__ == "__main__":
         config = json.load(f)
         prefix, ext = os.path.splitext(config["default_model"])
 
-    if ON_JETSON and ON_GPU:
+    on_gpu = not bool(os.system("command -v nvcc > /dev/null"))
+    on_jetson = platform.machine() == "aarch64"
+
+    if on_jetson or on_gpu:
         print("[DEBUG] changing default backend to tensorrt")
         config["default_model"] = prefix + ".engine"
         with open("../config/config.json", "w", encoding="utf8") as f:
             json.dump(config, f)
+
+        for i in range(1, 4):
+            os.rename(f"../config/models/det{i}.engine",
+                      f"../util/trt_mtcnn_plugin/mtcnn/det{i}.engine")
+
     else:
         backends = {".pb": "tensorflow", ".tflite": "tflite"}
         print(f"[DEBUG] default backend is {backends[ext]}")
