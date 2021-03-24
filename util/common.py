@@ -1,8 +1,9 @@
-"""Common paths used throughout the package.
+"""Common constants used throughout the repo.
 """
 
 import json
 import os
+import platform
 
 REPLACE = "[proj-root]"
 CWD = os.path.join(os.path.dirname(__file__), "../")
@@ -17,3 +18,6 @@ NAME_KEY_PATH = CONFIG["name_keys"].replace(REPLACE, CWD)
 EMBED_KEY_PATH = CONFIG["embedding_keys"].replace(REPLACE, CWD)
 
 DEFAULT_MODEL = CONFIG["default_model"].replace(REPLACE, CWD)
+
+ON_GPU = not bool(os.system("command -v nvcc > /dev/null"))
+ON_JETSON = platform.machine() == "aarch64"

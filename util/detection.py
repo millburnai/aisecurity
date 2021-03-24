@@ -1,4 +1,4 @@
-"""Haarcascade or MTCNN face detection.
+"""MTCNN face detection.
 """
 
 from functools import partial
@@ -9,10 +9,11 @@ import cv2
 from termcolor import colored
 
 sys.path.insert(1, "../")
-from util.paths import CONFIG_HOME
+from util.common import CONFIG_HOME
 
 
-def get_mtcnn(mtcnn_path, min_size=40.0, factor=0.709, thresholds=(0.6, 0.7, 0.7)):
+def get_mtcnn(mtcnn_path, min_size=40.0, factor=0.709,
+              thresholds=(0.6, 0.7, 0.7)):
     import tensorflow.compat.v1 as tf  # noqa
 
     def mtcnn(img, mtcnn_path, min_size, factor, thresholds):
@@ -39,16 +40,17 @@ def get_mtcnn(mtcnn_path, min_size=40.0, factor=0.709, thresholds=(0.6, 0.7, 0.7
 
 class FaceDetector:
 
-    def __init__(self, mode, img_shape=(160, 160), alpha=0.8, **kwargs):
+    def __init__(self, mode, img_shape=(160, 160), alpha=0.8, stride=1,
+                 min_face_size=40):
         assert mode in ("mtcnn", "trt-mtcnn"), f"{mode} not supported"
 
         self.mode = mode
         self.alpha = alpha
         self.img_shape = tuple(img_shape)
-        self.kwargs = kwargs
-
-        if "min_face_size" not in self.kwargs:
-            self.kwargs["min_face_size"] = 40
+        self.stride = stride
+        self.min_face_size = min_face_size
+        self.frame_ct = 0
+        self._cached_result = None
 
         if "trt-mtcnn" in mode:
             sys.path.insert(1, "../util/trt_mtcnn_plugin")
@@ -60,23 +62,31 @@ class FaceDetector:
 
         if "mtcnn" in mode.replace("trt-mtcnn", ""):
             import tensorflow.compat.v1 as tf  # noqa
-            assert tf.executing_eagerly(), "[internal] launch failed, tf not eager"
+            assert tf.executing_eagerly(), \
+                    "[internal] launch failed, tf not eager."\
+                    "Check that tensorflow>=2.3 and that eager exec enabled"
 
             mpath = CONFIG_HOME + "/models/mtcnn.pb"
             self.mtcnn = tf.wrap_function(
-                get_mtcnn(mpath, min_size=float(self.kwargs["min_face_size"])),
+                get_mtcnn(mpath, min_size=float(self.min_face_size)),
                 [tf.TensorSpec(shape=[None, None, 3], dtype=tf.float32)]
             )
 
     def detect_faces(self, img):
+        self.frame_ct += 1
         result = []
 
-        if "trt-mtcnn" in self.mode:
+        skip_frame = self.stride != 1 and self.frame_ct % self.stride != 0
+        if skip_frame and self._cached_result:
+            result = self._cached_result
+
+        elif "trt-mtcnn" in self.mode:
             result = self.trt_mtcnn.detect_faces(img)
 
-        if "mtcnn" in self.mode.replace("trt-mtcnn", ""):
+        elif "mtcnn" in self.mode.replace("trt-mtcnn", ""):
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            bboxes, scores, landmarks = map(lambda x: x.numpy(), self.mtcnn(img))
+            bboxes, scores, landmarks = map(lambda x: x.numpy(),
+                                            self.mtcnn(img))
 
             for face, score, pts in zip(bboxes, scores, landmarks):
                 x, y = int(face[1]), int(face[0])
@@ -92,6 +102,7 @@ class FaceDetector:
                                    "mouth_left": (pts[8], pts[3]),
                                    "mouth_right": (pts[9], pts[4])}})
 
+        self._cached_result = result
         return result
 
     def crop_face(self, img_bgr, margin, flip=False, verbose=True):
@@ -121,7 +132,7 @@ class FaceDetector:
 
             elif verbose:
                 confidence = round(face['confidence'] * 100, 2)
-                print(f"{confidence}% face detection confidence is too low")
+                print(f"{confidence}% detect confidence (too low)")
 
         elif verbose:
             print("No face detected")

@@ -10,46 +10,55 @@ import numpy as np
 from sklearn import neighbors, svm
 from termcolor import colored
 
+try:
+    import pycuda.autoinit  # noqa
+    import pycuda.driver as cuda  # noqa
+except (ModuleNotFoundError, ImportError) as e:
+    print(f"[DEBUG] '{e}'. Ignore if GPU is not set up")
+
+try:
+    import tensorrt as trt  # noqa
+except (ModuleNotFoundError, ImportError) as e:
+    print(f"[DEBUG] '{e}'. Ignore if GPU is not set up")
+
 from util.detection import FaceDetector
 from util.distance import DistMetric
-from util.engine import CudaEngine
 from util.loader import (print_time, screen_data, strip_id,
                          retrieve_embeds, get_frozen_graph)
-from util.paths import (DB_LOB, DEFAULT_MODEL, CONFIG_HOME,
-                        EMBED_KEY_PATH, NAME_KEY_PATH)
+from util.common import (DB_LOB, DEFAULT_MODEL, EMBED_KEY_PATH, NAME_KEY_PATH)
 from util.visuals import Camera, GraphicsRenderer
 from util.log import Logger
 
 
 class FaceNet:
     """Class implementation of FaceNet"""
-    MODELS = json.load(open(CONFIG_HOME + "/defaults/models.json",
-                            encoding="utf-8"))
 
     @print_time("model load time")
     def __init__(self, model_path=DEFAULT_MODEL, data_path=DB_LOB,
-                 input_name=None, output_name=None, input_shape=None,
-                 classifier="knn", allow_gpu_growth=False):
+                 input_name="input", output_name="embeddings",
+                 input_shape=(160, 160), classifier="svm", gpu_alloc=False):
         """Initializes FaceNet object
         :param model_path: path to model (default: utils.paths.DEFAULT_MODEL)
         :param data_path: path to data (default: utils.paths.DB_LOB)
-        :param input_name: name of input tensor (default: None)
-        :param output_name: name of output tensor (default: None)
-        :param input_shape: input shape (default: None)
-        :param classifier: classifier type (default: 'knn')
-        :param allow_gpu_growth: allow GPU growth (default: False)
+        :param input_name: input - TF mode only (default: "input:0")
+        :param output_name: output - TF mode only (default: "embeddings:0")
+        :param input_shape: input shape in HW (default: (160, 160))
+        :param classifier: classifier type (default: 'svm')
+        :param gpu_alloc: allow GPU growth (default: False)
         """
 
         assert os.path.exists(model_path), f"{model_path} not found"
         assert not data_path or os.path.exists(data_path), \
             f"{data_path} not found"
 
-        if allow_gpu_growth:
-            import tensorflow.compat.v1 as tf  # noqa
-            options = tf.GPUOptions(allow_growth=True)
-            config = tf.ConfigProto(gpu_options=options)
-            self.sess = tf.Session(config=config)
-            self.sess.__enter__()
+        if gpu_alloc:
+            import tensorflow as tf  # noqa
+            try:
+                gpus = tf.config.experimental.list_physical_devices("GPU")
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+            except RuntimeError as err:
+                print(err)
 
         if ".h5" in model_path:
             self._keras_init(model_path)
@@ -58,9 +67,10 @@ class FaceNet:
         elif ".pb" in model_path:
             self._tf_init(model_path, input_name, output_name, input_shape)
         elif ".engine" in model_path:
-            self._trt_init(model_path, input_name, output_name, input_shape)
+            self._trt_init(model_path, input_shape)
         else:
             raise TypeError("model must be an .h5, .pb, or .engine file")
+        print(f"[DEBUG] inference backend is {self.mode}")
 
         self._db = {}
         self.classifier = None
@@ -94,7 +104,7 @@ class FaceNet:
         """
 
         import tensorflow.compat.v1 as tf  # noqa
-        self.MODE = "keras"
+        self.mode = "keras"
         self.facenet = tf.keras.models.load_model(filepath)
         self.img_shape = self.facenet.input_shape[1:3]
 
@@ -104,7 +114,7 @@ class FaceNet:
         """
 
         import tensorflow.compat.v1 as tf  # noqa
-        self.MODE = "tflite"
+        self.mode = "tflite"
         self.facenet = tf.lite.Interpreter(model_path=filepath)
         self.facenet.allocate_tensors()
 
@@ -121,71 +131,51 @@ class FaceNet:
         """
 
         import tensorflow.compat.v1 as tf  # noqa
-        self.MODE = "tf"
+        self.mode = "tf"
+
+        self.input_name = input_name
+        self.output_name = output_name
+        self.img_shape = input_shape
 
         graph_def = get_frozen_graph(filepath)
         self.sess = tf.keras.backend.get_session()
 
         tf.import_graph_def(graph_def, name="")
-
-        self._tensor_init(model_name=filepath,
-                          input_name=input_name,
-                          output_name=output_name)
         self.facenet = self.sess.graph
 
-        try:
-            if input_shape is not None:
-                assert input_shape[-1] == 3, \
-                    "input shape must be channels-last for tensorflow mode"
-                self.img_shape = input_shape[:-1]
-            else:
-                input_tensor = self.facenet.get_tensor_by_name(
-                        self.input_name)
-                self.img_shape = input_tensor.get_shape().as_list()[1:3]
-
-        except ValueError:
-            self.img_shape = (160, 160)
-            print(f"[DEBUG] using default size of {self.img_shape}")
-
-    def _tensor_init(self, model_name, input_name, output_name):
-        """Initializes tensors (TF or TRT modes only)
-        :param model_name: name of model
-        :param input_name: input tensor name
-        :param output_name: output tensor name
-        """
-
-        self.model_config = self.MODELS["_default"]
-
-        for model in self.MODELS:
-            if model in model_name:
-                self.model_config = self.MODELS[model]
-
-        self.input_name = self.model_config["input"]
-        self.output_name = self.model_config["output"]
-
-        if not self.input_name:
-            self.input_name = input_name
-        elif not self.output_name:
-            self.output_name = output_name
-
-        assert self.input_name and self.output_name, \
-            f"I/O tensors for {model_name} not detected or provided"
-
-    def _trt_init(self, filepath, input_name, output_name, input_shape):
+    def _trt_init(self, filepath, input_shape):
         """TensorRT initialization
         :param filepath: path to serialized engine
-        :param input_name: name of input to network
-        :param output_name: name of output to network
-        :param input_shape: input shape (channels first)
+        :param input_shape: input shape
         """
 
-        self.MODE = "trt"
+        self.mode = "trt"
         try:
-            self.facenet = CudaEngine(filepath, input_name,
-                                      output_name, input_shape)
+            logger = trt.Logger(trt.Logger.ERROR)
+            runtime = trt.Runtime(logger)
+
+            with open(filepath, "rb") as model:
+                self.facenet = runtime.deserialize_cuda_engine(model.read())
+
+            self.stream = cuda.Stream()
+            self.context = self.facenet.create_execution_context()
+
+            self.h_input = cuda.pagelocked_empty(
+                trt.volume(self.context.get_binding_shape(0)),
+                dtype=np.float32
+            )
+            self.h_output = cuda.pagelocked_empty(
+                trt.volume(self.context.get_binding_shape(1)),
+                dtype=np.float32
+            )
+
+            self.d_input = cuda.mem_alloc(self.h_input.nbytes)
+            self.d_output = cuda.mem_alloc(self.h_output.nbytes)
+
         except NameError:
-            raise ValueError("trt mode not available")
-        self.img_shape = list(reversed(self.facenet.input_shape))[:-1]
+            raise ValueError("trt mode requested but not available")
+
+        self.img_shape = input_shape
 
     def add_entry(self, person, embeddings, train_classifier=True):
         """Adds entry (person, embeddings) to database
@@ -257,18 +247,13 @@ class FaceNet:
     def _train_classifier(self):
         """Trains person classifier"""
         try:
-            embeds = np.squeeze(list(self.data.values()), axis=1)
-
             if self.classifier_type == "svm":
                 self.classifier = svm.SVC(kernel="linear")
-                self.classifier.fit(embeds, self._stripped_names)
-
             elif self.classifier_type == "knn":
-                self.classifier = neighbors.NearestNeighbors(
-                    radius=self.alpha,
-                    metric=self.dist_metric.metric,
-                    n_jobs=-1)
-                self.classifier.fit(embeds)
+                self.classifier = neighbors.KNeighborsClassifier()
+
+            embeds = np.squeeze(list(self.data.values()), axis=1)
+            self.classifier.fit(embeds, self._stripped_names)
 
         except (AttributeError, ValueError):
             raise ValueError("Current model incompatible with database")
@@ -283,6 +268,8 @@ class FaceNet:
         elif self.img_norm == "fixed":
             # scales x to [-1, 1]
             return (imgs - 127.5) / 128.
+        else:
+            return imgs
 
     def embed(self, imgs):
         """Embeds cropped face
@@ -290,18 +277,29 @@ class FaceNet:
         :returns: embedding as array with shape (1, -1)
         """
 
-        if self.MODE == "keras":
-            embeds = self.facenet.predict(imgs, batch_size=len(imgs))  # noqa
-        elif self.MODE == "tf":
-            out = self.facenet.get_tensor_by_name(self.output_name)  # noqa
+        if self.mode == "keras":
+            embeds = self.facenet.predict(imgs, batch_size=len(imgs))
+        elif self.mode == "tf":
+            out = self.facenet.get_tensor_by_name(self.output_name)
             embeds = self.sess.run(out, feed_dict={self.input_name: imgs})
-        elif self.MODE == "tflite":
+        elif self.mode == "tflite":
             imgs = imgs.astype(np.float32)
             self.facenet.set_tensor(self.input_details[0]["index"], imgs)
             self.facenet.invoke()
             embeds = self.facenet.get_tensor(self.output_details[0]["index"])
         else:
-            embeds = self.facenet.inference(imgs)
+            if len(imgs) != 1:
+                raise NotImplementedError("trt batch not yet supported")
+            np.copyto(self.h_input, imgs.astype(np.float32).ravel())
+            cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
+            self.context.execute_async(batch_size=1,
+                                       bindings=[int(self.d_input),
+                                                 int(self.d_output)],
+                                       stream_handle=self.stream.handle)
+            cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
+            self.stream.synchronize()
+            embeds = np.copy(self.h_output)
+
         return embeds.reshape(len(imgs), -1)
 
     def predict(self, img, detector, margin=10, flip=False, verbose=True):
@@ -316,7 +314,10 @@ class FaceNet:
 
         cropped_faces, face_coords = detector.crop_face(img, margin,
                                                         flip, verbose)
-        assert cropped_faces is not None, "no face detected"
+        if cropped_faces is None:
+            if verbose:
+                print("No face detected")
+            return None, None
 
         start = timer()
 
@@ -332,12 +333,11 @@ class FaceNet:
 
         return embeds, face_coords
 
-    def recognize(self, img, *args, eps=2.0, verbose=True, **kwargs):
+    def recognize(self, img, *args, verbose=True, **kwargs):
         """Facial recognition
         :param img: image array in BGR mode
-        :param eps: controls inv dist sensitivity (default: 2.0)
-        :param verbose: verbose or not (default: True)
         :param args: will be passed to self.predict
+        :param verbose: verbose or not (default: True)
         :param kwargs: will be passed to self.predict
         :returns: face, is recognized, best match, time elapsed
         """
@@ -346,52 +346,37 @@ class FaceNet:
         is_recognized = None
         best_match = None
         face = None
-        dist = None
 
         try:
-            if self.classifier_type == "svm":
-                embeds, face = self.predict(img, *args, **kwargs)
+            embeds, face = self.predict(img, *args, **kwargs, verbose=verbose)
+            if embeds is not None:
                 best_match = self.classifier.predict(embeds)[0]
 
                 nearest = self._stripped_db[best_match]
                 dists = self.dist_metric.distance(embeds, nearest, True)
                 dist = np.average(dists)
-
                 is_recognized = dist <= self.alpha
 
-            elif self.classifier_type == "knn":
-                embeds, face = self.predict(img, *args, **kwargs)
-                dists, idxs = self.classifier.radius_neighbors(embeds)
-                dists = dists.flatten()[0]
-                idxs = idxs.flatten()[0]
+                if verbose and dist:
+                    info = colored(f"{round(dist, 4)} ({best_match})",
+                                   color="green" if is_recognized else "red")
+                    print(f"{self.dist_metric}: {info}")
 
-                if len(idxs) != 0:
-                    matches = np.take(self._stripped_names, idxs).tolist()
-                    key = lambda i: matches.count(matches[i]) + eps/dists[i]
-                    best_idx = max(range(len(matches)), key=key)
-
-                    best_match, dist = matches[best_idx], dists[best_idx]
-                    is_recognized = dist <= self.alpha
-
-            if verbose and dist:
-                info = colored(f"{round(dist, 4)} ({best_match})",
-                               color="green" if is_recognized else "red")
-                print(f"{self.dist_metric}: {info}")
-
-        except (ValueError, AssertionError, cv2.error) as error:
+        except (ValueError, cv2.error) as error:
             incompatible = "query data dimension"
             if isinstance(error, ValueError) and incompatible in str(error):
                 raise ValueError("Current model incompatible with database")
             elif isinstance(error, cv2.error) and "resize" in str(error):
                 print("Frame capture failed")
-            elif "no face detected" not in str(error):
+            else:
                 raise error
 
         elapsed = round(1000. * (timer() - start), 4)
         return face, is_recognized, best_match, elapsed
 
     def real_time_recognize(self, width=640, height=360, resize=1.,
-                            detector="mtcnn", flip=False, graphics=True, logging=True, socket=None):
+                            detector="mtcnn", flip=False, graphics=True,
+                            socket=None, mtcnn_stride=1):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
         :param height: height of frame (default: 360)
@@ -399,6 +384,8 @@ class FaceNet:
         :param detector: face detector type (default: "mtcnn")
         :param flip: whether to flip horizontally or not (default: False)
         :param graphics: whether or not to use graphics (default: True)
+        :param socket: socket (dev) (default: False)
+        :param mtcnn_stride: stride frame stride (default: 1)
         """
 
         assert self._db, "data must be provided"
@@ -408,7 +395,8 @@ class FaceNet:
         logger = Logger(15, 5)
         cap = Camera(width, height)
 
-        detector = FaceDetector(detector, self.img_shape, min_face_size=240)
+        detector = FaceDetector(detector, self.img_shape,
+                                min_face_size=240, stride=mtcnn_stride)
 
         while True:
             _, frame = cap.read()
@@ -422,7 +410,7 @@ class FaceNet:
             info = self.recognize(frame, detector, flip=flip)
 
             if socket:
-                socket.send(json.dumps({"best_match":info[2]}))
+                socket.send(json.dumps({"best_match": info[2]}))
 
             # graphics
             if graphics:
@@ -432,7 +420,7 @@ class FaceNet:
                     break
 
             if logging:
-                print("Logged:",logger.log(info[2]))
+                print("Logged:", logger.log(info[2]))
 
         cap.release()
         cv2.destroyAllWindows()

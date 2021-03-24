@@ -16,7 +16,7 @@ from tqdm import tqdm
 sys.path.insert(1, "../")
 from util.encryptions import (ALL, NAMES, EMBEDS,  # noqa
                               encrypt_data, decrypt_data)
-from util.paths import DB_LOB, NAME_KEY_PATH, EMBED_KEY_PATH  # noqa
+from util.common import DB_LOB, NAME_KEY_PATH, EMBED_KEY_PATH  # noqa
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -75,7 +75,6 @@ def strip_id(name, split="-"):
     return name[:idx] if idx != -1 else name
 
 
-@print_time("data embedding time")
 def online_load(facenet, img_dir, people=None, **kwargs):
     if people is None:
         people = [os.path.join(img_dir, f) for f in os.listdir(img_dir)
@@ -92,14 +91,14 @@ def online_load(facenet, img_dir, people=None, **kwargs):
             print(f"[DEBUG] '{person}' too large (> 100M bytes)")
             no_faces.append(person)
         else:
-            try:
-                embeds, __ = facenet.predict(cv2.imread(person), **kwargs)
+            embeds, __ = facenet.predict(cv2.imread(person), **kwargs)
+            if embeds is not None:
                 person = ntpath.basename(person)
                 person = person.replace(".jpg", "").replace(".png", "")
                 data[person] = embeds.reshape(len(embeds), -1)
-            except AssertionError as e:
+            else:
                 no_faces.append(person)
-                print(f"[DEBUG] error ('{person}'): {e}")
+                print(f"[DEBUG] no face detected for '{person}'")
 
     return data, no_faces
 
