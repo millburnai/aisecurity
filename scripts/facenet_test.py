@@ -1,27 +1,18 @@
-import os
-import platform
 import sys
-
 sys.path.insert(1, "../")
+
 from facenet import FaceNet
+from util.common import ON_GPU, ON_JETSON
 
 
 if __name__ == "__main__":
-    jetson = platform.machine() == "aarch64"
-
-    print("[DEBUG] checking for CUDA...")
-    cuda = not bool(os.system("nvcc --version"))
-    if cuda:
-        print("[DEBUG] CUDA found... using tensorrt")
-    else:
-        print("[DEBUG] CUDA not found... defaulting to tensorflow")
+    detector = "trt-mtcnn" if ON_GPU else "mtcnn"
+    graphics = not ON_JETSON
+    mtcnn_stride = 7 if ON_JETSON else 3
+    resize = 1 if ON_JETSON else 0.6
 
     facenet = FaceNet()
-
-    detector = "trt-mtcnn" if cuda else "mtcnn"
-    graphics = not jetson
-    stride = 7 if jetson else 1
-
     facenet.real_time_recognize(detector=detector,
                                 graphics=graphics,
-                                stride=stride)
+                                mtcnn_stride=mtcnn_stride,
+                                resize=resize)

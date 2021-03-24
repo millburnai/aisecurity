@@ -25,8 +25,7 @@ from util.detection import FaceDetector
 from util.distance import DistMetric
 from util.loader import (print_time, screen_data, strip_id,
                          retrieve_embeds, get_frozen_graph)
-from util.paths import (DB_LOB, DEFAULT_MODEL, CONFIG_HOME,
-                        EMBED_KEY_PATH, NAME_KEY_PATH)
+from util.common import (DB_LOB, DEFAULT_MODEL, EMBED_KEY_PATH, NAME_KEY_PATH)
 from util.visuals import Camera, GraphicsRenderer
 
 
@@ -134,6 +133,7 @@ class FaceNet:
         self.mode = "tf"
 
         self.input_name = input_name
+        self.output_name = output_name
         self.img_shape = input_shape
 
         graph_def = get_frozen_graph(filepath)
@@ -277,9 +277,9 @@ class FaceNet:
         """
 
         if self.mode == "keras":
-            embeds = self.facenet.predict(imgs, batch_size=len(imgs))  # noqa
+            embeds = self.facenet.predict(imgs, batch_size=len(imgs))
         elif self.mode == "tf":
-            out = self.facenet.get_tensor_by_name(self.output_name)  # noqa
+            out = self.facenet.get_tensor_by_name(self.output_name)
             embeds = self.sess.run(out, feed_dict={self.input_name: imgs})
         elif self.mode == "tflite":
             imgs = imgs.astype(np.float32)
@@ -288,10 +288,8 @@ class FaceNet:
             embeds = self.facenet.get_tensor(self.output_details[0]["index"])
         else:
             if len(imgs) != 1:
-                raise NotImplementedError("trt batch not yet suppported")
-
-            imgs = imgs.astype(np.float32)
-            np.copyto(self.h_input, imgs.ravel())
+                raise NotImplementedError("trt batch not yet supported")
+            np.copyto(self.h_input, imgs.astype(np.float32).ravel())
             cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
             self.context.execute_async(batch_size=1,
                                        bindings=[int(self.d_input),
@@ -315,7 +313,10 @@ class FaceNet:
 
         cropped_faces, face_coords = detector.crop_face(img, margin,
                                                         flip, verbose)
-        assert cropped_faces is not None, "no face detected"
+        if cropped_faces is None:
+            if verbose:
+                print("No face detected")
+            return None, None
 
         start = timer()
 
@@ -346,26 +347,27 @@ class FaceNet:
         face = None
 
         try:
-            embeds, face = self.predict(img, *args, **kwargs)
-            best_match = self.classifier.predict(embeds)[0]
+            embeds, face = self.predict(img, *args, **kwargs, verbose=verbose)
+            if embeds is not None:
+                best_match = self.classifier.predict(embeds)[0]
 
-            nearest = self._stripped_db[best_match]
-            dists = self.dist_metric.distance(embeds, nearest, True)
-            dist = np.average(dists)
-            is_recognized = dist <= self.alpha
+                nearest = self._stripped_db[best_match]
+                dists = self.dist_metric.distance(embeds, nearest, True)
+                dist = np.average(dists)
+                is_recognized = dist <= self.alpha
 
-            if verbose and dist:
-                info = colored(f"{round(dist, 4)} ({best_match})",
-                               color="green" if is_recognized else "red")
-                print(f"{self.dist_metric}: {info}")
+                if verbose and dist:
+                    info = colored(f"{round(dist, 4)} ({best_match})",
+                                   color="green" if is_recognized else "red")
+                    print(f"{self.dist_metric}: {info}")
 
-        except (ValueError, AssertionError, cv2.error) as error:
+        except (ValueError, cv2.error) as error:
             incompatible = "query data dimension"
             if isinstance(error, ValueError) and incompatible in str(error):
                 raise ValueError("Current model incompatible with database")
             elif isinstance(error, cv2.error) and "resize" in str(error):
                 print("Frame capture failed")
-            elif "no face detected" not in str(error):
+            else:
                 raise error
 
         elapsed = round(1000. * (timer() - start), 4)
@@ -373,7 +375,7 @@ class FaceNet:
 
     def real_time_recognize(self, width=640, height=360, resize=1.,
                             detector="mtcnn", flip=False, graphics=True,
-                            socket=None, stride=1):
+                            socket=None, mtcnn_stride=1):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
         :param height: height of frame (default: 360)
@@ -382,7 +384,7 @@ class FaceNet:
         :param flip: whether to flip horizontally or not (default: False)
         :param graphics: whether or not to use graphics (default: True)
         :param socket: socket (dev) (default: False)
-        :param stride: mtcnn frame stride (default: 1)
+        :param mtcnn_stride: stride frame stride (default: 1)
         """
 
         assert self._db, "data must be provided"
@@ -392,7 +394,7 @@ class FaceNet:
         cap = Camera(width, height)
 
         detector = FaceDetector(detector, self.img_shape,
-                                min_face_size=240, stride=stride)
+                                min_face_size=240, stride=mtcnn_stride)
 
         while True:
             _, frame = cap.read()
