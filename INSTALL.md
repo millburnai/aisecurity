@@ -20,6 +20,8 @@ After general installation...
 ## Jetson Nano installation
 Follow these for Jetson-specific instructions, tested with Jetpack 4.5 (CUDA 10.2).
 
+Make sure that wifi is connected: `sudo nmcli device wifi connect <NETWORK_NAME> password <PASSWORD>`
+
 ### Regular installation
 *Only applicable if `.engine`s are available.* Use this if developing on an SD card != `a1`.
 
@@ -37,8 +39,7 @@ Follow these for Jetson-specific instructions, tested with Jetpack 4.5 (CUDA 10.
 2. `cd aisecurity && git submodule update --init`
 3. `cd util/trt_mtcnn_plugin && make`
 4. `cd ~/aisecurity/scripts && python3 download.py <TOKEN>`, see Discord server (`announcements` channel) for `<TOKEN>`
-5. `cd ~/aisecurity/config/models/ && mv det* ~/aisecurity/util/trt_mtcnn_plugin/mtcnn/`
-6. `cd ~/aisecurity/scripts && python3 facenet_test.py` to ensure that everything works
+6. `python3 facenet_test.py` to ensure that everything works
 
 ### Full installation
 *Only follow these instructions if the `.engine` files aren't available yet.* 
