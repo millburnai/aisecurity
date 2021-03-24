@@ -10,9 +10,19 @@ import numpy as np
 from sklearn import neighbors, svm
 from termcolor import colored
 
+try:
+    import pycuda.autoinit  # noqa
+    import pycuda.driver as cuda  # noqa
+except (ModuleNotFoundError, ImportError) as e:
+    print(f"[DEBUG] '{e}'. Ignore if GPU is not set up")
+
+try:
+    import tensorrt as trt  # noqa
+except (ModuleNotFoundError, ImportError) as e:
+    print(f"[DEBUG] '{e}'. Ignore if GPU is not set up")
+
 from util.detection import FaceDetector
 from util.distance import DistMetric
-from util.engine import CudaEngine
 from util.loader import (print_time, screen_data, strip_id,
                          retrieve_embeds, get_frozen_graph)
 from util.paths import (DB_LOB, DEFAULT_MODEL, CONFIG_HOME,
@@ -22,22 +32,19 @@ from util.visuals import Camera, GraphicsRenderer
 
 class FaceNet:
     """Class implementation of FaceNet"""
-    MODELS = json.load(open(CONFIG_HOME + "/defaults/models.json",
-                            encoding="utf-8"))
 
     @print_time("model load time")
     def __init__(self, model_path=DEFAULT_MODEL, data_path=DB_LOB,
-                 input_name=None, output_name=None, input_shape=None,
-                 classifier="knn", gpu_alloc=False, **kwargs):
+                 input_name="input", output_name="embeddings",
+                 input_shape=(160, 160), classifier="svm", gpu_alloc=False):
         """Initializes FaceNet object
         :param model_path: path to model (default: utils.paths.DEFAULT_MODEL)
         :param data_path: path to data (default: utils.paths.DB_LOB)
-        :param input_name: name of input tensor (default: None)
-        :param output_name: name of output tensor (default: None)
-        :param input_shape: input shape (default: None)
-        :param classifier: classifier type (default: 'knn')
-        :param allow_gpu_growth: allow GPU growth (default: False)
-        :param kwargs: params for cuda init
+        :param input_name: input - TF mode only (default: "input:0")
+        :param output_name: output - TF mode only (default: "embeddings:0")
+        :param input_shape: input shape in HW (default: (160, 160))
+        :param classifier: classifier type (default: 'svm')
+        :param gpu_alloc: allow GPU growth (default: False)
         """
 
         assert os.path.exists(model_path), f"{model_path} not found"
@@ -60,8 +67,7 @@ class FaceNet:
         elif ".pb" in model_path:
             self._tf_init(model_path, input_name, output_name, input_shape)
         elif ".engine" in model_path:
-            self._trt_init(model_path, input_name, output_name, input_shape,
-                           **kwargs)
+            self._trt_init(model_path, input_shape)
         else:
             raise TypeError("model must be an .h5, .pb, or .engine file")
         print(f"[DEBUG] inference backend is {self.mode}")
@@ -127,61 +133,48 @@ class FaceNet:
         import tensorflow.compat.v1 as tf  # noqa
         self.mode = "tf"
 
-        self.model_config = self.MODELS["_default"]
+        self.input_name = input_name
+        self.img_shape = input_shape
 
-        for model in self.MODELS:
-            if model in filepath:
-                self.model_config = self.MODELS[model]
-
-        self.input_name = self.model_config["input"]
-        self.output_name = self.model_config["output"]
-
-        if not self.input_name:
-            self.input_name = input_name
-        elif not self.output_name:
-            self.output_name = output_name
-
-        assert self.input_name and self.output_name, \
-            f"I/O tensors for '{filepath}' not detected or provided"
-        
         graph_def = get_frozen_graph(filepath)
         self.sess = tf.keras.backend.get_session()
 
         tf.import_graph_def(graph_def, name="")
-
         self.facenet = self.sess.graph
 
-        try:
-            if input_shape is not None:
-                assert input_shape[-1] == 3, \
-                    "input shape must be channels-last for tensorflow mode"
-                self.img_shape = input_shape[:-1]
-            else:
-                input_tensor = self.facenet.get_tensor_by_name(
-                        self.input_name)
-                self.img_shape = input_tensor.get_shape().as_list()[1:3]
-
-        except ValueError:
-            self.img_shape = (160, 160)
-            print(f"[DEBUG] using default size of {self.img_shape}")
-
-    def _trt_init(self, filepath, input_name, output_name, input_shape,
-                  **kwargs):
+    def _trt_init(self, filepath, input_shape):
         """TensorRT initialization
         :param filepath: path to serialized engine
-        :param input_name: name of input to network
-        :param output_name: name of output to network
-        :param input_shape: input shape (channels first)
-        :param kwargs: kwargs for CudaEngine init
+        :param input_shape: input shape
         """
 
         self.mode = "trt"
         try:
-            self.facenet = CudaEngine(filepath, input_name, output_name,
-                                      input_shape, **kwargs)
+            logger = trt.Logger(trt.Logger.ERROR)
+            runtime = trt.Runtime(logger)
+
+            with open(filepath, "rb") as model:
+                self.facenet = runtime.deserialize_cuda_engine(model.read())
+
+            self.stream = cuda.Stream()
+            self.context = self.facenet.create_execution_context()
+
+            self.h_input = cuda.pagelocked_empty(
+                trt.volume(self.context.get_binding_shape(0)),
+                dtype=np.float32
+            )
+            self.h_output = cuda.pagelocked_empty(
+                trt.volume(self.context.get_binding_shape(1)),
+                dtype=np.float32
+            )
+
+            self.d_input = cuda.mem_alloc(self.h_input.nbytes)
+            self.d_output = cuda.mem_alloc(self.h_output.nbytes)
+
         except NameError:
             raise ValueError("trt mode requested but not available")
-        self.img_shape = list(reversed(self.facenet.input_shape))[:-1]
+
+        self.img_shape = input_shape
 
     def add_entry(self, person, embeddings, train_classifier=True):
         """Adds entry (person, embeddings) to database
@@ -294,7 +287,17 @@ class FaceNet:
             self.facenet.invoke()
             embeds = self.facenet.get_tensor(self.output_details[0]["index"])
         else:
-            embeds = self.facenet.inference(imgs)
+            imgs = imgs.astype(np.float32)
+            np.copyto(self.h_input, imgs.ravel())
+            cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
+            self.context.execute_async(batch_size=1,
+                                       bindings=[int(self.d_input),
+                                                 int(self.d_output)],
+                                       stream_handle=self.stream.handle)
+            cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
+            self.stream.synchronize()
+            embeds = np.copy(self.h_output)
+
         return embeds.reshape(len(imgs), -1)
 
     def predict(self, img, detector, margin=10, flip=False, verbose=True):

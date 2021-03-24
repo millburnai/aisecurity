@@ -21,18 +21,12 @@ if __name__ == "__main__":
     parser.add_argument("--mean", help="use mean or not", action="store_true")
     args = parser.parse_args()
 
-    on_jetson = platform.machine() == "aarch64"
-
-    try:
-        facenet = FaceNet(data_path=None, fp16=on_jetson)
-    except TypeError:
-        facenet = FaceNet(data_path=None)
+    facenet = FaceNet(data_path=None)
     facenet.dist_metric = DistMetric("cosine", normalize=True)
     facenet.img_norm = "fixed"
     facenet.alpha = 0.3
 
-    detector = FaceDetector("trt-mtcnn" if on_jetson else "mtcnn",
-                            facenet.img_shape)
+    detector = FaceDetector("mtcnn", facenet.img_shape)
     no_faces = dump_and_embed(facenet, args.img_dir, args.dump_path,
                               to_encrypt=NAMES, detector=detector,
                               full_overwrite=True, use_mean=args.mean,
