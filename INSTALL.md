@@ -22,6 +22,22 @@ Follow these for Jetson-specific instructions, tested with Jetpack 4.5 (CUDA 10.
 
 Make sure that wifi is connected: `sudo nmcli device wifi connect <NETWORK_NAME> password <PASSWORD>`
 
+### Fast installation
+*Only applicable if preloaded disk images are available. See the [Google Drive folder](https://drive.google.com/drive/folders/11dhxsYLuP5pNr_2hJuzqIia5U9H6yBEd?usp=sharing)*
+
+#### Flash image
+1. Download and unzip the image from the Google Drive url (use `2021a1.img.gz`)
+2. Plug in the microSD card and identify the `/dev/disk[n]` path using `diskutil list`
+3. Erase the microSD card using Disk Utility. Format should be changed from APFS to ExFAT
+4. Write the image: `sudo dd if=[path/to/img] of=/dev/disk[n]`
+   - Be VERY careful with this command- a typo will irrecoverably screw up a) the microSD card or b) your computer
+
+#### Test everything
+1. Make sure to use barrel jack PSU and have the J48 jumper cap on
+2. Plug in microUSB and connect to computer
+3. Find the `tty.usb[id]` file in `/dev/` and run `screen /dev/tty.usb[id]`
+4. Login to the Nano; `cd aisecurity/scripts && python3 facenet_test.py`
+
 ### Regular installation
 *Only applicable if `.engine`s are available.* Use this if developing on an SD card != `a1`.
 
