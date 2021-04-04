@@ -4,6 +4,7 @@
 import json
 import os
 from timeit import default_timer as timer
+import time
 
 import cv2
 import numpy as np
@@ -28,6 +29,11 @@ from util.loader import (print_time, screen_data, strip_id,
 from util.common import (DB_LOB, DEFAULT_MODEL, EMBED_KEY_PATH, NAME_KEY_PATH)
 from util.visuals import Camera, GraphicsRenderer
 
+embeds_ = None
+count=0
+
+import util.thread_manager
+from util.thread_manager import Thread
 
 class FaceNet:
     """Class implementation of FaceNet"""
@@ -72,7 +78,7 @@ class FaceNet:
         print(f"[DEBUG] inference backend is {self.mode}")
 
         self._db = {}
-        self.classifier = None
+        self.classifiers = []
         self.classifier_type = classifier
 
         if data_path:
@@ -246,13 +252,18 @@ class FaceNet:
     def _train_classifier(self):
         """Trains person classifier"""
         try:
-            if self.classifier_type == "svm":
-                self.classifier = svm.SVC(kernel="linear")
-            elif self.classifier_type == "knn":
-                self.classifier = neighbors.KNeighborsClassifier()
+            self.classifiers = []
+            self.names = []
+            self.classifiers.append(svm.SVC(kernel="linear"))
+            self.names.append("svm")
+            self.classifiers.append(neighbors.KNeighborsClassifier())
+            self.names.append("knn")
 
             embeds = np.squeeze(list(self.data.values()), axis=1)
-            self.classifier.fit(embeds, self._stripped_names)
+            for classifier in self.classifiers:
+                classifier.fit(embeds, self._stripped_names)
+            
+            self.pred_thread = Thread(self.names, self.classifiers)
 
         except (AttributeError, ValueError):
             raise ValueError("Current model incompatible with database")
@@ -311,12 +322,12 @@ class FaceNet:
         :returns: normalized embeddings, facial coordinates
         """
 
-        cropped_faces, face_coords = detector.crop_face(img, margin,
+        cropped_faces, face_coords, append = detector.crop_face(img, margin,
                                                         flip, verbose)
         if cropped_faces is None:
             if verbose:
                 print("No face detected")
-            return None, None
+            return None, None, append
 
         start = timer()
 
@@ -328,9 +339,9 @@ class FaceNet:
             elapsed = round(1000. * (timer() - start), 2)
             time = colored(f"{elapsed} ms", attrs=["bold"])
             vecs = f"{len(embeds)} vector{'s' if len(embeds) > 1 else ''}"
-            print(f"Embedding time ({vecs}): " + time)
+            #print(f"Embedding time ({vecs}): " + time)
 
-        return embeds, face_coords
+        return embeds, face_coords, append
 
     def recognize(self, img, *args, verbose=True, **kwargs):
         """Facial recognition
@@ -345,21 +356,31 @@ class FaceNet:
         is_recognized = None
         best_match = None
         face = None
-
+	
         try:
-            embeds, face = self.predict(img, *args, **kwargs, verbose=verbose)
-            if embeds is not None:
-                best_match = self.classifier.predict(embeds)[0]
+            embeds, face, append = self.predict(img, *args, **kwargs, verbose=verbose)
+            if append: 
+                self.embed_list.append(embeds)
+            else:
+                start = time.time()
+                best_match = self.pred_thread.run(self.embed_list)
+                print(best_match)
+                best_match = best_match["svm_0"]
+                print("PROCESS {}".format(time.time()-start))
+       
 
                 nearest = self._stripped_db[best_match]
-                dists = self.dist_metric.distance(embeds, nearest, True)
-                dist = np.average(dists)
-                is_recognized = dist <= self.alpha
+                #dists = self.dist_metric.distance(embeds, nearest, True)
+                #dist = np.average(dists)
+                #is_recognized = dist <= self.alpha
+                is_recognized = False
+                dist = 0
 
                 if verbose and dist:
                     info = colored(f"{round(dist, 4)} ({best_match})",
                                    color="green" if is_recognized else "red")
                     print(f"{self.dist_metric}: {info}")
+                self.embed_list = [None]
 
         except (ValueError, cv2.error) as error:
             incompatible = "query data dimension"
@@ -395,7 +416,7 @@ class FaceNet:
 
         detector = FaceDetector(detector, self.img_shape,
                                 min_face_size=240, stride=mtcnn_stride)
-
+        self.embed_list = [None]
         while True:
             _, frame = cap.read()
             cframe = frame.copy()

@@ -75,10 +75,12 @@ class FaceDetector:
     def detect_faces(self, img):
         self.frame_ct += 1
         result = []
+        append = False
 
         skip_frame = self.stride != 1 and self.frame_ct % self.stride != 0
         if skip_frame and self._cached_result:
             result = self._cached_result
+            append = True
 
         elif "trt-mtcnn" in self.mode:
             result = self.trt_mtcnn.detect_faces(img)
@@ -103,14 +105,14 @@ class FaceDetector:
                                    "mouth_right": (pts[9], pts[4])}})
 
         self._cached_result = result
-        return result
+        return result, append
 
     def crop_face(self, img_bgr, margin, flip=False, verbose=True):
         start = timer()
         resized_faces, face = None, None
 
         img = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        result = self.detect_faces(img)
+        result, append = self.detect_faces(img)
 
         if len(result) != 0:
             face = max(result, key=lambda person: person["confidence"])
@@ -135,6 +137,6 @@ class FaceDetector:
                 print(f"{confidence}% detect confidence (too low)")
 
         elif verbose:
-            print("No face detected")
+            pass#print("No face detected")
 
-        return resized_faces, face
+        return resized_faces, face, append
