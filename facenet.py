@@ -394,7 +394,6 @@ class FaceNet:
         graphics_controller = GraphicsRenderer(width, height, resize)
         logger = Logger(15, 5)
         cap = Camera(width, height)
-
         detector = FaceDetector(detector, self.img_shape,
                                 min_face_size=240, stride=mtcnn_stride)
 
@@ -419,8 +418,7 @@ class FaceNet:
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 
-            if logging:
-                print("Logged:", logger.log(info[2]))
+            print("Logged:", logger.log(info[2]))
 
         cap.release()
         cv2.destroyAllWindows()
