@@ -5,6 +5,11 @@ import threading
 
 import cv2
 import numpy as np
+try:
+    import pyrealsense2 as rs
+except (ModuleNotFoundError, ImportError) as e:
+    print(f"[DEBUG] '{e}'. Ignore if Realsense is not set up")
+
 
 
 NVARGUS = "nvarguscamerasrc ! video/x-raw(memory:NVMM), " \
@@ -17,38 +22,62 @@ NVARGUS = "nvarguscamerasrc ! video/x-raw(memory:NVMM), " \
 class Camera:
     # https://github.com/jkjung-avt/tensorrt_demos/blob/master/utils/camera.py
 
-    def __init__(self, width=640, height=360, dev=0, threaded=False):
+    def __init__(self, width=640, height=360, fps=30, dev=0, threaded=False):
         self.width = width
         self.height = height
         self.dev = dev
         self.threaded = threaded
+        self.fps = fps
 
         self.thread_running = False
         self.retval = False
         self.img_handle = None
         self.thread = None
+        self.cap = None
 
         self._open()
         self._start()
 
     def _open(self):
         try:
-            gstreamer_pipeline = NVARGUS.format(self.width, self.height)
-            self.cap = cv2.VideoCapture(gstreamer_pipeline, cv2.CAP_GSTREAMER)
-            assert self.cap.isOpened(), "video capture failed to initialize"
+            config = rs.config()
+            config.enable_stream(rs.stream.color, self.width, self.height, 
+                                 rs.format.bgr8, self.fps)
+            self.pipeline = rs.pipeline()
+            self.pipeline.start(config)
+            assert self.pipeline.get_active_profile(), "video capture failed to initialize"
 
-        except AssertionError:
-            self.cap = cv2.VideoCapture(self.dev)
-            assert self.cap.isOpened(), "video capture failed to initialize"
+        except:
+            try:
+                gstreamer_pipeline = NVARGUS.format(self.width, self.height)
+                self.cap = cv2.VideoCapture(gstreamer_pipeline, cv2.CAP_GSTREAMER)
+                assert self.cap.isOpened(), "video capture failed to initialize"
 
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+            except AssertionError:
+                self.cap = cv2.VideoCapture(self.dev)
+                assert self.cap.isOpened(), "video capture failed to initialize"
+
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+
+    def read_realsense(self):
+        ret = True
+        frames = self.pipeline.wait_for_frames()
+        color_frame = frames.get_color_frame()
+        if not color_frame:
+            ret = False
+            return ret, None
+        else:
+            color_image = np.array(color_frame.get_data())
+            return ret, color_image
 
     def _start(self):
         def grab_img(cam):
             while cam.thread_running:
-                cam.retval, cam.img_handle = cam.cap.read()
-
+                try:
+                    cam.retval, cam.img_handle = self.read_realsense()
+                except:
+                    cam.retval, cam.img_handle = cam.cap.read()
             cam.thread_running = False
 
         if self.threaded:
@@ -61,13 +90,19 @@ class Camera:
         if self.threaded:
             return self.retval, self.img_handle
         else:
-            return self.cap.read()
+            try:
+                return self.read_realsense()
+            except:
+                return self.cap.read()
 
     def release(self):
         if self.threaded:
             self.thread_running = False
             self.thread.join()
-        self.cap.release()
+        try:
+            self.cap.release()
+        except:
+            self.pipeline.stop()
 
 
 class GraphicsRenderer:
