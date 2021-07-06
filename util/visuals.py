@@ -41,10 +41,12 @@ class Camera:
     def _open(self):
         try:
             config = rs.config()
-            config.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, self.fps)
+            config.enable_stream(rs.stream.color, self.width, self.height, 
+                                 rs.format.bgr8, self.fps)
             self.pipeline = rs.pipeline()
             self.pipeline.start(config)
             assert self.pipeline.get_active_profile(), "video capture failed to initialize"
+
         except:
             try:
                 gstreamer_pipeline = NVARGUS.format(self.width, self.height)
@@ -57,13 +59,14 @@ class Camera:
 
                 self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
                 self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-    def readRealsense(self):
+
+    def read_realsense(self):
         ret = True
         frames = self.pipeline.wait_for_frames()
         color_frame = frames.get_color_frame()
         if not color_frame:
             ret = False
-            return ret,None
+            return ret, None
         else:
             color_image = np.array(color_frame.get_data())
             return ret, color_image
@@ -72,7 +75,7 @@ class Camera:
         def grab_img(cam):
             while cam.thread_running:
                 try:
-                    cam.retval, cam.img_handle = self.readRealsense()
+                    cam.retval, cam.img_handle = self.read_realsense()
                 except:
                     cam.retval, cam.img_handle = cam.cap.read()
             cam.thread_running = False
@@ -88,7 +91,7 @@ class Camera:
             return self.retval, self.img_handle
         else:
             try:
-                return self.readRealsense()
+                return self.read_realsense()
             except:
                 return self.cap.read()
 
