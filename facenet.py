@@ -26,6 +26,7 @@ from util.distance import DistMetric
 from util.loader import (print_time, screen_data, strip_id,
                          retrieve_embeds, get_frozen_graph)
 from util.common import (DB_LOB, DEFAULT_MODEL, EMBED_KEY_PATH, NAME_KEY_PATH)
+from util.pbar import ProgressBar
 from util.visuals import Camera, GraphicsRenderer
 from util.log import Logger
 
@@ -384,7 +385,7 @@ class FaceNet:
         :param detector: face detector type (default: "mtcnn")
         :param flip: whether to flip horizontally or not (default: False)
         :param graphics: whether or not to use graphics (default: True)
-        :param socket: socket (dev) (default: False)
+        :param socket: socket (dev) (default: None)
         :param mtcnn_stride: stride frame stride (default: 1)
         """
 
@@ -392,7 +393,8 @@ class FaceNet:
         assert 0. <= resize <= 1., "resize must be in [0., 1.]"
 
         graphics_controller = GraphicsRenderer(width, height, resize)
-        logger = Logger(15, 5)
+        logger = Logger(frame_limit=15, frame_threshold=5)
+        pbar = ProgressBar(logger, ws=socket)
         cap = Camera(width, height)
         detector = FaceDetector(detector, self.img_shape,
                                 min_face_size=240, stride=mtcnn_stride)
@@ -407,9 +409,17 @@ class FaceNet:
 
             # facial detection and recognition
             info = self.recognize(frame, detector, flip=flip)
+            face, is_recognized, best_match, elapsed = info
 
-            if socket:
-                socket.send(json.dumps({"best_match": info[2]}))
+            # logging and socket
+            looking = pbar.update(face)
+            print(f"{looking=}")
+            log_result = logger.log(best_match) if looking else None
+            if log_result:
+                print(f"Logged '{log_result}'")
+                pbar.reset()
+                if socket:
+                    socket.send(json.dumps({"best_match": log_result}))
 
             # graphics
             if graphics:
@@ -417,8 +427,6 @@ class FaceNet:
                 cv2.imshow("AI Security v2021.0.1", cframe)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
-
-            print("Logged:", logger.log(info[2]))
 
         cap.release()
         cv2.destroyAllWindows()
