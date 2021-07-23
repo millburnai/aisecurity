@@ -7,8 +7,8 @@ class Logger:
         self.frame_threshold = frame_threshold
 
     def log(self, best_match):
-        best_match = str(best_match)
-        self.matches.append(best_match)
+        if best_match:
+            self.matches.append(best_match)
 
         if len(self.matches) > self.frame_limit: #remove index 0 which is chronologically last frame
             self.matches.pop(0)
@@ -17,13 +17,12 @@ class Logger:
 
         for i in range(self.frame_limit-1, -1, -1): #iteration from most recent frame -> last
             current_match = self.matches[i]
-            if current_match == "":
-                pass
-            elif current_match not in match_frequencies.keys(): #if match id doesn't exist, set frequency to 1
+            if current_match not in match_frequencies.keys(): #if match id doesn't exist, set frequency to 1
                 match_frequencies.update({current_match : 1})
             else: #otherwise increment frequency
                 match_frequencies.update({current_match : match_frequencies.get(current_match)+1})
                 if match_frequencies.get(current_match) >= self.frame_threshold: #if frequency == threshold, detect
+                    self.matches = [""] * self.frame_limit
                     return current_match
                     
         return ""
