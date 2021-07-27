@@ -32,7 +32,7 @@ class ProgressBar:
         if self.progress >= 1.:
             self.progress = 0.
 
-    def update(self, face, amt=1., message="Recognizing.....", ratio=1.5):
+    def update(self, face, rec, amt=1., message="Recognizing.....", ratio=1.5):
         try:
             pts = face["keypoints"]
             x_diff = (abs(pts["right_eye"][0] - pts["left_eye"][0])
@@ -40,7 +40,7 @@ class ProgressBar:
             y_diff = (abs(pts["right_eye"][1] - pts["mouth_right"][1])
                       + abs(pts["left_eye"][1] - pts["mouth_left"][1])) / 2
 
-            looking = y_diff / x_diff <= ratio
+            looking = rec and y_diff / x_diff <= ratio
             if looking:
                 self._update(amt, message)
             return looking

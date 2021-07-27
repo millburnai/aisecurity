@@ -4,6 +4,7 @@
 import json
 import os
 from timeit import default_timer as timer
+import threading
 
 import cv2
 import numpy as np
@@ -152,13 +153,14 @@ class FaceNet:
 
         self.mode = "trt"
         try:
+            self.dev_ctx = cuda.Device(0).make_context()
+            self.stream = cuda.Stream()
             logger = trt.Logger(trt.Logger.ERROR)
             runtime = trt.Runtime(logger)
 
             with open(filepath, "rb") as model:
                 self.facenet = runtime.deserialize_cuda_engine(model.read())
 
-            self.stream = cuda.Stream()
             self.context = self.facenet.create_execution_context()
 
             self.h_input = cuda.pagelocked_empty(
@@ -291,6 +293,9 @@ class FaceNet:
         else:
             if len(imgs) != 1:
                 raise NotImplementedError("trt batch not yet supported")
+            threading.Thread.__init__(self)
+            self.dev_ctx.push()
+
             np.copyto(self.h_input, imgs.astype(np.float32).ravel())
             cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
             self.context.execute_async(batch_size=1,
@@ -299,6 +304,8 @@ class FaceNet:
                                        stream_handle=self.stream.handle)
             cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
             self.stream.synchronize()
+            self.dev_ctx.pop()
+
             embeds = np.copy(self.h_output)
 
         return embeds.reshape(len(imgs), -1)
@@ -412,8 +419,8 @@ class FaceNet:
             face, is_recognized, best_match, elapsed = info
 
             # logging and socket
-            looking = pbar.update(face)
-            print(f"{looking=}")
+            looking = pbar.update(face, is_recognized)
+            print("{}".format(looking))
             log_result = logger.log(best_match) if looking else None
             if log_result:
                 print(f"Logged '{log_result}'")
