@@ -40,8 +40,8 @@ def get_mtcnn(mtcnn_path, min_size=40.0, factor=0.709,
 
 class FaceDetector:
 
-    def __init__(self, mode, img_shape=(160, 160), alpha=0.8, stride=1,
-                 min_face_size=40):
+    def __init__(self, mode, img_shape=(160, 160), alpha=0.99, stride=1,
+                 min_face_size=240):
         assert mode in ("mtcnn", "trt-mtcnn"), f"{mode} not supported"
 
         self.mode = mode

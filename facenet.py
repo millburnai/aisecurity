@@ -420,7 +420,7 @@ class FaceNet:
 
             # logging and socket
             looking = pbar.update(face, is_recognized)
-            print("{}".format(looking))
+            print(looking)
             log_result = logger.log(best_match) if looking else None
             if log_result:
                 print(f"Logged '{log_result}'")
