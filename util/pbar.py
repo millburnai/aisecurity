@@ -41,8 +41,10 @@ class ProgressBar:
             x, y, w, h = face["box"]
 
             ratio = eye_diff / w
-            if ratio > 0.4:
+            looking = ratio > 0.4
+            print(f"ratio: {ratio}")
+            if looking:
                 self._update(amt, message)
-            return ratio
+            return looking
         except TypeError:
             return False

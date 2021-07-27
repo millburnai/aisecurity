@@ -24,5 +24,4 @@ class Logger:
                 if match_frequencies.get(current_match) >= self.frame_threshold: #if frequency == threshold, detect
                     self.matches = [""] * self.frame_limit
                     return current_match
-                    
         return ""

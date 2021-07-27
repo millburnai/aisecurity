@@ -420,13 +420,12 @@ class FaceNet:
 
             # logging and socket
             looking = pbar.update(face, is_recognized)
-            print(looking)
-            log_result = logger.log(best_match) if looking else None
-            if log_result:
-                print(f"Logged '{log_result}'")
+#             log_result = logger.log(best_match) if looking else None
+#             if log_result:
+#                 print(f"Logged '{log_result}'")
+            if socket:
                 pbar.reset()
-                if socket:
-                    socket.send(json.dumps({"best_match": log_result}))
+                socket.send(json.dumps({"best_match": best_match}))
 
             # graphics
             if graphics:
