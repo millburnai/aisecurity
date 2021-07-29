@@ -22,7 +22,7 @@ try:
 except (ModuleNotFoundError, ImportError) as e:
     print(f"[DEBUG] '{e}'. Ignore if GPU is not set up")
 
-from util.detection import FaceDetector
+from util.detection import FaceDetector, is_looking
 from util.distance import DistMetric
 from util.loader import (print_time, screen_data, strip_id,
                          retrieve_embeds, get_frozen_graph)
@@ -400,7 +400,7 @@ class FaceNet:
         assert 0. <= resize <= 1., "resize must be in [0., 1.]"
 
         graphics_controller = GraphicsRenderer(width, height, resize)
-        logger = Logger(frame_limit=15, frame_threshold=5)
+        logger = Logger(frame_limit=10, frame_threshold=5)
         pbar = ProgressBar(logger, ws=socket)
         cap = Camera(width, height)
         detector = FaceDetector(detector, self.img_shape,
@@ -419,13 +419,11 @@ class FaceNet:
             face, is_recognized, best_match, elapsed = info
 
             # logging and socket
-            looking = pbar.update(face, is_recognized)
-#             log_result = logger.log(best_match) if looking else None
-#             if log_result:
-#                 print(f"Logged '{log_result}'")
-            if socket:
-                pbar.reset()
-                socket.send(json.dumps({"best_match": best_match}))
+            if is_recognized and is_looking(face):
+                log_result = logger.log(best_match)
+                pbar.update(end=log_result is not None)
+                if log_result and socket:
+                    socket.send(json.dumps({"best_match": best_match}))
 
             # graphics
             if graphics:
