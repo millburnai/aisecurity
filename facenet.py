@@ -402,7 +402,7 @@ class FaceNet:
         graphics_controller = GraphicsRenderer(width, height, resize)
         logger = Logger(frame_limit=10, frame_threshold=5)
         pbar = ProgressBar(logger, ws=socket)
-        cap = Camera(width, height)
+        cap = Camera()
         detector = FaceDetector(detector, self.img_shape,
                                 min_face_size=240, stride=mtcnn_stride)
 
