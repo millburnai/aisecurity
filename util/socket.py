@@ -1,10 +1,6 @@
-import socket
+import websocket
 import json
-
-try:
-    import thread
-except ImportError:
-    import _thread as thread
+from functools import partial
 
 
 class WebSocket:
@@ -21,24 +17,20 @@ class WebSocket:
         print("###########################")
 
     def on_error(self, ws, error):
-        print("### error ###")
         print(error)
 
-    def on_close(self, ws):
+    def on_close(self, ws, close_status_code, close_msg):
         print("### closed ###")
 
-    def connect(self):
-        def on_open(ws):
+    def connect(self, **facenet_kwargs):
+        def on_open(ws, **kwargs):
             ws.send(json.dumps({"id": str(self.id)}))
-            self.facenet.real_time_recognize(detector="trt-mtcnn",
-                                             graphics=True,
-                                             mtcnn_stride=7,
-                                             socket=ws)
+            self.facenet.real_time_recognize(**kwargs, socket=ws)
 
-        socket.enableTrace(True)
-        ws = socket.WebSocketApp("ws://{}/v1/nano".format(self.ip),
-                                 on_message=self.on_message,
-                                 on_error=self.on_error,
-                                 on_close=self.on_close)
-        ws.on_open = on_open
+        websocket.enableTrace(True)
+        ws = websocket.WebSocketApp(f"ws://{self.ip}/v1/nano",
+                                    on_message=self.on_message,
+                                    on_error=self.on_error,
+                                    on_close=self.on_close)
+        ws.on_open = partial(on_open, **facenet_kwargs)
         ws.run_forever()
