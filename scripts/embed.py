@@ -7,7 +7,7 @@ from util.loader import dump_and_embed
 from util.detection import FaceDetector
 from util.encryptions import NAMES
 from util.distance import DistMetric
-from util.common import ON_GPU
+from util.common import ON_CUDA
 
 
 if __name__ == "__main__":
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     facenet.img_norm = "fixed"
     facenet.alpha = 0.33
 
-    detector = FaceDetector("trt-mtcnn" if ON_GPU else "mtcnn",
+    detector = FaceDetector("trt-mtcnn" if ON_CUDA else "mtcnn",
                             facenet.img_shape)
     no_faces = dump_and_embed(facenet, args.img_dir, args.dump_path,
                               to_encrypt=NAMES, detector=detector,

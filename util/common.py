@@ -19,5 +19,5 @@ EMBED_KEY_PATH = CONFIG["embedding_keys"].replace(REPLACE, CWD)
 
 DEFAULT_MODEL = CONFIG["default_model"].replace(REPLACE, CWD)
 
-ON_GPU = not bool(os.system("command -v nvcc > /dev/null"))
+ON_CUDA = not bool(os.system("command -v nvcc > /dev/null"))
 ON_JETSON = platform.machine() == "aarch64"
