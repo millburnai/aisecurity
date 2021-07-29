@@ -2,7 +2,7 @@ import sys
 sys.path.insert(1, "../")
 
 from facenet import FaceNet
-from util.websocket import WebSocket 
+from util.socket import WebSocket
 
 
 if __name__ == "__main__":
