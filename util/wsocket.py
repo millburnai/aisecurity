@@ -1,4 +1,5 @@
 import websocket
+from socket import error as SocketError
 import json
 from functools import partial
 
