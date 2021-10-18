@@ -174,6 +174,7 @@ class FaceNet:
 
             self.d_input = cuda.mem_alloc(self.h_input.nbytes)
             self.d_output = cuda.mem_alloc(self.h_output.nbytes)
+            print("here")
 
         except NameError:
             raise ValueError("trt mode requested but not available")
