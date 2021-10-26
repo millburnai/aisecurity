@@ -67,7 +67,8 @@ class FaceNet:
         elif ".tflite" in model_path:
             self._tflite_init(model_path)
         elif ".pb" in model_path:
-            self._tf_init(model_path, input_name, output_name, input_shape)
+            self._tf_init(model_path, input_name + ":0",
+                          output_name + ":0", input_shape)
         elif ".engine" in model_path:
             self._trt_init(model_path, input_shape)
         else:
@@ -155,8 +156,8 @@ class FaceNet:
         try:
             self.dev_ctx = cuda.Device(0).make_context()
             self.stream = cuda.Stream()
-            logger = trt.Logger(trt.Logger.ERROR)
-            runtime = trt.Runtime(logger)
+            trt_logger = trt.Logger(trt.Logger.INFO)
+            runtime = trt.Runtime(trt_logger)
 
             with open(filepath, "rb") as model:
                 self.facenet = runtime.deserialize_cuda_engine(model.read())
