@@ -1,15 +1,14 @@
 import json
 import os
-from pathlib import Path
 import platform
 import sys
 import re
-
 import dropbox
+
+from pathlib import Path
 from tqdm import tqdm
 
-
-def get_files(dbx, prefix, ignore):
+def get_files(dbx, prefix, ignore) -> None:
     has_more = True
     cursor = None
 
@@ -29,7 +28,6 @@ def get_files(dbx, prefix, ignore):
         has_more = res.has_more
         cursor = res.cursor
 
-
 if __name__ == "__main__":
     dest = "../config"
     dbx_prefix = "/aisecurity/2020-2021/config"
@@ -42,8 +40,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     dbx = dropbox.Dropbox(token)
-    print(f"[DEBUG] logged into account name "
-          f"'{dbx.users_get_current_account().name.display_name}'")
+    display_name = dbx.users_get_current_account().name.display_name
+    print(f"[DEBUG] logged into account name: \"{display_name}\"")
 
     urls = list(get_files(dbx, dbx_prefix, ignore))
     for url in tqdm(urls):

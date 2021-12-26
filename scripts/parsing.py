@@ -1,23 +1,23 @@
 import os
 import shutil
-from pathlib import Path
-import sys
 
-"""
-DO NOT RUN ON ALREADY PROCESSED FOLDERS
+"""DO NOT RUN ON ALREADY PROCESSED FOLDERS
 It will delete files and mess up the naming system
 """
 
-rootdir = '' #Unzipped folders, will be deleted
-dest = '' #Has named images in folders sorted by person
+# NOTE: Unzipped folders, will be deleted
+rootdir = ''
 
+# NOTE: Already has named images in folders sorted by person
+dest = ''
 
-#deleteExcess
-for root, dirs, files in os.walk(rootdir, topdown=False):
+# NOTE: Delete excess.
+for root, dirs, files in os.walk(rootdir, topdown = False):
     for name in dirs:
         if(name.startswith("jtxt") or name.startswith("store") or name.startswith("_Data") or name.startswith("cdnjs") or name.startswith("fonts") or name.startswith("ssl")):
             shutil.rmtree(os.path.join(root, name), ignore_errors=True)
-#moveFolders
+
+# NOTE: Move folders.
 m = 0
 for roots, dirs, files in os.walk(rootdir):
     for dir in dirs:
@@ -31,9 +31,8 @@ for roots, dirs, files in os.walk(rootdir):
 print("Folders moved to dest")
 shutil.rmtree(rootdir, ignore_errors=True) #deletes rootdir
 
-
-#autoName
-#Run after naming folders
+# NOTE: Auto name
+# Run after naming folders
 """
 for rootss, dirss, filess in os.walk(rootdir):
     for dir in dirss:
@@ -54,7 +53,7 @@ for rootss, dirss, filess in os.walk(rootdir):
 print("Files renamed")
 """
 
-#Moves all files to 1 folder
+# NOTE: Moves all files to 1 folder
 """
 #dest = '' #works with previous code or diff folder
 allImages = '' #Path for new folder
