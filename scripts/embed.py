@@ -17,7 +17,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     facenet = FaceNet(data_path=None)
-    facenet.dist_metric = DistMetric("cosine", normalize = True)
+    facenet.dist_metric = DistMetric("cosine", normalize=True)
     facenet.img_norm = "fixed"
     facenet.alpha = 0.33
 
@@ -27,8 +27,8 @@ if __name__ == "__main__":
     )
     no_faces = dump_and_embed(
         facenet, args.img_dir, args.dump_path,
-        to_encrypt = NAMES, detector = detector,
-        full_overwrite = True, use_mean = args.mean,
-        verbose = False
+        to_encrypt=NAMES, detector=detector,
+        full_overwrite=True, use_mean=args.mean,
+        verbose=False
     )
     print(f"[DEBUG] faces not detected for {no_faces}")
