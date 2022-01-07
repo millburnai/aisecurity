@@ -7,7 +7,7 @@ from util.visuals import Camera
 if __name__ == "__main__":
     cam = Camera()
 
-    while(True):
+    while True:
         _, frame = cam.read()
         cv2.imshow("cam test", frame)
 
