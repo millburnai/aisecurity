@@ -7,6 +7,7 @@ def shape(x):
     except:
         raise argparse.ArgumentTypeError("input must be shape tuple")
 
+        
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--infile", help="input filename")
