@@ -9,6 +9,7 @@ from util.encryptions import NAMES
 from util.distance import DistMetric
 from util.common import ON_GPU
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--img_dir", help="image dir to embed")
