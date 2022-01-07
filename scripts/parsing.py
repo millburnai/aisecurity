@@ -1,20 +1,27 @@
-import os
-import shutil
-
 """DO NOT RUN ON ALREADY PROCESSED FOLDERS
 It will delete files and mess up the naming system
 """
 
+import os
+import shutil
+
 # NOTE: Unzipped folders, will be deleted
-rootdir = ''
+rootdir = ""
 
 # NOTE: Already has named images in folders sorted by person
-dest = ''
+dest = ""
 
 # NOTE: Delete excess.
-for root, dirs, files in os.walk(rootdir, topdown = False):
+for root, dirs, files in os.walk(rootdir, topdown=False):
     for name in dirs:
-        if(name.startswith("jtxt") or name.startswith("store") or name.startswith("_Data") or name.startswith("cdnjs") or name.startswith("fonts") or name.startswith("ssl")):
+        if (
+            name.startswith("jtxt") 
+            or name.startswith("store") 
+            or name.startswith("_Data") 
+            or name.startswith("cdnjs") 
+            or name.startswith("fonts")
+            or name.startswith("ssl")
+        ):
             shutil.rmtree(os.path.join(root, name), ignore_errors=True)
 
 # NOTE: Move folders.
@@ -23,9 +30,9 @@ for roots, dirs, files in os.walk(rootdir):
     for dir in dirs:
         if(not(dir.startswith("web") or dir.startswith("www"))):
             if(os.path.isdir(os.path.join(dest, dir))):
-                new = dir+str(m)
+                new = dir + str(m)
                 os.rename(os.path.join(roots, dir), os.path.join(dest, new))
-                m = m+1
+                m = m + 1
             else:
                 shutil.move(os.path.join(roots, dir), dest)
 print("Folders moved to dest")
