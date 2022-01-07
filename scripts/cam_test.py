@@ -4,6 +4,7 @@ import cv2
 sys.path.insert(1, "../")
 from util.visuals import Camera
 
+
 if __name__ == "__main__":
     cam = Camera()
 
