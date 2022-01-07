@@ -12,7 +12,9 @@ if __name__ == "__main__":
     resize = 1 if ON_JETSON else 0.6
 
     facenet = FaceNet()
-    facenet.real_time_recognize(detector=detector,
-                                graphics=graphics,
-                                mtcnn_stride=mtcnn_stride,
-                                resize=resize)
+    facenet.real_time_recognize(
+        detector=detector,
+        graphics=graphics,
+        mtcnn_stride=mtcnn_stride,
+        resize=resize
+    )

@@ -4,6 +4,7 @@
 from functools import partial
 import sys
 from timeit import default_timer as timer
+from typing import Tuple, List
 
 import cv2
 from termcolor import colored
@@ -12,8 +13,12 @@ sys.path.insert(1, "../")
 from util.common import CONFIG_HOME
 
 
-def get_mtcnn(mtcnn_path, min_size=40.0, factor=0.709,
-              thresholds=(0.6, 0.7, 0.7)):
+def get_mtcnn(
+    mtcnn_path,
+    min_size: float = 40.0,
+    factor: float = 0.709,
+    thresholds: Tuple[float, float, float] = (0.6, 0.7, 0.7)
+):
     import tensorflow.compat.v1 as tf  # noqa
 
     def mtcnn(img, mtcnn_path, min_size, factor, thresholds):
@@ -39,9 +44,14 @@ def get_mtcnn(mtcnn_path, min_size=40.0, factor=0.709,
 
 
 class FaceDetector:
-
-    def __init__(self, mode, img_shape=(160, 160), alpha=0.8, stride=1,
-                 min_face_size=40):
+    def __init__(
+        self,
+        mode,
+        img_shape: Tuple[int, int] = (160, 160),
+        alpha: float = 0.8,
+        stride: int = 1,
+        min_face_size: int = 40
+    ) -> None:
         assert mode in ("mtcnn", "trt-mtcnn"), f"{mode} not supported"
 
         self.mode = mode
@@ -72,7 +82,7 @@ class FaceDetector:
                 [tf.TensorSpec(shape=[None, None, 3], dtype=tf.float32)]
             )
 
-    def detect_faces(self, img):
+    def detect_faces(self, img) -> List[dict]:
         self.frame_ct += 1
         result = []
 
@@ -93,19 +103,30 @@ class FaceDetector:
                 width, height = int(face[3] - x), int(face[2] - y)
 
                 pts = list(map(int, pts))
-                result.append({"box": (x, y, width, height),
-                               "confidence": score,
-                               "keypoints": {
-                                   "left_eye": (pts[5], pts[0]),
-                                   "right_eye": (pts[6], pts[1]),
-                                   "nose": (pts[7], pts[2]),
-                                   "mouth_left": (pts[8], pts[3]),
-                                   "mouth_right": (pts[9], pts[4])}})
+                result.append(
+                    {
+                        "box": (x, y, width, height),
+                        "confidence": score,
+                        "keypoints": {
+                            "left_eye": (pts[5], pts[0]),
+                            "right_eye": (pts[6], pts[1]),
+                            "nose": (pts[7], pts[2]),
+                            "mouth_left": (pts[8], pts[3]),
+                            "mouth_right": (pts[9], pts[4])
+                        }
+                    }
+                )
 
         self._cached_result = result
         return result
 
-    def crop_face(self, img_bgr, margin, flip=False, verbose=True):
+    def crop_face(
+        self,
+        img_bgr,
+        margin,
+        flip: bool = False,
+        verbose: bool = True
+    ):
         start = timer()
         resized_faces, face = None, None
 
