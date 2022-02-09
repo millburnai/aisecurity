@@ -4,6 +4,7 @@
 import json
 import os
 from timeit import default_timer as timer
+import threading
 
 import cv2
 import numpy as np
@@ -21,11 +22,12 @@ try:
 except (ModuleNotFoundError, ImportError) as e:
     print(f"[DEBUG] '{e}'. Ignore if GPU is not set up")
 
-from util.detection import FaceDetector
+from util.detection import FaceDetector, is_looking
 from util.distance import DistMetric
 from util.loader import (print_time, screen_data, strip_id,
                          retrieve_embeds, get_frozen_graph)
 from util.common import (DB_LOB, DEFAULT_MODEL, EMBED_KEY_PATH, NAME_KEY_PATH)
+from util.pbar import ProgressBar
 from util.visuals import Camera, GraphicsRenderer
 from util.log import Logger
 
@@ -65,7 +67,8 @@ class FaceNet:
         elif ".tflite" in model_path:
             self._tflite_init(model_path)
         elif ".pb" in model_path:
-            self._tf_init(model_path, input_name, output_name, input_shape)
+            self._tf_init(model_path, input_name + ":0",
+                          output_name + ":0", input_shape)
         elif ".engine" in model_path:
             self._trt_init(model_path, input_shape)
         else:
@@ -151,13 +154,14 @@ class FaceNet:
 
         self.mode = "trt"
         try:
-            logger = trt.Logger(trt.Logger.ERROR)
-            runtime = trt.Runtime(logger)
+            self.dev_ctx = cuda.Device(0).make_context()
+            self.stream = cuda.Stream()
+            trt_logger = trt.Logger(trt.Logger.INFO)
+            runtime = trt.Runtime(trt_logger)
 
             with open(filepath, "rb") as model:
                 self.facenet = runtime.deserialize_cuda_engine(model.read())
 
-            self.stream = cuda.Stream()
             self.context = self.facenet.create_execution_context()
 
             self.h_input = cuda.pagelocked_empty(
@@ -171,6 +175,7 @@ class FaceNet:
 
             self.d_input = cuda.mem_alloc(self.h_input.nbytes)
             self.d_output = cuda.mem_alloc(self.h_output.nbytes)
+            print("here")
 
         except NameError:
             raise ValueError("trt mode requested but not available")
@@ -290,6 +295,9 @@ class FaceNet:
         else:
             if len(imgs) != 1:
                 raise NotImplementedError("trt batch not yet supported")
+            threading.Thread.__init__(self)
+            self.dev_ctx.push()
+
             np.copyto(self.h_input, imgs.astype(np.float32).ravel())
             cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
             self.context.execute_async(batch_size=1,
@@ -298,6 +306,8 @@ class FaceNet:
                                        stream_handle=self.stream.handle)
             cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
             self.stream.synchronize()
+            self.dev_ctx.pop()
+
             embeds = np.copy(self.h_output)
 
         return embeds.reshape(len(imgs), -1)
@@ -384,7 +394,7 @@ class FaceNet:
         :param detector: face detector type (default: "mtcnn")
         :param flip: whether to flip horizontally or not (default: False)
         :param graphics: whether or not to use graphics (default: True)
-        :param socket: socket (dev) (default: False)
+        :param socket: socket (dev) (default: None)
         :param mtcnn_stride: stride frame stride (default: 1)
         """
 
@@ -392,8 +402,9 @@ class FaceNet:
         assert 0. <= resize <= 1., "resize must be in [0., 1.]"
 
         graphics_controller = GraphicsRenderer(width, height, resize)
-        logger = Logger(15, 5)
-        cap = Camera(width, height)
+        logger = Logger(frame_limit=10, frame_threshold=5)
+        pbar = ProgressBar(logger, ws=socket)
+        cap = Camera()
         detector = FaceDetector(detector, self.img_shape,
                                 min_face_size=240, stride=mtcnn_stride)
 
@@ -407,9 +418,14 @@ class FaceNet:
 
             # facial detection and recognition
             info = self.recognize(frame, detector, flip=flip)
+            face, is_recognized, best_match, elapsed = info
 
-            if socket:
-                socket.send(json.dumps({"best_match": info[2]}))
+            # logging and socket
+            if is_recognized and is_looking(face):
+                log_result = logger.log(best_match)
+                pbar.update(end=log_result is not None)
+                if log_result and socket:
+                    socket.send(json.dumps({"best_match": best_match}))
 
             # graphics
             if graphics:
@@ -417,8 +433,6 @@ class FaceNet:
                 cv2.imshow("AI Security v2021.0.1", cframe)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
-
-            print("Logged:", logger.log(info[2]))
 
         cap.release()
         cv2.destroyAllWindows()
