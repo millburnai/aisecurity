@@ -44,14 +44,30 @@ Make sure that wifi is connected: `sudo nmcli device wifi connect <NETWORK_NAME>
 #### Install dependencies
 1. `sudo apt-get update`
 2. `sudo apt-get install python3-pip`
-3. `sudo pip3 install -U pip testresources setuptools==49.6.0`
-4. `sudo pip3 install -U scikit-learn tqdm websocket Cython pycryptodome dropbox`
+3. `sudo pip3 install -U pip testresources setuptools==49.6.0 Cython`
+4. `sudo pip3 install -U scikit-learn tqdm websocket pycryptodome dropbox`
 5. `sudo pip3 install -U numpy==1.19.4`
 6. `export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}`
 7. `export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}`
 
+*Note: you might have to add the lines from steps 6 and 7 to the `~/.bashrc` file and run `source ~/.bashrc` as well.*
+
+#### Install `pyrealsense2`
+1. `sudo apt-get update && sudo apt-get -y upgrade`
+2. `sudo apt-get install -y --no-install-recommends python3 python3-setuptools python3-dev`
+3. `sudo apt-get install -y git libssl-dev libusb-1.0-0-dev pkg-config libgtk-3-dev`
+4. `sudo apt-get install -y libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev`
+5. `git clone https://github.com/IntelRealSense/librealsense.git`
+6. `cd ./librealsense`
+7. `./scripts/setup_udev_rules.sh`
+8. `mkdir build && cd build`
+9. `cmake ../ -DBUILD_PYTHON_BINDINGS:bool=true`
+10. `sudo make uninstall && sudo make clean && sudo make -j4 && sudo make install`
+11. `nano ~/.bashrc` (or any text editor)
+12. Enter the following line in `~/.bashrc`: `export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.6/pyrealsense2`
+
 #### Install `aisecurity`
-1. `cd ~/ && git clone https://github.com/orangese/aisecurity.git`
+1. `cd ~/ && git clone https://github.com/aisecurity/aisecurity.git`
 2. `cd aisecurity && git submodule update --init`
 3. `cd util/trt_mtcnn_plugin && make`
 4. `cd ~/aisecurity/scripts && python3 download.py <TOKEN>`, see Discord server (`announcements` channel) for `<TOKEN>`
@@ -75,8 +91,22 @@ Unless developing on the `a1` Jetson, do not use these instructions.
 12. `export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}`
 13. `export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}`
 
+#### Install `pyrealsense2`
+1. `sudo apt-get update && sudo apt-get -y upgrade`
+2. `sudo apt-get install -y --no-install-recommends python3 python3-setuptools python3-dev`
+3. `sudo apt-get install -y git libssl-dev libusb-1.0-0-dev pkg-config libgtk-3-dev`
+4. `sudo apt-get install -y libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev`
+5. `git clone https://github.com/IntelRealSense/librealsense.git`
+6. `cd ./librealsense`
+7. `./scripts/setup_udev_rules.sh`
+8. `mkdir build && cd build`
+9. `cmake ../ -DBUILD_PYTHON_BINDINGS:bool=true`
+10. `sudo make uninstall && sudo make clean && sudo make -j4 && sudo make install`
+11. `nano ~/.bashrc` (or any text editor)
+12. Enter the following line in `~/.bashrc`: `export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.6/pyrealsense2`
+
 #### Install aisecurity and `mtcnn` models
-1. `cd ~/ && git clone https://github.com/orangese/aisecurity.git`
+1. `cd ~/ && git clone https://github.com/aisecurity/aisecurity.git`
 2. `cd aisecurity && git submodule update --init`
 3. `cd face/trt_mtcnn_plugin/mtcnn && make && ./create_engines`. Change engine params in `det1_relu.prototxt` or `create_engines.cpp` (before `make`) if necessary
 4. `cd .. && make`

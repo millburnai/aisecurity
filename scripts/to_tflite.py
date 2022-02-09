@@ -1,7 +1,5 @@
 import argparse
-
 import tensorflow as tf
-
 
 def shape(x):
     try:
@@ -9,7 +7,7 @@ def shape(x):
     except:
         raise argparse.ArgumentTypeError("input must be shape tuple")
 
-
+        
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--infile", help="input filename")
@@ -22,8 +20,10 @@ if __name__ == "__main__":
 
     converter = tf.compat.v1.lite.TFLiteConverter.from_frozen_graph(
         args.infile, args.inputs, args.outputs,
-        {input_name: shape for input_name, shape
-            in zip(args.inputs, args.input_shapes)},
+        {
+            input_name: shape for input_name, shape
+            in zip(args.inputs, args.input_shapes)
+        },
     )
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
     converter.target_spec.supported_types = [tf.float16]

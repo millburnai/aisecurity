@@ -1,0 +1,13 @@
+tensorflow>=2
+scikit-learn
+opencv-python
+pycryptodome
+websocket
+tqdm
+dropbox
+testresources
+setuptools==49.6.0
+Cython
+numpy==1.19.4
+pycuda
+tensorrt
