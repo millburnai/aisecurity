@@ -1,149 +1,126 @@
 """Graphics util.
 """
-from typing import Tuple
 
+from abc import ABC, abstractmethod
 import threading
 
 import cv2
 import numpy as np
+
+from util.common import HAS_RS
+
 try:
     import pyrealsense2 as rs
 except (ModuleNotFoundError, ImportError) as e:
     print(f"[DEBUG] '{e}'. Ignore if Realsense is not set up")
+    HAS_RS = False
 
-NVARGUS = "nvarguscamerasrc ! video/x-raw(memory:NVMM), " \
-          "width=(int)1280, height=(int)720, format=(string)NV12, " \
-          "framerate=(fraction)30/1 ! nvvidconv flip-method=2 ! video/x-raw, " \
-          "width=(int){}, height=(int){}, format=(string)BGRx ! " \
-          "videoconvert ! video/x-raw, format=(string)BGR ! appsink"
+def Camera(**kwargs):
+    if HAS_RS:
+        return RSCapture(**kwargs)
+    return WebcamCapture(**kwargs)
 
 
-class Camera:
-    # https://github.com/jkjung-avt/tensorrt_demos/blob/master/utils/camera.py
+class CVThread(ABC):
 
-    def __init__(
-        self,
-        width: int = 640,
-        height: int = 360,
-        fps: int = 30,
-        dev: int = 0,
-        threaded: bool = False
-    ) -> None:
-        self.width = width
-        self.height = height
-        self.dev = dev
-        self.threaded = threaded
-        self.fps = fps
+    def stop(self):
+        self.stopped = True
 
-        self.thread_running = False
-        self.retval = False
-        self.img_handle = None
-        self.thread = None
-        self.cap = None
+    def _setup(self, uid, tname, args):
+        self.uid = uid
+        self.tname = tname
+        self.stopped = False
+        self._next()
 
-        self._open()
-        self._start()
+        thread = threading.Thread(target=self._update, name=tname, args=args)
+        thread.daemon = True
+        thread.start()
 
-    def _open(self) -> None:
-        try:
-            config = rs.config()
-            config.enable_stream(rs.stream.color, self.width, self.height, 
-                                 rs.format.bgr8, self.fps)
-            self.pipeline = rs.pipeline()
-            self.pipeline.start(config)
-            assert self.pipeline.get_active_profile(), "video capture failed to initialize"
+    def _update(self):
+        while True:
+            if self.stopped:
+                self._cleanup()
+                return
+            self._next()
 
-        except:
-            try:
-                gstreamer_pipeline = NVARGUS.format(self.width, self.height)
-                self.cap = cv2.VideoCapture(gstreamer_pipeline, cv2.CAP_GSTREAMER)
-                assert self.cap.isOpened(), "video capture failed to initialize"
+    @abstractmethod
+    def _next(self):
+        """Sets nexts frames"""
 
-            except AssertionError:
-                self.cap = cv2.VideoCapture(self.dev)
-                assert self.cap.isOpened(), "video capture failed to initialize"
+    @abstractmethod
+    def _cleanup(self):
+        """Cleans up on termination"""
 
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+    @abstractmethod
+    def read(self):
+        """Returns next frames"""
 
-    def read_realsense(self):
-        ret = True
-        frames = self.pipeline.wait_for_frames()
-        color_frame = frames.get_color_frame()
-        if not color_frame:
-            ret = False
-            return ret, None
-        else:
-            color_image = np.array(color_frame.get_data())
-            return ret, color_image
+    def release(self):
+        self.stopped = True
 
-    def _start(self) -> None:
-        def grab_img(cam):
-            while cam.thread_running:
-                try:
-                    cam.retval, cam.img_handle = self.read_realsense()
-                except:
-                    cam.retval, cam.img_handle = cam.cap.read()
-            cam.thread_running = False
 
-        if self.threaded:
-            assert not self.thread_running, "thread is already running"
-            self.thread_running = True
-            self.thread = threading.Thread(target=grab_img, args=(self,))
-            self.thread.start()
+class WebcamCapture(CVThread):
+
+    def __init__(self, src=0, *args):
+        self.cap = cv2.VideoCapture(src)
+        self._setup(src, f"VS-{src}", args)
+
+    def _next(self):
+        self.retval, self.frame = self.cap.read()
+
+    def _cleanup(self):
+        pass
 
     def read(self):
-        if self.threaded:
-            return self.retval, self.img_handle
-        else:
-            try:
-                return self.read_realsense()
-            except:
-                return self.cap.read()
+        return self.retval, self.frame
 
-    def release(self) -> None:
-        if self.threaded:
-            self.thread_running = False
-            self.thread.join()
-        try:
-            self.cap.release()
-        except:
-            self.pipeline.stop()
+
+class RSCapture(CVThread):
+
+    def __init__(self, uid=0, *args):
+        self.stream = rs.pipeline()
+
+        rs_cfg = rs.config()
+        rs_cfg.enable_stream(rs.stream.color)
+
+        self.stream.start(rs_cfg)
+        self._setup(uid, f"RS-{uid}", args)
+
+    def _next(self):
+        frames = self.stream.wait_for_frames()
+        frame = np.asanyarray(frames.get_color_frame().get_data())
+        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+        self.frame = frame
+
+    def _cleanup(self):
+        self.stream.stop()
+
+    def read(self):
+        return True, self.frame
 
 
 class GraphicsRenderer:
-    def __init__(
-        self,
-        width: int = 640,
-        height: int = 360,
-        resize: float = 1.0,
-        margin: int = 10,
-        font=cv2.FONT_HERSHEY_DUPLEX
-    ):
+
+    def __init__(self, width=640, height=360, resize=1., margin=10,
+                 font=cv2.FONT_HERSHEY_DUPLEX):
         self.width = width
         self.height = height
         self.resize = resize
         self.margin = margin
         self.font = font
 
-        # NOTE: Works for 6.25e4 pixel video cature to 1e6 pixel video capture
+        # works for 6.25e4 pixel video cature to 1e6 pixel video capture
         self.line_thickness = round(1e-6 * width * height + 1.5)
         self.radius = round((1e-6 * width * height + 1.5) / 2.)
         self.font_size = 4.5e-7 * width * height + 0.5
 
-    def add_box_and_label(
-        self,
-        frame,
-        origin,
-        corner,
-        best_match,
-        color,
-        thickness: int = 1
-    ) -> None:
-        # Bounding box
+    def add_box_and_label(self, frame, origin, corner,
+                          best_match, color, thickness=1):
+        # bounding box
         cv2.rectangle(frame, origin, corner, color, self.line_thickness)
 
-        # Label box
+        # label box
         label = best_match.replace("_", " ").title()
 
         (width, height), __ = cv2.getTextSize(label, self.font,
@@ -153,11 +130,11 @@ class GraphicsRenderer:
         cv2.rectangle(frame, (origin[0], corner[1] - 35),
                       (box_x, corner[1]), color, cv2.FILLED)
 
-        # Label
+        # label
         cv2.putText(frame, label, (origin[0] + 6, corner[1] - 6),
                     self.font, self.font_size, (255, 255, 255), thickness)
 
-    def add_features(self, overlay, features, color) -> None:
+    def add_features(self, overlay, features, color):
         cv2.circle(overlay, (features["left_eye"]),
                    self.radius, color, self.line_thickness)
         cv2.circle(overlay, (features["right_eye"]),
@@ -178,41 +155,23 @@ class GraphicsRenderer:
         cv2.line(overlay, features["mouth_right"], features["nose"],
                  color, self.radius)
 
-    def add_fps(
-        self,
-        frame,
-        elapsed,
-        thickness: int = 2
-    ) -> None:
-        fps = round(1000. / elapsed, 2)
-        text = f"FPS: {fps}"
+    def add_fps(self, frame, elapsed, thickness=2):
+        text = "FPS: {}".format(round(1000. / elapsed, 2))
 
         x, y = 10, 20
         rgb = [255 * round((255 - np.mean(frame[:x, :y])) / 255)] * 3
 
-        cv2.putText(
-            frame, text, (x, y), self.font,
-            self.font_size, rgb, thickness
-        )
+        cv2.putText(frame, text, (x, y), self.font,
+                    self.font_size, rgb, thickness)
 
-    def add_graphics(
-        self,
-        frame,
-        person,
-        is_recognized,
-        best_match,
-        elapsed
-    ) -> Tuple[int, int, int]:
-        def get_color() -> None:
+    def add_graphics(self, frame, person, is_recognized, best_match, elapsed):
+        def get_color():
             if not is_recognized:
-                # NOTE: Returns red
-                return (0, 0, 255)
+                return 0, 0, 255  # red
             elif "visitor" in best_match:
-                # NOTE: Returns orchid (purple)
-                return (218, 112, 214)
+                return 218, 112, 214  # purple (actually more of an "orchid")
             else:
-                # NOTE: Returns green
-                return (0, 255, 0)
+                return 0, 255, 0  # green
 
         if person is not None:
             features = person["keypoints"]

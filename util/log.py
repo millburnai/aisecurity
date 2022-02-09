@@ -1,4 +1,5 @@
 class Logger:
+
     def __init__(
         self,
         frame_limit: int,
@@ -36,9 +37,11 @@ class Logger:
 
             # NOTE: Increment frequency
             else:
-                match_frequencies.update({current_match : match_frequencies.get(current_match) + 1})
+                match_frequencies.update(
+                        {current_match: match_frequencies.get(current_match) + 1}
+                )
                 #NOTE: if frequency == threshold, detect
-                if match_frequencies.get(current_match) >= self.frame_threshold: 
+                if match_frequencies.get(current_match) >= self.frame_threshold:
                     return current_match
-                    
+
         return ""

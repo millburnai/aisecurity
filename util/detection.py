@@ -13,6 +13,16 @@ sys.path.insert(1, "../")
 from util.common import CONFIG_HOME
 
 
+def is_looking(face):
+    pts = face["keypoints"]
+    eye_diff = abs(pts["right_eye"][0] - pts["left_eye"][0])
+    x, y, w, h = face["box"]
+
+    ratio = eye_diff / w
+    print(f"ratio: {ratio}")
+    return ratio > 0.4
+
+
 def get_mtcnn(
     mtcnn_path,
     min_size: float = 40.0,
@@ -44,6 +54,7 @@ def get_mtcnn(
 
 
 class FaceDetector:
+
     def __init__(
         self,
         mode,

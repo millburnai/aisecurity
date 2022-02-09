@@ -2,8 +2,10 @@
 """
 
 import json
+import importlib
 import os
 import platform
+import warnings
 
 REPLACE = "[proj-root]"
 CWD = os.path.join(os.path.dirname(__file__), "../")
@@ -18,6 +20,17 @@ NAME_KEY_PATH = CONFIG["name_keys"].replace(REPLACE, CWD)
 EMBED_KEY_PATH = CONFIG["embedding_keys"].replace(REPLACE, CWD)
 
 DEFAULT_MODEL = CONFIG["default_model"].replace(REPLACE, CWD)
+WIFI = {"network": CONFIG["server"]["network"],
+        "password": CONFIG["server"]["password"]}
+IP = CONFIG["server"]["ip"]
+IFACE = CONFIG["server"]["iface"]
 
-ON_GPU = not bool(os.system("command -v nvcc > /dev/null"))
+OS = platform.system()
+if OS == "Windows":
+    warnings.warn("Some features are not supported for Windows OS: "
+                  "TensorRT and automatic wifi connection")
+
+ON_CUDA = not bool(os.system("command -v nvcc > /dev/null"))
 ON_JETSON = platform.machine() == "aarch64"
+
+HAS_RS = importlib.util.find_spec("pyrealsense2") is not None
