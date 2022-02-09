@@ -1,7 +1,12 @@
-import websocket
-from socket import error as SocketError
 import json
 from functools import partial
+import sys
+
+from socket import error as SocketError
+import websocket
+
+sys.path.insert(1, "../")
+from util.common import IP
 
 
 class WebSocket:
@@ -35,3 +40,18 @@ class WebSocket:
                                     on_close=self.on_close)
         ws.on_open = partial(on_open, **facenet_kwargs)
         ws.run_forever()
+
+    @classmethod
+    def run(cls, facenet, id=1, **kwargs):
+        def _run():
+            ws = cls(IP, id, facenet)
+            ws.connect(**kwargs)
+
+        i = 0
+        while True:
+            i += 1
+            print(f"------ RESETTING ({i}) ------\n\n\n")
+            try:
+                _run()
+            except SocketError:
+                continue
