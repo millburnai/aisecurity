@@ -1,6 +1,7 @@
 """Main production script for kiosk/aisecurity."""
 
 import sys
+
 sys.path.insert(1, "../")
 
 from facenet import FaceNet
@@ -18,8 +19,12 @@ if __name__ == "__main__":
 
     def run():
         ws = WebSocket("10.56.9.186:8000", 1, facenet)
-        ws.connect(detector=detector, graphics=graphics,
-                   mtcnn_stride=mtcnn_stride, resize=resize)
+        ws.connect(
+            detector=detector,
+            graphics=graphics,
+            mtcnn_stride=mtcnn_stride,
+            resize=resize,
+        )
 
     i = 0
     while True:

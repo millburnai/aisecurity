@@ -17,6 +17,7 @@ ALL = 0
 EMBEDS = 1
 NAMES = 2
 
+
 def require_permission(func):
     @functools.wraps(func)
     def _func(*args, **kwargs):
@@ -27,6 +28,7 @@ def require_permission(func):
 
     return _func
 
+
 # Generate encryption information
 @require_permission
 def generate_key(key_file) -> None:
@@ -34,6 +36,7 @@ def generate_key(key_file) -> None:
     with open(key_file, "wb") as keys:
         key = get_random_bytes(NUM_BITS)
         keys.write(key)
+
 
 @require_permission
 def generate_cipher(key_file, alloc_mem):
@@ -44,6 +47,7 @@ def generate_cipher(key_file, alloc_mem):
             keys.write(cipher.nonce)
     return cipher
 
+
 # RETRIEVALS
 @require_permission
 def get_key(key_file):
@@ -51,29 +55,34 @@ def get_key(key_file):
         key = b"".join(keys.readlines())[:NUM_BITS]
     return key
 
+
 @require_permission
 def get_nonce(key_file, position):
     with open(key_file, "rb") as keys:
         joined_nonces = b"".join(keys.readlines())[NUM_BITS:]
-        nonce = joined_nonces[position * NUM_BITS:(position + 1) * NUM_BITS]
+        nonce = joined_nonces[position * NUM_BITS : (position + 1) * NUM_BITS]
     return nonce
+
 
 # ENCRYPT AND DECRYPT
 def encrypt(data, cipher):
     cipher_text, __ = cipher.encrypt_and_digest(data)
     return cipher_text
 
+
 def decrypt(cipher_text, position, key_file):
-    decrypt_cipher = AES.new(get_key(key_file), AES.MODE_EAX,
-                             nonce=get_nonce(key_file, position))
+    decrypt_cipher = AES.new(
+        get_key(key_file), AES.MODE_EAX, nonce=get_nonce(key_file, position)
+    )
     return decrypt_cipher.decrypt(cipher_text)
+
 
 def encrypt_data(
     data,
-    to_encrypt = ALL,
+    to_encrypt=ALL,
     decryptable: bool = True,
-    name_keys = NAME_KEY_PATH,
-    embedding_keys = EMBED_KEY_PATH
+    name_keys=NAME_KEY_PATH,
+    embedding_keys=EMBED_KEY_PATH,
 ):
     if decryptable:
         generate_key(name_keys)
@@ -81,8 +90,9 @@ def encrypt_data(
 
     encrypted = {}
     for person in data:
-        assert data[person].ndim == 2, \
-            "embeds must have shape (number of embeds, dim(embed))"
+        assert (
+            data[person].ndim == 2
+        ), "embeds must have shape (number of embeds, dim(embed))"
         encrypted_name, encrypted_embeds = person, data[person].tolist()
 
         if to_encrypt in (ALL, NAMES):
@@ -93,8 +103,7 @@ def encrypt_data(
 
         if to_encrypt in (ALL, EMBEDS):
             for idx, embed in enumerate(encrypted_embeds):
-                embed_cipher = generate_cipher(embedding_keys,
-                                               alloc_mem=decryptable)
+                embed_cipher = generate_cipher(embedding_keys, alloc_mem=decryptable)
                 byte_embed = struct.pack("%sd" % len(embed), *embed)
                 encrypted_embeds[idx] = list(encrypt(byte_embed, embed_cipher))
 
@@ -102,11 +111,9 @@ def encrypt_data(
 
     return encrypted
 
+
 def decrypt_data(
-    data,
-    to_encrypt = ALL,
-    name_keys = NAME_KEY_PATH,
-    embedding_keys = EMBED_KEY_PATH
+    data, to_encrypt=ALL, name_keys=NAME_KEY_PATH, embedding_keys=EMBED_KEY_PATH
 ):
     """Obviously, if the embedding sets
     have differing lengths, the lengths
@@ -145,8 +152,7 @@ def decrypt_data(
 
         if to_encrypt in (ALL, EMBEDS):
             for idx, embed in enumerate(embeds):
-                byte_embed = decrypt(bytes(embed), adj_nonce_pos + idx,
-                                     embedding_keys)
+                byte_embed = decrypt(bytes(embed), adj_nonce_pos + idx, embedding_keys)
                 nums = len(byte_embed) // 8
                 unpacked = struct.unpack("%sd" % nums, byte_embed)
                 embeds[idx] = np.array(unpacked)
