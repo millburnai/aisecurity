@@ -24,9 +24,14 @@ except (ModuleNotFoundError, ImportError) as e:
 
 from util.detection import FaceDetector, is_looking
 from util.distance import DistMetric
-from util.loader import (print_time, screen_data, strip_id,
-                         retrieve_embeds, get_frozen_graph)
-from util.common import (DB_LOB, DEFAULT_MODEL, EMBED_KEY_PATH, NAME_KEY_PATH)
+from util.loader import (
+    print_time,
+    screen_data,
+    strip_id,
+    retrieve_embeds,
+    get_frozen_graph,
+)
+from util.common import DB_LOB, DEFAULT_MODEL, EMBED_KEY_PATH, NAME_KEY_PATH
 from util.pbar import ProgressBar
 from util.visuals import Camera, GraphicsRenderer
 from util.log import Logger
@@ -36,9 +41,16 @@ class FaceNet:
     """Class implementation of FaceNet"""
 
     @print_time("model load time")
-    def __init__(self, model_path=DEFAULT_MODEL, data_path=DB_LOB,
-                 input_name="input", output_name="embeddings",
-                 input_shape=(160, 160), classifier="svm", gpu_alloc=False):
+    def __init__(
+        self,
+        model_path=DEFAULT_MODEL,
+        data_path=DB_LOB,
+        input_name="input",
+        output_name="embeddings",
+        input_shape=(160, 160),
+        classifier="svm",
+        gpu_alloc=False,
+    ):
         """Initializes FaceNet object
         :param model_path: path to model (default: utils.paths.DEFAULT_MODEL)
         :param data_path: path to data (default: utils.paths.DB_LOB)
@@ -50,11 +62,11 @@ class FaceNet:
         """
 
         assert os.path.exists(model_path), f"{model_path} not found"
-        assert not data_path or os.path.exists(data_path), \
-            f"{data_path} not found"
+        assert not data_path or os.path.exists(data_path), f"{data_path} not found"
 
         if gpu_alloc:
             import tensorflow as tf  # noqa
+
             try:
                 gpus = tf.config.experimental.list_physical_devices("GPU")
                 for gpu in gpus:
@@ -67,8 +79,9 @@ class FaceNet:
         elif ".tflite" in model_path:
             self._tflite_init(model_path)
         elif ".pb" in model_path:
-            self._tf_init(model_path, input_name + ":0",
-                          output_name + ":0", input_shape)
+            self._tf_init(
+                model_path, input_name + ":0", output_name + ":0", input_shape
+            )
         elif ".engine" in model_path:
             self._trt_init(model_path, input_shape)
         else:
@@ -80,9 +93,11 @@ class FaceNet:
         self.classifier_type = classifier
 
         if data_path:
-            self.set_data(*retrieve_embeds(data_path,
-                                           name_keys=NAME_KEY_PATH,
-                                           embedding_keys=EMBED_KEY_PATH))
+            self.set_data(
+                *retrieve_embeds(
+                    data_path, name_keys=NAME_KEY_PATH, embedding_keys=EMBED_KEY_PATH
+                )
+            )
         else:
             print("[DEBUG] data not set. Set it manually with set_data")
 
@@ -96,10 +111,12 @@ class FaceNet:
 
     @property
     def metadata(self):
-        return {"metric": self.dist_metric.metric,
-                "normalize": self.dist_metric.normalize,
-                "alpha": self.alpha,
-                "img_norm": self.img_norm}
+        return {
+            "metric": self.dist_metric.metric,
+            "normalize": self.dist_metric.normalize,
+            "alpha": self.alpha,
+            "img_norm": self.img_norm,
+        }
 
     def _keras_init(self, filepath):
         """Initializes a Keras model
@@ -107,6 +124,7 @@ class FaceNet:
         """
 
         import tensorflow.compat.v1 as tf  # noqa
+
         self.mode = "keras"
         self.facenet = tf.keras.models.load_model(filepath)
         self.img_shape = self.facenet.input_shape[1:3]
@@ -117,6 +135,7 @@ class FaceNet:
         """
 
         import tensorflow.compat.v1 as tf  # noqa
+
         self.mode = "tflite"
         self.facenet = tf.lite.Interpreter(model_path=filepath)
         self.facenet.allocate_tensors()
@@ -134,6 +153,7 @@ class FaceNet:
         """
 
         import tensorflow.compat.v1 as tf  # noqa
+
         self.mode = "tf"
 
         self.input_name = input_name
@@ -165,12 +185,10 @@ class FaceNet:
             self.context = self.facenet.create_execution_context()
 
             self.h_input = cuda.pagelocked_empty(
-                trt.volume(self.context.get_binding_shape(0)),
-                dtype=np.float32
+                trt.volume(self.context.get_binding_shape(0)), dtype=np.float32
             )
             self.h_output = cuda.pagelocked_empty(
-                trt.volume(self.context.get_binding_shape(1)),
-                dtype=np.float32
+                trt.volume(self.context.get_binding_shape(1)), dtype=np.float32
             )
 
             self.d_input = cuda.mem_alloc(self.h_input.nbytes)
@@ -238,9 +256,11 @@ class FaceNet:
         self._stripped_names = []
         self.data_cfg = metadata
 
-        self.dist_metric = DistMetric(self.data_cfg["metric"],
-                                      self.data_cfg["normalize"],
-                                      self.data_cfg.get("mean"))
+        self.dist_metric = DistMetric(
+            self.data_cfg["metric"],
+            self.data_cfg["normalize"],
+            self.data_cfg.get("mean"),
+        )
         self.alpha = self.data_cfg["alpha"]
         self.img_norm = self.data_cfg["img_norm"]
 
@@ -267,12 +287,12 @@ class FaceNet:
         if self.img_norm == "per_image":
             # linearly scales x to have mean of 0, variance of 1
             std_adj = np.std(imgs, axis=(1, 2, 3), keepdims=True)
-            std_adj = np.maximum(std_adj, 1. / np.sqrt(imgs.size / len(imgs)))
+            std_adj = np.maximum(std_adj, 1.0 / np.sqrt(imgs.size / len(imgs)))
             mean = np.mean(imgs, axis=(1, 2, 3), keepdims=True)
             return (imgs - mean) / std_adj
         elif self.img_norm == "fixed":
             # scales x to [-1, 1]
-            return (imgs - 127.5) / 128.
+            return (imgs - 127.5) / 128.0
         else:
             return imgs
 
@@ -300,10 +320,11 @@ class FaceNet:
 
             np.copyto(self.h_input, imgs.astype(np.float32).ravel())
             cuda.memcpy_htod_async(self.d_input, self.h_input, self.stream)
-            self.context.execute_async(batch_size=1,
-                                       bindings=[int(self.d_input),
-                                                 int(self.d_output)],
-                                       stream_handle=self.stream.handle)
+            self.context.execute_async(
+                batch_size=1,
+                bindings=[int(self.d_input), int(self.d_output)],
+                stream_handle=self.stream.handle,
+            )
             cuda.memcpy_dtoh_async(self.h_output, self.d_output, self.stream)
             self.stream.synchronize()
             self.dev_ctx.pop()
@@ -322,8 +343,7 @@ class FaceNet:
         :returns: normalized embeddings, facial coordinates
         """
 
-        cropped_faces, face_coords = detector.crop_face(img, margin,
-                                                        flip, verbose)
+        cropped_faces, face_coords = detector.crop_face(img, margin, flip, verbose)
         if cropped_faces is None:
             if verbose:
                 print("No face detected")
@@ -336,7 +356,7 @@ class FaceNet:
         embeds = self.dist_metric.apply_norms(embeds, batch=True)
 
         if verbose:
-            elapsed = round(1000. * (timer() - start), 2)
+            elapsed = round(1000.0 * (timer() - start), 2)
             time = colored(f"{elapsed} ms", attrs=["bold"])
             vecs = f"{len(embeds)} vector{'s' if len(embeds) > 1 else ''}"
             print(f"Embedding time ({vecs}): " + time)
@@ -368,8 +388,10 @@ class FaceNet:
                 is_recognized = dist <= self.alpha
 
                 if verbose and dist:
-                    info = colored(f"{round(dist, 4)} ({best_match})",
-                                   color="green" if is_recognized else "red")
+                    info = colored(
+                        f"{round(dist, 4)} ({best_match})",
+                        color="green" if is_recognized else "red",
+                    )
                     print(f"{self.dist_metric}: {info}")
 
         except (ValueError, cv2.error) as error:
@@ -381,12 +403,20 @@ class FaceNet:
             else:
                 raise error
 
-        elapsed = round(1000. * (timer() - start), 4)
+        elapsed = round(1000.0 * (timer() - start), 4)
         return face, is_recognized, best_match, elapsed
 
-    def real_time_recognize(self, width=640, height=360, resize=1.,
-                            detector="mtcnn", flip=False, graphics=True,
-                            socket=None, mtcnn_stride=1):
+    def real_time_recognize(
+        self,
+        width=640,
+        height=360,
+        resize=1.0,
+        detector="mtcnn",
+        flip=False,
+        graphics=True,
+        socket=None,
+        mtcnn_stride=1,
+    ):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
         :param height: height of frame (default: 360)
@@ -399,14 +429,15 @@ class FaceNet:
         """
 
         assert self._db, "data must be provided"
-        assert 0. <= resize <= 1., "resize must be in [0., 1.]"
+        assert 0.0 <= resize <= 1.0, "resize must be in [0., 1.]"
 
         graphics_controller = GraphicsRenderer(width, height, resize)
         logger = Logger(frame_limit=10, frame_threshold=5)
         pbar = ProgressBar(logger, ws=socket)
         cap = Camera()
-        detector = FaceDetector(detector, self.img_shape,
-                                min_face_size=240, stride=mtcnn_stride)
+        detector = FaceDetector(
+            detector, self.img_shape, min_face_size=240, stride=mtcnn_stride
+        )
 
         while True:
             _, frame = cap.read()

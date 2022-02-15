@@ -8,6 +8,7 @@ import dropbox
 from pathlib import Path
 from tqdm import tqdm
 
+
 def get_files(dbx, prefix, ignore) -> None:
     has_more = True
     cursor = None
@@ -28,6 +29,7 @@ def get_files(dbx, prefix, ignore) -> None:
         has_more = res.has_more
         cursor = res.cursor
 
+
 if __name__ == "__main__":
     dest = "../config"
     dbx_prefix = "/aisecurity/2020-2021/config"
@@ -41,7 +43,7 @@ if __name__ == "__main__":
 
     dbx = dropbox.Dropbox(token)
     display_name = dbx.users_get_current_account().name.display_name
-    print(f"[DEBUG] logged into account name: \"{display_name}\"")
+    print(f'[DEBUG] logged into account name: "{display_name}"')
 
     urls = list(get_files(dbx, dbx_prefix, ignore))
     for url in tqdm(urls):
@@ -67,8 +69,10 @@ if __name__ == "__main__":
             json.dump(config, f)
 
         for i in range(1, 4):
-            os.rename(f"../config/models/det{i}.engine",
-                      f"../util/trt_mtcnn_plugin/mtcnn/det{i}.engine")
+            os.rename(
+                f"../config/models/det{i}.engine",
+                f"../util/trt_mtcnn_plugin/mtcnn/det{i}.engine",
+            )
 
     else:
         backends = {".pb": "tensorflow", ".tflite": "tflite"}

@@ -14,8 +14,7 @@ import numpy as np
 from tqdm import tqdm
 
 sys.path.insert(1, "../")
-from util.encryptions import (ALL, NAMES, EMBEDS,  # noqa
-                              encrypt_data, decrypt_data)
+from util.encryptions import ALL, NAMES, EMBEDS, encrypt_data, decrypt_data  # noqa
 from util.common import DB_LOB, NAME_KEY_PATH, EMBED_KEY_PATH  # noqa
 
 
@@ -39,7 +38,9 @@ def print_time(message):
             result = func(*args, **kwargs)
             print(f"[DEBUG] {message}: {round(timer() - start, 4)}s")
             return result
+
         return _func
+
     return _timer
 
 
@@ -49,6 +50,7 @@ def get_frozen_graph(path):
     :returns: tf.GraphDef object
     """
     import tensorflow.compat.v1 as tf  # noqa
+
     with tf.gfile.FastGFile(path, "rb") as graph_file:
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(graph_file.read())
@@ -66,8 +68,9 @@ def screen_data(key, value):
     for embed in value:
         embed = np.asarray(embed)
         is_vector = np.prod(embed.shape) == embed.flatten().shape
-        assert is_vector, f"each value must be a vectorized " \
-                          f"embedding, got shape {embed.shape}"
+        assert is_vector, (
+            f"each value must be a vectorized " f"embedding, got shape {embed.shape}"
+        )
 
 
 def strip_id(name, split="-"):
@@ -77,8 +80,11 @@ def strip_id(name, split="-"):
 
 def online_load(facenet, img_dir, people=None, **kwargs):
     if people is None:
-        people = [os.path.join(img_dir, f) for f in os.listdir(img_dir)
-                  if f.endswith("jpg") or f.endswith("png")]
+        people = [
+            os.path.join(img_dir, f)
+            for f in os.listdir(img_dir)
+            if f.endswith("jpg") or f.endswith("png")
+        ]
 
     data = {}
     no_faces = []
@@ -103,8 +109,7 @@ def online_load(facenet, img_dir, people=None, **kwargs):
     return data, no_faces
 
 
-def dump_and_encrypt(data, metadata, dump_path, to_encrypt=ALL,
-                     mode="w+", **kwargs):
+def dump_and_encrypt(data, metadata, dump_path, to_encrypt=ALL, mode="w+", **kwargs):
     encrypted_data = encrypt_data(data, to_encrypt=to_encrypt, **kwargs)
 
     with open(dump_path, mode, encoding="utf-8") as dump_file:
@@ -113,22 +118,27 @@ def dump_and_encrypt(data, metadata, dump_path, to_encrypt=ALL,
 
 
 @print_time("data embedding and dumping time")
-def dump_and_embed(facenet, img_dir, dump_path, retrieve_path=None,
-                   full_overwrite=False, to_encrypt=ALL, use_mean=False,
-                   **kwargs):
+def dump_and_embed(
+    facenet,
+    img_dir,
+    dump_path,
+    retrieve_path=None,
+    full_overwrite=False,
+    to_encrypt=ALL,
+    use_mean=False,
+    **kwargs,
+):
     metadata = facenet.metadata
     metadata["to_encrypt"] = to_encrypt
 
     if not full_overwrite:
         path = retrieve_path if retrieve_path else dump_path
-        old_embeds, old_metadata = retrieve_embeds(path, NAME_KEY_PATH,
-                                                   EMBED_KEY_PATH)
+        old_embeds, old_metadata = retrieve_embeds(path, NAME_KEY_PATH, EMBED_KEY_PATH)
 
         new_embeds, no_faces = online_load(facenet, img_dir, **kwargs)
         data = {**old_embeds, **new_embeds}
 
-        assert not old_metadata or metadata == old_metadata, \
-            "metadata inconsistent"
+        assert not old_metadata or metadata == old_metadata, "metadata inconsistent"
 
     else:
         data, no_faces = online_load(facenet, img_dir, **kwargs)
@@ -151,6 +161,7 @@ def retrieve_embeds(path, name_keys, embedding_keys):
         metadata = data["metadata"]
         encrypted_data = data["data"]
 
-    decrypted = decrypt_data(encrypted_data, metadata["to_encrypt"],
-                             name_keys, embedding_keys)
+    decrypted = decrypt_data(
+        encrypted_data, metadata["to_encrypt"], name_keys, embedding_keys
+    )
     return decrypted, metadata

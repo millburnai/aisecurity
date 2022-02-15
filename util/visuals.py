@@ -15,6 +15,7 @@ except (ModuleNotFoundError, ImportError) as e:
     print(f"[DEBUG] '{e}'. Ignore if Realsense is not set up")
     HAS_RS = False
 
+
 def Camera(**kwargs):
     if HAS_RS:
         return RSCapture(**kwargs)
@@ -22,7 +23,6 @@ def Camera(**kwargs):
 
 
 class CVThread(ABC):
-
     def stop(self):
         self.stopped = True
 
@@ -60,7 +60,6 @@ class CVThread(ABC):
 
 
 class WebcamCapture(CVThread):
-
     def __init__(self, src=0, *args):
         self.cap = cv2.VideoCapture(src)
         self._setup(src, f"VS-{src}", args)
@@ -76,7 +75,6 @@ class WebcamCapture(CVThread):
 
 
 class RSCapture(CVThread):
-
     def __init__(self, uid=0, *args):
         self.stream = rs.pipeline()
 
@@ -101,9 +99,9 @@ class RSCapture(CVThread):
 
 
 class GraphicsRenderer:
-
-    def __init__(self, width=640, height=360, resize=1., margin=10,
-                 font=cv2.FONT_HERSHEY_DUPLEX):
+    def __init__(
+        self, width=640, height=360, resize=1.0, margin=10, font=cv2.FONT_HERSHEY_DUPLEX
+    ):
         self.width = width
         self.height = height
         self.resize = resize
@@ -112,57 +110,63 @@ class GraphicsRenderer:
 
         # works for 6.25e4 pixel video cature to 1e6 pixel video capture
         self.line_thickness = round(1e-6 * width * height + 1.5)
-        self.radius = round((1e-6 * width * height + 1.5) / 2.)
+        self.radius = round((1e-6 * width * height + 1.5) / 2.0)
         self.font_size = 4.5e-7 * width * height + 0.5
 
-    def add_box_and_label(self, frame, origin, corner,
-                          best_match, color, thickness=1):
+    def add_box_and_label(self, frame, origin, corner, best_match, color, thickness=1):
         # bounding box
         cv2.rectangle(frame, origin, corner, color, self.line_thickness)
 
         # label box
         label = best_match.replace("_", " ").title()
 
-        (width, height), __ = cv2.getTextSize(label, self.font,
-                                              self.font_size, thickness)
+        (width, height), __ = cv2.getTextSize(
+            label, self.font, self.font_size, thickness
+        )
 
         box_x = max(corner[0], origin[0] + width + 6)
-        cv2.rectangle(frame, (origin[0], corner[1] - 35),
-                      (box_x, corner[1]), color, cv2.FILLED)
+        cv2.rectangle(
+            frame, (origin[0], corner[1] - 35), (box_x, corner[1]), color, cv2.FILLED
+        )
 
         # label
-        cv2.putText(frame, label, (origin[0] + 6, corner[1] - 6),
-                    self.font, self.font_size, (255, 255, 255), thickness)
+        cv2.putText(
+            frame,
+            label,
+            (origin[0] + 6, corner[1] - 6),
+            self.font,
+            self.font_size,
+            (255, 255, 255),
+            thickness,
+        )
 
     def add_features(self, overlay, features, color):
-        cv2.circle(overlay, (features["left_eye"]),
-                   self.radius, color, self.line_thickness)
-        cv2.circle(overlay, (features["right_eye"]),
-                   self.radius, color, self.line_thickness)
-        cv2.circle(overlay, (features["nose"]),
-                   self.radius, color, self.line_thickness)
-        cv2.circle(overlay, (features["mouth_left"]),
-                   self.radius, color, self.line_thickness)
-        cv2.circle(overlay, (features["mouth_right"]),
-                   self.radius, color, self.line_thickness)
+        cv2.circle(
+            overlay, (features["left_eye"]), self.radius, color, self.line_thickness
+        )
+        cv2.circle(
+            overlay, (features["right_eye"]), self.radius, color, self.line_thickness
+        )
+        cv2.circle(overlay, (features["nose"]), self.radius, color, self.line_thickness)
+        cv2.circle(
+            overlay, (features["mouth_left"]), self.radius, color, self.line_thickness
+        )
+        cv2.circle(
+            overlay, (features["mouth_right"]), self.radius, color, self.line_thickness
+        )
 
-        cv2.line(overlay, features["left_eye"], features["nose"],
-                 color, self.radius)
-        cv2.line(overlay, features["right_eye"], features["nose"],
-                 color, self.radius)
-        cv2.line(overlay, features["mouth_left"], features["nose"],
-                 color, self.radius)
-        cv2.line(overlay, features["mouth_right"], features["nose"],
-                 color, self.radius)
+        cv2.line(overlay, features["left_eye"], features["nose"], color, self.radius)
+        cv2.line(overlay, features["right_eye"], features["nose"], color, self.radius)
+        cv2.line(overlay, features["mouth_left"], features["nose"], color, self.radius)
+        cv2.line(overlay, features["mouth_right"], features["nose"], color, self.radius)
 
     def add_fps(self, frame, elapsed, thickness=2):
-        text = "FPS: {}".format(round(1000. / elapsed, 2))
+        text = "FPS: {}".format(round(1000.0 / elapsed, 2))
 
         x, y = 10, 20
         rgb = [255 * round((255 - np.mean(frame[:x, :y])) / 255)] * 3
 
-        cv2.putText(frame, text, (x, y), self.font,
-                    self.font_size, rgb, thickness)
+        cv2.putText(frame, text, (x, y), self.font, self.font_size, rgb, thickness)
 
     def add_graphics(self, frame, person, is_recognized, best_match, elapsed):
         def get_color():
@@ -177,23 +181,23 @@ class GraphicsRenderer:
             features = person["keypoints"]
             x, y, height, width = person["box"]
 
-            if self.resize != 1.:
-                scale_factor = 1. / self.resize
+            if self.resize != 1.0:
+                scale_factor = 1.0 / self.resize
 
                 if features:
-                    scale = lambda x: tuple(round(element * scale_factor)
-                                            for element in x)
-                    features = {feature: scale(features[feature])
-                                for feature in features}
+                    scale = lambda x: tuple(
+                        round(element * scale_factor) for element in x
+                    )
+                    features = {
+                        feature: scale(features[feature]) for feature in features
+                    }
 
-                scale = lambda *xs: tuple(int(round(x * scale_factor))
-                                          for x in xs)
+                scale = lambda *xs: tuple(int(round(x * scale_factor)) for x in xs)
                 x, y, height, width = scale(x, y, height, width)
 
             color = get_color()
             origin = (x - self.margin // 2, y - self.margin // 2)
-            corner = (x + height + self.margin // 2,
-                      y + width + self.margin // 2)
+            corner = (x + height + self.margin // 2, y + width + self.margin // 2)
 
             if features:
                 overlay = frame.copy()
@@ -201,7 +205,6 @@ class GraphicsRenderer:
                 cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
 
             text = best_match if is_recognized else ""
-            self.add_box_and_label(frame, origin, corner,
-                                   text, color, thickness=1)
+            self.add_box_and_label(frame, origin, corner, text, color, thickness=1)
 
         self.add_fps(frame, elapsed)
