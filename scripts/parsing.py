@@ -15,10 +15,10 @@ dest = ""
 for root, dirs, files in os.walk(rootdir, topdown=False):
     for name in dirs:
         if (
-            name.startswith("jtxt") 
-            or name.startswith("store") 
-            or name.startswith("_Data") 
-            or name.startswith("cdnjs") 
+            name.startswith("jtxt")
+            or name.startswith("store")
+            or name.startswith("_Data")
+            or name.startswith("cdnjs")
             or name.startswith("fonts")
             or name.startswith("ssl")
         ):
@@ -28,15 +28,15 @@ for root, dirs, files in os.walk(rootdir, topdown=False):
 m = 0
 for roots, dirs, files in os.walk(rootdir):
     for dir in dirs:
-        if(not(dir.startswith("web") or dir.startswith("www"))):
-            if(os.path.isdir(os.path.join(dest, dir))):
+        if not (dir.startswith("web") or dir.startswith("www")):
+            if os.path.isdir(os.path.join(dest, dir)):
                 new = dir + str(m)
                 os.rename(os.path.join(roots, dir), os.path.join(dest, new))
                 m = m + 1
             else:
                 shutil.move(os.path.join(roots, dir), dest)
 print("Folders moved to dest")
-shutil.rmtree(rootdir, ignore_errors=True) #deletes rootdir
+shutil.rmtree(rootdir, ignore_errors=True)  # deletes rootdir
 
 # NOTE: Auto name
 # Run after naming folders

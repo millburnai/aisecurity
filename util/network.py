@@ -26,13 +26,11 @@ def connect_to_wifi():
         objc.loadBundle(
             "CoreWLAN",
             bundle_path="/System/Library/Frameworks/CoreWLAN.framework",
-            module_globals=globals()
+            module_globals=globals(),
         )
 
         iface = CWInterface.interface()
-        networks, error = iface.scanForNetworksWithName_error_(
-            WIFI["network"], None
-        )
+        networks, error = iface.scanForNetworksWithName_error_(WIFI["network"], None)
         network = networks.anyObject()
         success, error = iface.associateToNetwork_password_error_(
             network, WIFI["password"], None
@@ -53,13 +51,14 @@ def connect_to_wifi():
         if "Device or resource busy" in result:
             return False
         else:
-            ssid_list = [item.lstrip("SSID:").strip('"\n')
-                         for item in result]
+            ssid_list = [item.lstrip("SSID:").strip('"\n') for item in result]
 
         for name in ssid_list:
-            cmd = f"nmcli d wifi connect {name} " \
-                  f"password {WIFI['password']} " \
-                  f"iface {IFACE}"
+            cmd = (
+                f"nmcli d wifi connect {name} "
+                f"password {WIFI['password']} "
+                f"iface {IFACE}"
+            )
             if os.system(cmd) != 0:
                 print(f"[DEBUG] Couldn't connect to wifi '{WIFI['network']}'")
                 return False
@@ -73,7 +72,6 @@ def connect_to_wifi():
 
 
 class WebSocket:
-
     def __init__(self, ip, id, facenet):
         self.ip = ip
         self.id = id
@@ -101,10 +99,12 @@ class WebSocket:
             self.facenet.real_time_recognize(**kwargs, socket=ws)
 
         websocket.enableTrace(True)
-        ws = websocket.WebSocketApp(f"ws://{self.ip}/v1/nano",
-                                    on_message=self.on_message,
-                                    on_error=self.on_error,
-                                    on_close=self.on_close)
+        ws = websocket.WebSocketApp(
+            f"ws://{self.ip}/v1/nano",
+            on_message=self.on_message,
+            on_error=self.on_error,
+            on_close=self.on_close,
+        )
         ws.on_open = partial(on_open, **facenet_kwargs)
         ws.run_forever()
 
@@ -119,10 +119,12 @@ class WebSocket:
                 raise SocketError
 
         websocket.enableTrace(True)
-        ws = websocket.WebSocketApp(f"ws://{self.ip}/v1/nano",
-                                    on_message=self.on_message,
-                                    on_error=self.on_error,
-                                    on_close=self.on_close)
+        ws = websocket.WebSocketApp(
+            f"ws://{self.ip}/v1/nano",
+            on_message=self.on_message,
+            on_error=self.on_error,
+            on_close=self.on_close,
+        )
         ws.send = new_send  # monkey-patch
         ws.on_open = partial(on_open, **facenet_kwargs)
         ws.run_forever()
