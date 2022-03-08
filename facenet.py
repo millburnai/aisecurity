@@ -384,7 +384,6 @@ class FaceNet:
 
                 nearest = self._stripped_db[best_match]
                 s = self.compute_similarity(embeds, self.data["andrew_hong-2"])
-                print(s)
                 dists = self.dist_metric.distance(embeds, nearest, True)
                 dist = np.average(dists)
                 is_recognized = dist <= self.alpha
@@ -473,28 +472,30 @@ class FaceNet:
     def compute_similarity(self, embedding1, embedding2) -> float:
         """
         https://arxiv.org/pdf/1810.11160.pdf
-        
+
         In Figure 1, the letters (A, B, C) are representing
         different people and person C is being inputted into
         the facial recognition.
-        
+
         In Figure 2, the person is being added to the database
         with their name and embedding registered. All embeddings
         are extracted from other people and are being compared
         using the dot product with the inputted person's embedding
         and the other people's embedding inputted into the database.
         The dot product results are being compared.
-        
+
         T = (1, ..., t) is a LIST
         v = (1...t) is an ITERATOR
-        
+
         FT = INPUT PERSON's embedding
         Fv = v person's embedding
         S(T, v) = dot(FT, Fv)
-        
+
         Questions:
         - If the database is empty, how do you get the thresholds?
         - If you found a new similarity, do you keep or replace the
-        old embedding and threshold? 
+        old embedding and threshold?
         """
-        return np.dot(np.squeeze(np.asarray(embedding1)), np.squeeze(np.asarray(embedding2)))
+        return np.dot(
+            np.squeeze(np.asarray(embedding1)), np.squeeze(np.asarray(embedding2))
+        )
