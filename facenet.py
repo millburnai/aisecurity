@@ -1,6 +1,7 @@
 """Facial recognition with FaceNet in Keras, TensorFlow, or TensorRT.
 """
 
+from copy import copy
 import json
 import os
 from timeit import default_timer as timer
@@ -89,6 +90,7 @@ class FaceNet:
         print(f"[DEBUG] inference backend is {self.mode}")
 
         self._db = {}
+        self._db_threshold = {}
         self.classifier = None
         self.classifier_type = classifier
 
@@ -103,7 +105,7 @@ class FaceNet:
 
     @property
     def data(self):
-        """Property for static database
+        """Property for static database of embeddings
         :returns: self._db
         """
 
@@ -117,6 +119,13 @@ class FaceNet:
             "alpha": self.alpha,
             "img_norm": self.img_norm,
         }
+
+    @property
+    def data_threshold(self):
+        """Property for static database of thresholds
+        :returns: self._db_threshold
+        """
+        return self._db_threshold
 
     def _keras_init(self, filepath):
         """Initializes a Keras model
@@ -210,6 +219,7 @@ class FaceNet:
 
         embeds = np.array(embeddings).reshape(len(embeddings), -1)
         self._db[person] = embeds
+        self._db_threshold[person] = 0
 
         stripped = strip_id(person)
         self._stripped_names.append(stripped)
@@ -267,6 +277,7 @@ class FaceNet:
         if data:
             for person, embed in data.items():
                 self.add_entry(person, embed, train_classifier=False)
+            self.apply_thresholds()
             self._train_classifier()
 
     def _train_classifier(self):
@@ -350,6 +361,7 @@ class FaceNet:
             return None, None
 
         start = timer()
+        
 
         normalized = self.normalize(np.array(cropped_faces))
         embeds = self.embed(normalized)
@@ -360,6 +372,9 @@ class FaceNet:
             time = colored(f"{elapsed} ms", attrs=["bold"])
             vecs = f"{len(embeds)} vector{'s' if len(embeds) > 1 else ''}"
             print(f"Embedding time ({vecs}): {time}")
+
+        s = self.find_similar_embedding(embeds)
+        print(s, list(self.data.keys())[s])
 
         return embeds, face_coords
 
@@ -383,7 +398,7 @@ class FaceNet:
                 best_match = self.classifier.predict(embeds)[0]
 
                 nearest = self._stripped_db[best_match]
-                s = self.compute_similarity(embeds, self.data["andrew_hong-2"])
+
                 dists = self.dist_metric.distance(embeds, nearest, True)
                 dist = np.average(dists)
                 is_recognized = dist <= self.alpha
@@ -484,18 +499,69 @@ class FaceNet:
         and the other people's embedding inputted into the database.
         The dot product results are being compared.
 
-        T = (1, ..., t) is a LIST
-        v = (1...t) is an ITERATOR
+        t = ITERATOR & total amount of embeddings
+        In Figure 2, F4 is the max Ft can go.
 
         FT = INPUT PERSON's embedding
         Fv = v person's embedding
         S(T, v) = dot(FT, Fv)
 
+        F(fancy S korean character) embedding of the facial image without identity
+        Fu is themost similar embedding
+
         Questions:
         - If the database is empty, how do you get the thresholds?
         - If you found a new similarity, do you keep or replace the
         old embedding and threshold?
+        
+        1 ... n = row
+        1, ..., n = column
         """
         return np.dot(
             np.squeeze(np.asarray(embedding1)), np.squeeze(np.asarray(embedding2))
         )
+
+    def find_threshold(self, person) -> float:
+        """This might be correct, not 100% sure.
+        """
+        embedding = self.data[person]
+        compares = []
+        people = copy(self.data)
+        del people[person]
+        people_thresholds = people.values()
+        for x in people_thresholds:
+            s = self.compute_similarity(embedding, x)
+            compares.append(s)
+        
+        return np.max(np.std(compares))
+
+    def apply_thresholds(self) -> None:
+        people = list(self.data.keys())
+        i = 0
+        for person in people:
+            thresholds = [0]
+            if i != 0:
+                thresholds = [0, self.find_threshold(people[i-1])]
+            
+            for j in range(len(people)):
+                person_name1 = people[j].split("-")[0]
+                person_name2 = person.split("-")[0]
+                if person_name1 != person_name2:
+                    thresholds.append(self.compute_similarity(self.data[people[j]], self.data[person]))
+
+            self._db_threshold[person] = np.max(thresholds)
+            i += 1
+
+    def find_similar_embedding(self, embedding) -> int:
+        """Returns index of similar embedding for self.data
+        """
+        compares = []
+        for x in self.data.values():
+            s = self.compute_similarity(embedding, x)
+            compares.append(s)
+        return np.argmax(compares)
+
+    def is_intruder(self, embedding) -> bool:
+        simliar_embedding = self.find_similar_embedding(embedding)
+        
+        
