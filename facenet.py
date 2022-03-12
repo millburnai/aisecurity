@@ -371,10 +371,6 @@ class FaceNet:
             vecs = f"{len(embeds)} vector{'s' if len(embeds) > 1 else ''}"
             print(f"Embedding time ({vecs}): {time}")
 
-        s = self.is_intruder(embeds)
-        if s:
-            print("intruder alert")
-
         return embeds, face_coords
 
     def recognize(self, img, *args, verbose=True, **kwargs):
@@ -567,3 +563,34 @@ class FaceNet:
         threshold = self.data_threshold[list(self.data.keys())[simliar_index]]
         
         return simliarity_score < threshold
+
+    def adapt_evaluation(self, embedding, detected_person) -> bool:
+        """
+        Parameters:
+            embedding: Embedding that is inputted into
+                the recognition program
+            detected_person: String of the detected person's
+                key in the database
+        """
+        simliar_index = self.find_similar_embedding(embedding)
+        other_key = list(self.data.keys())[simliar_index]
+        other_val = list(self.data.values())[simliar_index]
+        simliarity_score = self.compute_similarity(embedding, other_val)
+        threshold = self.data_threshold[list(self.data.keys())[simliar_index]]
+
+        case_type = None
+        if simliarity_score >= threshold and other_key.split("-")[0] == detected_person:
+            case_type = "true accept"
+
+        if simliarity_score < threshold and other_key in list(self.data.keys()):
+            case_type = "false reject"
+
+        if simliarity_score >= threshold and other_key not in list(self.data.keys()):
+            case_type = "false accept"
+
+        if simliarity_score < threshold and other_key not in list(self.data.keys()):
+            case_type = "true reject"
+
+        return case_type
+
+        
