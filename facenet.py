@@ -91,6 +91,7 @@ class FaceNet:
 
         self._db = {}
         self._db_threshold = {}
+        self._db_threshold_stripped = {}
         self.classifier = None
         self.classifier_type = classifier
 
@@ -390,20 +391,22 @@ class FaceNet:
         try:
             embeds, face = self.predict(img, *args, **kwargs, verbose=verbose)
             if embeds is not None:
-                best_match = self.classifier.predict(embeds)[0]
+                intruder = self.is_intruder(embeds)
+                if not intruder:
+                    best_match = self.classifier.predict(embeds)[0]
 
-                nearest = self._stripped_db[best_match]
+                    simliar_index = self.find_similar_embedding(embeds)
+                    other = list(self.data.values())[simliar_index]
+                    simliarity_score = self.compute_similarity(embeds, other)
+                    threshold = np.average(self._db_threshold_stripped[best_match])
+                    is_recognized = simliarity_score >= threshold
 
-                dists = self.dist_metric.distance(embeds, nearest, True)
-                dist = np.average(dists)
-                is_recognized = dist <= self.alpha
-
-                if verbose and dist:
-                    info = colored(
-                        f"{round(dist, 4)} ({best_match})",
-                        color="green" if is_recognized else "red",
-                    )
-                    print(f"{self.dist_metric}: {info}")
+                    if verbose and simliarity_score:
+                        info = colored(
+                            f"{round(simliarity_score, 4)} > {round(threshold, 4)} ({best_match})",
+                            color="green" if is_recognized else "red",
+                        )
+                        print(f"adaptive thresholding: {info}")
 
         except (ValueError, cv2.error) as error:
             incompatible = "query data dimension"
@@ -482,35 +485,6 @@ class FaceNet:
     def compute_similarity(self, embedding1, embedding2) -> float:
         """
         https://arxiv.org/pdf/1810.11160.pdf
-
-        In Figure 1, the letters (A, B, C) are representing
-        different people and person C is being inputted into
-        the facial recognition.
-
-        In Figure 2, the person is being added to the database
-        with their name and embedding registered. All embeddings
-        are extracted from other people and are being compared
-        using the dot product with the inputted person's embedding
-        and the other people's embedding inputted into the database.
-        The dot product results are being compared.
-
-        t = ITERATOR & total amount of embeddings
-        In Figure 2, F4 is the max Ft can go.
-
-        FT = INPUT PERSON's embedding
-        Fv = v person's embedding
-        S(T, v) = dot(FT, Fv)
-
-        F(fancy S korean character) embedding of the facial image without identity
-        Fu is themost similar embedding
-
-        Questions:
-        - If the database is empty, how do you get the thresholds?
-        - If you found a new similarity, do you keep or replace the
-        old embedding and threshold?
-        
-        1 ... n = row
-        1, ..., n = column
         """
         return np.dot(
             np.squeeze(np.asarray(embedding1)), np.squeeze(np.asarray(embedding2))
@@ -545,6 +519,10 @@ class FaceNet:
                     thresholds.append(self.compute_similarity(self.data[people[j]], self.data[person]))
 
             self._db_threshold[person] = np.max(thresholds)
+            if person.split("-")[0] in list(self._db_threshold_stripped.keys()):
+                self._db_threshold_stripped[person.split("-")[0]].append(self._db_threshold[person])
+            else:
+                self._db_threshold_stripped[person.split("-")[0]] = []
             i += 1
 
     def find_similar_embedding(self, embedding) -> int:
@@ -567,10 +545,8 @@ class FaceNet:
     def adapt_evaluation(self, embedding, detected_person) -> bool:
         """
         Parameters:
-            embedding: Embedding that is inputted into
-                the recognition program
-            detected_person: String of the detected person's
-                key in the database
+            embedding: Embedding that is inputted into the recognition program
+            detected_person: String of the detected person's key in the database
         """
         simliar_index = self.find_similar_embedding(embedding)
         other_key = list(self.data.keys())[simliar_index]
@@ -591,6 +567,6 @@ class FaceNet:
         if simliarity_score < threshold and other_key not in list(self.data.keys()):
             case_type = "true reject"
 
-        return case_type
+        return case_type, simliarity_score
 
         
