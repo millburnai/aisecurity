@@ -168,7 +168,4 @@ class FaceDetector:
                 confidence = round(face["confidence"] * 100, 2)
                 print(f"{confidence}% detect confidence (too low)")
 
-        elif verbose:
-            print("No face detected")
-
         return resized_faces, face

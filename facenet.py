@@ -356,8 +356,6 @@ class FaceNet:
 
         cropped_faces, face_coords = detector.crop_face(img, margin, flip, verbose)
         if cropped_faces is None:
-            if verbose:
-                print("No face detected")
             return None, None
 
         start = timer()
@@ -373,8 +371,9 @@ class FaceNet:
             vecs = f"{len(embeds)} vector{'s' if len(embeds) > 1 else ''}"
             print(f"Embedding time ({vecs}): {time}")
 
-        s = self.find_similar_embedding(embeds)
-        print(s, list(self.data.keys())[s])
+        s = self.is_intruder(embeds)
+        if s:
+            print("intruder alert")
 
         return embeds, face_coords
 
@@ -562,6 +561,9 @@ class FaceNet:
         return np.argmax(compares)
 
     def is_intruder(self, embedding) -> bool:
-        simliar_embedding = self.find_similar_embedding(embedding)
+        simliar_index = self.find_similar_embedding(embedding)
+        other = list(self.data.values())[simliar_index]
+        simliarity_score = self.compute_similarity(embedding, other)
+        threshold = self.data_threshold[list(self.data.keys())[simliar_index]]
         
-        
+        return simliarity_score < threshold
