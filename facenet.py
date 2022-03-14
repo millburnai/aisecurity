@@ -6,6 +6,7 @@ import json
 import os
 from timeit import default_timer as timer
 import threading
+import random
 
 import cv2
 import numpy as np
@@ -395,8 +396,7 @@ class FaceNet:
                 if not intruder:
                     best_match = self.classifier.predict(embeds)[0]
 
-                    simliar_index = self.find_similar_embedding(embeds)
-                    other = list(self.data.values())[simliar_index]
+                    other = random.choice(self._stripped_db[best_match])
                     simliarity_score = self.compute_similarity(embeds, other)
                     threshold = np.average(self._db_threshold_stripped[best_match])
                     is_recognized = simliarity_score >= threshold
