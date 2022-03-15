@@ -33,7 +33,13 @@ from util.loader import (
     retrieve_embeds,
     get_frozen_graph,
 )
-from util.common import DB_LOB, DEFAULT_MODEL, EMBED_KEY_PATH, NAME_KEY_PATH
+from util.common import (
+    DB_LOB,
+    DEFAULT_MODEL,
+    EMBED_KEY_PATH,
+    NAME_KEY_PATH,
+    name_cleanup,
+)
 from util.pbar import ProgressBar
 from util.visuals import Camera, GraphicsRenderer
 from util.log import Logger
@@ -361,7 +367,6 @@ class FaceNet:
             return None, None
 
         start = timer()
-        
 
         normalized = self.normalize(np.array(cropped_faces))
         embeds = self.embed(normalized)
@@ -396,8 +401,9 @@ class FaceNet:
                 if not intruder:
                     best_match = self.classifier.predict(embeds)[0]
 
-                    other = random.choice(self._stripped_db[best_match])
+                    other = np.average(self._stripped_db[best_match], axis=0)
                     simliarity_score = self.compute_similarity(embeds, other)
+                    print(simliarity_score)
                     threshold = np.average(self._db_threshold_stripped[best_match])
                     is_recognized = simliarity_score >= threshold
 
@@ -483,15 +489,27 @@ class FaceNet:
         cv2.destroyAllWindows()
 
     def compute_similarity(self, embedding1, embedding2) -> float:
+        """Calculates the similarity score.
+
+        Parameters:
+            embedding1 (embedding): The first embedding.
+            embedding2 (embedding): The second embedding to be compared with.
+
+        Returns (float):
+            Similarity score.
+
         """
-        https://arxiv.org/pdf/1810.11160.pdf
-        """
-        return np.dot(
-            np.squeeze(np.asarray(embedding1)), np.squeeze(np.asarray(embedding2))
-        )
+        return 1 - self.dist_metric.distance(embedding1, embedding2, True)[0]
 
     def find_threshold(self, person) -> float:
-        """This might be correct, not 100% sure.
+        """Calculates the adaptive threshold for each person.
+
+        Parameters:
+            person (str): Person's name.
+
+        Returns (float):
+            The threshold value.
+
         """
         embedding = self.data[person]
         compares = []
@@ -501,32 +519,41 @@ class FaceNet:
         for x in people_thresholds:
             s = self.compute_similarity(embedding, x)
             compares.append(s)
-        
+
         return np.max(np.std(compares))
 
     def apply_thresholds(self) -> None:
+        """Applys the threshold values to every person in the database."""
         people = list(self.data.keys())
         i = 0
         for person in people:
             thresholds = [0]
             if i != 0:
-                thresholds = [0, self.find_threshold(people[i-1])]
-            
+                thresholds = [0, self.find_threshold(people[i - 1])]
+
             for j in range(len(people)):
-                person_name1 = people[j].split("-")[0]
-                person_name2 = person.split("-")[0]
+                person_name1 = name_cleanup(people[j])
+                person_name2 = name_cleanup(person)
                 if person_name1 != person_name2:
-                    thresholds.append(self.compute_similarity(self.data[people[j]], self.data[person]))
+                    thresholds.append(
+                        self.compute_similarity(self.data[people[j]], self.data[person])
+                    )
 
             self._db_threshold[person] = np.max(thresholds)
-            if person.split("-")[0] in list(self._db_threshold_stripped.keys()):
-                self._db_threshold_stripped[person.split("-")[0]].append(self._db_threshold[person])
+            if name_cleanup(person) in list(self._db_threshold_stripped.keys()):
+                self._db_threshold_stripped[name_cleanup(person)].append(
+                    self._db_threshold[person]
+                )
             else:
-                self._db_threshold_stripped[person.split("-")[0]] = []
+                self._db_threshold_stripped[name_cleanup(person)] = []
             i += 1
 
     def find_similar_embedding(self, embedding) -> int:
-        """Returns index of similar embedding for self.data
+        """Returns index of similar embedding from self.data.
+
+        Parameters:
+            embedding (embedding): Embedding to be compared with.
+
         """
         compares = []
         for x in self.data.values():
@@ -535,18 +562,34 @@ class FaceNet:
         return np.argmax(compares)
 
     def is_intruder(self, embedding) -> bool:
+        """Returns a boolean if the person's embedding is registered
+        in the database or not.
+
+        Parameters:
+            embedding (embedding): Embedding to be compared with.
+
+        Returns (bool):
+            Is intruder or not.
+
+        """
         simliar_index = self.find_similar_embedding(embedding)
         other = list(self.data.values())[simliar_index]
         simliarity_score = self.compute_similarity(embedding, other)
         threshold = self.data_threshold[list(self.data.keys())[simliar_index]]
-        
+
         return simliarity_score < threshold
 
     def adapt_evaluation(self, embedding, detected_person) -> bool:
-        """
+        """This was in the article about adaptive thresholding.
+        https://arxiv.org/pdf/1810.11160.pdf
+
         Parameters:
-            embedding: Embedding that is inputted into the recognition program
-            detected_person: String of the detected person's key in the database
+            embedding (embedding): Embedding that is inputted into the recognition program
+            detected_person (str): The detected person's key in the database
+
+        Return (str):
+            Case type.
+
         """
         simliar_index = self.find_similar_embedding(embedding)
         other_key = list(self.data.keys())[simliar_index]
@@ -555,7 +598,7 @@ class FaceNet:
         threshold = self.data_threshold[list(self.data.keys())[simliar_index]]
 
         case_type = None
-        if simliarity_score >= threshold and other_key.split("-")[0] == detected_person:
+        if simliarity_score >= threshold and name_cleanup(other_key) == detected_person:
             case_type = "true accept"
 
         if simliarity_score < threshold and other_key in list(self.data.keys()):
@@ -568,5 +611,3 @@ class FaceNet:
             case_type = "true reject"
 
         return case_type, simliarity_score
-
-        
