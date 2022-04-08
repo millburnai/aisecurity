@@ -3,7 +3,7 @@ import numpy as np
 
 class DistMetric:
     def __init__(
-        self, metric, normalize: bool = True, mean: None | float = None
+        self, metric, normalize: bool = True, mean: None or float = None
     ) -> None:
         assert metric in ("cosine", "euclidean"), f"{metric} not supported"
         if metric == "cosine":
