@@ -106,7 +106,7 @@ for i in range(0, len(students)):
         list_items = driver.find_elements_by_xpath("//div[@class='"+ OUTER_PICTURE_CLASS_NAME + "']")
 
 
-    print("Downloaded {} images of {}".format(len(list_items), name))
+    print("Downloaded {} images of {}".format(len(list_items), name)) 
 
     driver.back() #go back to main page
     students = driver.find_elements_by_xpath("//li[@class='"+ LIST_ITEMS_CLASS_NAME + "']")
