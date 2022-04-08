@@ -90,17 +90,16 @@ for i in range(0, len(students)):
         # take screenshot
         location = cur_pic.location;
         size = cur_pic.size;
-        driver.save_screenshot(name + "_fullscreen_" + str(j) + ".png");
-
+        driver.save_screenshot(name + str(j) + "_" + ".png"); #change the rest to this
         # crop image; These sizes are good enough
         x = 600;
         y = 25;
         width = 1605;
         height = 1530;
-        im = Image.open(name + "_fullscreen_" + str(j) + ".png")
+        im = Image.open(name + str(j) + ".png")
         im = im.crop((int(x), int(y), int(width), int(height)))
-        im.save(name + "_cropped_" + str(j) + ".png")
-        print("Downloaded" + name + "_cropped_" + str(j) + ".png")
+        im.save(name + str(j) + ".png")
+        print("Downloaded " + name + str(j) + ".png")
 
         driver.back()
 
