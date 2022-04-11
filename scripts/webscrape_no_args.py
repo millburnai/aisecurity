@@ -30,18 +30,9 @@ BIG_PICTURE_CLASS_NAME = "ImageProtectionOverlay";
 PASSWORD = "millers2022" #password that's entered
 
 
-try:
-    dump_dir = sys.argv[1]
-    chromedriver = sys.argv[2]
-except IndexError:
-    print("usage: python3 webscrape.py [dump dir] [chromedriver path]")
-    sys.exit(1)
-
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument("--incognito") #makes Chrome open incognito so your history isn't flooded :P
-
-driver = webdriver.Chrome(chromedriver, options=chrome_options)
-
+driver = webdriver.Chrome(options=chrome_options)
 driver.maximize_window()
 
 driver.implicitly_wait(3)
@@ -86,10 +77,8 @@ for i in range(0, len(students)):
 
     list_items = driver.find_elements_by_xpath("//div[@class='"+ OUTER_PICTURE_CLASS_NAME + "']")
     num_each_pic.append(len(list_items))
-
-    os.makedirs(dump_dir)
-
     for j in range(0, len(list_items)):
+
 
         p = list_items[j]
         p.click()
@@ -101,17 +90,17 @@ for i in range(0, len(students)):
         # take screenshot
         location = cur_pic.location;
         size = cur_pic.size;
-        path = os.path.join(dump_dir, name + str(j) + ".png")
-        driver.save_screenshot(path); #change the rest to this
+        file_name = name + "_" + str(j) + ".png"
+        driver.save_screenshot(file_name); #change the rest to this
         # crop image; These sizes are good enough
         x = 600;
         y = 25;
         width = 1605;
         height = 1530;
-        im = Image.open(path)
+        im = Image.open(file_name)
         im = im.crop((int(x), int(y), int(width), int(height)))
-        im.save(path)
-        print(f"Downloaded to '{path}'")
+        im.save(file_name)
+        print("Downloaded " + file_name)
 
         driver.back()
 
