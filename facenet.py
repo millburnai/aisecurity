@@ -380,12 +380,13 @@ class FaceNet:
 
         return embeds, face_coords
 
-    def recognize(self, img, *args, verbose=True, **kwargs):
+    def recognize(self, img, *args, verbose=True, mode="default", **kwargs):
         """Facial recognition
         :param img: image array in BGR mode
         :param args: will be passed to self.predict
         :param verbose: verbose or not (default: True)
         :param kwargs: will be passed to self.predict
+        :param mode: ["default", "adaptive_threshold"]
         :returns: face, is recognized, best match, time elapsed
         """
         start = timer()
@@ -399,20 +400,34 @@ class FaceNet:
             if embeds is not None:
                 intruder = self.is_intruder(embeds)
                 if not intruder:
-                    best_match = self.classifier.predict(embeds)[0]
+                    if mode == "adaptive_threshold":
+                        best_match = self.classifier.predict(embeds)[0]
 
-                    other = np.average(self._stripped_db[best_match], axis=0)
-                    simliarity_score = self.compute_similarity(embeds, other)
-                    print(simliarity_score)
-                    threshold = np.average(self._db_threshold_stripped[best_match])
-                    is_recognized = simliarity_score >= threshold
+                        other = np.average(self._stripped_db[best_match], axis=0)
+                        simliarity_score = self.compute_similarity(embeds, other)
+                        threshold = np.average(self._db_threshold_stripped[best_match])
+                        is_recognized = simliarity_score >= threshold
 
-                    if verbose and simliarity_score:
-                        info = colored(
-                            f"{round(simliarity_score, 4)} > {round(threshold, 4)} ({best_match})",
-                            color="green" if is_recognized else "red",
-                        )
-                        print(f"adaptive thresholding: {info}")
+                        if verbose and simliarity_score:
+                            info = colored(
+                                f"{round(simliarity_score, 4)} > {round(threshold, 4)} ({best_match})",
+                                color="green" if is_recognized else "red",
+                            )
+                            print(f"adaptive thresholding: {info}")
+                    elif mode == "default":
+                        best_match = self.classifier.predict(embeds)[0]
+
+                        nearest = self._stripped_db[best_match]
+                        dists = self.dist_metric.distance(embeds, nearest, True)
+                        dist = np.average(dists)
+                        is_recognized = dist <= self.alpha
+
+                        if verbose and dist:
+                            info = colored(
+                                f"{round(dist, 4)} ({best_match})",
+                                color="green" if is_recognized else "red",
+                            )
+                            print(f"{self.dist_metric}: {info}")
 
         except (ValueError, cv2.error) as error:
             incompatible = "query data dimension"
