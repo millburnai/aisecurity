@@ -451,6 +451,7 @@ class FaceNet:
         graphics=True,
         socket=None,
         mtcnn_stride=1,
+        mode="default"
     ):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
@@ -461,6 +462,7 @@ class FaceNet:
         :param graphics: whether or not to use graphics (default: True)
         :param socket: socket (dev) (default: None)
         :param mtcnn_stride: stride frame stride (default: 1)
+        :param mode: ["default", "adaptive_threshold"] (default: "default)
         """
 
         assert self._db, "data must be provided"
@@ -483,7 +485,7 @@ class FaceNet:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
             # facial detection and recognition
-            info = self.recognize(frame, detector, flip=flip)
+            info = self.recognize(frame, detector, flip=flip, mode=mode)
             face, is_recognized, best_match, elapsed = info
 
             # logging and socket
