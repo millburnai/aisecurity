@@ -451,7 +451,7 @@ class FaceNet:
         graphics=True,
         socket=None,
         mtcnn_stride=1,
-        mode="default"
+        mode="default",
     ):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
