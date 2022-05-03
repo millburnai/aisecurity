@@ -14,5 +14,9 @@ if __name__ == "__main__":
 
     facenet = FaceNet()
     facenet.real_time_recognize(
-        detector=detector, graphics=graphics, mtcnn_stride=mtcnn_stride, resize=resize, mode="adaptive_threshold"
+        detector=detector,
+        graphics=graphics,
+        mtcnn_stride=mtcnn_stride,
+        resize=resize,
+        mode="adaptive_threshold",
     )
