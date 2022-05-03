@@ -38,3 +38,7 @@ ON_CUDA = not bool(os.system("command -v nvcc > /dev/null"))
 ON_JETSON = platform.machine() == "aarch64"
 
 HAS_RS = importlib.util.find_spec("pyrealsense2") is not None
+
+
+def name_cleanup(name: str) -> str:
+    return name.split("-")[0]
