@@ -380,13 +380,13 @@ class FaceNet:
 
         return embeds, face_coords
 
-    def recognize(self, img, *args, verbose=True, mode="default", **kwargs):
+    def recognize(self, img, *args, verbose=True, mode="cosine", **kwargs):
         """Facial recognition
         :param img: image array in BGR mode
         :param args: will be passed to self.predict
         :param verbose: verbose or not (default: True)
         :param kwargs: will be passed to self.predict
-        :param mode: ["default", "adaptive_threshold"]
+        :param mode: ["cosine", "adaptive_threshold"]
         :returns: face, is recognized, best match, time elapsed
         """
         start = timer()
@@ -400,7 +400,7 @@ class FaceNet:
             if embeds is not None:
                 intruder = self.is_intruder(embeds)
                 if not intruder:
-                    if mode == "adaptive_threshold":
+                    if mode == "adaptive":
                         best_match = self.classifier.predict(embeds)[0]
 
                         other = np.average(self._stripped_db[best_match], axis=0)
@@ -414,7 +414,7 @@ class FaceNet:
                                 color="green" if is_recognized else "red",
                             )
                             print(f"adaptive thresholding: {info}")
-                    elif mode == "default":
+                    elif mode == "cosine":
                         best_match = self.classifier.predict(embeds)[0]
 
                         nearest = self._stripped_db[best_match]
@@ -428,6 +428,8 @@ class FaceNet:
                                 color="green" if is_recognized else "red",
                             )
                             print(f"{self.dist_metric}: {info}")
+                    else:
+                        raise Exception("Invalid face recognition mode")
 
         except (ValueError, cv2.error) as error:
             incompatible = "query data dimension"
@@ -451,7 +453,7 @@ class FaceNet:
         graphics=True,
         socket=None,
         mtcnn_stride=1,
-        mode="default",
+        mode="cosine",
     ):
         """Real-time facial recognition
         :param width: width of frame (default: 640)
