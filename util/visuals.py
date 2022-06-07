@@ -207,4 +207,4 @@ class GraphicsRenderer:
             text = best_match if is_recognized else ""
             self.add_box_and_label(frame, origin, corner, text, color, thickness=1)
 
-        self.add_fps(frame, elapsed)
+        #self.add_fps(frame, elapsed)

@@ -439,8 +439,11 @@ class FaceNet:
             detector, self.img_shape, min_face_size=240, stride=mtcnn_stride
         )
 
+        cache = []
         while True:
             _, frame = cap.read()
+            if frame is None: continue
+
             cframe = frame.copy()
 
             # resize frame
@@ -461,7 +464,89 @@ class FaceNet:
             # graphics
             if graphics:
                 graphics_controller.add_graphics(cframe, *info)
-                cv2.imshow("AI Security v2021.0.1", cframe)
+
+                # YEET
+                img = cv2.imread("msg.png")
+                img = cv2.resize(img, (527, cframe.shape[0]))
+
+                if best_match:
+                    if is_recognized:
+                        cache.append(best_match)
+                    else:
+                        cache.append(None)
+                    if len(cache) > 6:
+                        del cache[0]
+                print(cache)
+                if not cache:
+                    best_match = None
+                else:
+                    best_match = max(cache, key=cache.count)
+                if is_recognized and best_match is not None and len(cache) > 5:
+                    x0, y0 = 63, 711
+
+                    # 312 x 261 photo box
+                    passport = cv2.imread("passport.png")
+
+                    x, y, w, h = face["box"]
+                    margin_y = int(height * 0.2)
+                    margin_x = int(width * 0.2)
+                    face_ = frame[
+                        y - margin_y // 2 : y + h + margin_y // 2,
+                        x - margin_x // 2 : x + w + margin_x // 2,
+                        :,
+                    ]
+
+                    try:
+                        face_ = cv2.resize(face_, (261, 312))
+                        passport[y0:y0 + face_.shape[0], x0:x0 + face_.shape[1], :] = face_
+                        cv2.putText(
+                            passport,
+                            "WELCOME,",
+                            (120, passport.shape[0] // 3 - 170),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            3,
+                            (0, 0, 0),
+                            10,
+                            cv2.LINE_AA
+                        )
+                        cv2.putText(
+                            passport,
+                            best_match.split("_")[0].upper() + "!!!",
+                            (120, passport.shape[0] // 3 - 80),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            3,
+                            (255, 144,30),
+                            10,
+                            cv2.LINE_AA
+                        )
+                        cv2.putText(
+                            passport,
+                            "SAFE TRAVELS",
+                            (120, passport.shape[0] // 3 + 110),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            3,
+                            (0, 0,0),
+                            10,
+                            cv2.LINE_AA
+                        )
+
+                        ny = int(round(passport.shape[1] * cframe.shape[0] / passport.shape[0]))
+                        img = cv2.resize(passport, (ny, cframe.shape[0]))
+                    except (AssertionError, cv2.error):
+                        pass
+
+                elif face is not None and not is_recognized and best_match is None and len(cache) > 5 :
+                    img = cv2.imread("err.png")
+                    img = cv2.resize(img, (527, cframe.shape[0]))
+
+                name = "around the world!"
+                cframe = np.hstack([cframe, img])
+                cframe = cv2.resize(cframe, (cframe.shape[1] * 2, cframe.shape[0] * 2))
+                # END YEET
+
+                cv2.namedWindow(name, cv2.WND_PROP_FULLSCREEN)
+                cv2.setWindowProperty(name, cv2.WND_PROP_FULLSCREEN, 1)
+                cv2.imshow(name, cframe)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
 
