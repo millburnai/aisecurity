@@ -144,7 +144,8 @@ class FaceDetector:
         result = self.detect_faces(img)
 
         if len(result) != 0:
-            face = max(result, key=lambda person: person["confidence"])
+#            face = max(result, key=lambda person: person["confidence"])
+            face = max(result, key=lambda person: person["box"][-1] * person["box"][-2])
 
             if face["confidence"] >= self.alpha:
                 x, y, width, height = face["box"]

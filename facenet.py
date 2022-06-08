@@ -440,6 +440,9 @@ class FaceNet:
         )
 
         cache = []
+        with open('seniors.txt', 'r') as s:
+            seniors = list(map(str.rstrip, s.readlines()))
+
         while True:
             _, frame = cap.read()
             if frame is None: continue
@@ -451,7 +454,9 @@ class FaceNet:
                 frame = cv2.resize(frame, (0, 0), fx=resize, fy=resize)
 
             # facial detection and recognition
-            info = self.recognize(frame, detector, flip=flip)
+            info = list(self.recognize(frame, detector, flip=flip))
+            if info[-2] not in seniors:
+                info[1] = False
             face, is_recognized, best_match, elapsed = info
 
             # logging and socket
@@ -474,13 +479,20 @@ class FaceNet:
                         cache.append(best_match)
                     else:
                         cache.append(None)
-                    if len(cache) > 6:
+                    if len(cache) > 7:
                         del cache[0]
+                if best_match not in seniors:
+                    best_match = None
+
                 print(cache)
                 if not cache:
                     best_match = None
                 else:
                     best_match = max(cache, key=cache.count)
+                    if best_match is None:
+                        if cache.count(None) != len(cache):
+                            is_recognized = True  # skip error msg
+
                 if is_recognized and best_match is not None and len(cache) > 5:
                     x0, y0 = 63, 711
 
