@@ -110,7 +110,7 @@ for i in range(0, len(students)):
 
     list_items = driver.find_elements_by_xpath(
         "//div[@class='" + OUTER_PICTURE_CLASS_NAME + "']"
-        )
+    )
     num_each_pic.append(len(list_items))
     for j in range(0, len(list_items)):
 
@@ -140,7 +140,7 @@ for i in range(0, len(students)):
 
         list_items = driver.find_elements_by_xpath(
             "//div[@class='" + OUTER_PICTURE_CLASS_NAME + "']"
-            )
+        )
 
     print("Downloaded {} images of {}".format(len(list_items), name))
 
