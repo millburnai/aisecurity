@@ -13,9 +13,9 @@ from util.common import ON_CUDA
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--img_dir", help="image dir to embed")
-    parser.add_argument("--dump_path", help="dump path for embeddings")
-    parser.add_argument("--mean", help="use mean or not", action="store_true")
+    parser.add_argument("img_dir", help="image dir to embed")
+    parser.add_argument("dump_path", help="dump path for embeddings")
+    parser.add_argument("mean", help="use mean or not", action="store_true")
     args = parser.parse_args()
 
     facenet = FaceNet(data_path=None)
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     facenet.img_norm = "fixed"
     facenet.alpha = 0.33
 
-    detector = FaceDetector("trt-mtcnn" if ON_GPU else "mtcnn", facenet.img_shape)
+    detector = FaceDetector("trt-mtcnn" if ON_CUDA else "mtcnn", facenet.img_shape)
     no_faces = dump_and_embed(
         facenet,
         args.img_dir,

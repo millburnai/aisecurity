@@ -93,10 +93,17 @@ for i in range(0, len(students)):
     )
     name = names[i].text
     name = name.replace(", ", "_")  # make the name last_first
-    name = name.split("_")[1] + "_" + name.split("_")[0]  # actaully First_Last
+    try:
+        name = name.split("_")[1] + "_" + name.split("_")[0]  # actaully First_Last
+    except IndexError:
+        print(name, i, " - SKIPPING")
+        continue
 
     # make image dir
-    os.makedirs(f"{dump}/{name}")
+    try:
+        os.makedirs(f"{dump}/{name}")
+    except FileExistsError:
+        continue
 
     s.click()
     time.sleep(0.6)
@@ -119,7 +126,7 @@ for i in range(0, len(students)):
         # take screenshot
         location = cur_pic.location
         size = cur_pic.size
-        file_name = os.path.join(f"{dump}/{name}", name + "_" + str(j) + ".png")
+        file_name = os.path.join(f"{dump}/{name}", name + "-" + str(j) + ".png")
 
         driver.save_screenshot(file_name)
         # change the rest to this

@@ -20,12 +20,13 @@ NAME_KEY_PATH = CONFIG["name_keys"].replace(REPLACE, CWD)
 EMBED_KEY_PATH = CONFIG["embedding_keys"].replace(REPLACE, CWD)
 
 DEFAULT_MODEL = CONFIG["default_model"].replace(REPLACE, CWD)
+SERVER = CONFIG.get("server", {})
 WIFI = {
-    "network": CONFIG["server"]["network"],
-    "password": CONFIG["server"]["password"],
+    "network": SERVER.get("network"),
+    "password": SERVER.get("password"),
 }
-IP = CONFIG["server"]["ip"]
-IFACE = CONFIG["server"]["iface"]
+IP = SERVER.get("ip")
+IFACE = SERVER.get("iface")
 
 OS = platform.system()
 if OS == "Windows":
