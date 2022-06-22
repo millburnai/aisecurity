@@ -8,6 +8,6 @@ dropbox
 testresources
 setuptools==49.6.0
 Cython
-numpy==1.21.0
+numpy==1.22.0
 pycuda
 tensorrt
