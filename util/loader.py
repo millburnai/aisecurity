@@ -126,28 +126,33 @@ def dump_and_embed(
     full_overwrite=False,
     to_encrypt=ALL,
     use_mean=False,
-    **kwargs,
+    load_kwargs=None,
+    encrypt_kwargs=None,
 ):
     metadata = facenet.metadata
     metadata["to_encrypt"] = to_encrypt
+
+    load_kwargs = load_kwargs or {}
+    encrypt_kwargs = encrypt_kwargs or {}
 
     if not full_overwrite:
         path = retrieve_path if retrieve_path else dump_path
         old_embeds, old_metadata = retrieve_embeds(path, NAME_KEY_PATH, EMBED_KEY_PATH)
 
-        new_embeds, no_faces = online_load(facenet, img_dir, **kwargs)
+        new_embeds, no_faces = online_load(facenet, img_dir, **load_kwargs)
         data = {**old_embeds, **new_embeds}
 
         assert not old_metadata or metadata == old_metadata, "metadata inconsistent"
 
     else:
-        data, no_faces = online_load(facenet, img_dir, **kwargs)
+        data, no_faces = online_load(facenet, img_dir, **load_kwargs)
 
     if use_mean:
         embeds = np.array(list(data.values()))
         metadata["mean"] = np.average(embeds, axis=(0, 1, 2))
 
-    dump_and_encrypt(data, metadata, dump_path, to_encrypt=to_encrypt)
+    dump_and_encrypt(data, metadata, dump_path, to_encrypt=to_encrypt,
+                     **encrypt_kwargs)
     return no_faces
 
 
