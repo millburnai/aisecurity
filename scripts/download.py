@@ -32,18 +32,20 @@ def get_files(dbx, prefix, ignore) -> None:
 
 if __name__ == "__main__":
     dest = "../config"
-    dbx_prefix = "/aisecurity/2020-2021/config"
     ignore = re.compile(r".*photos$|^.*\.(jpg|png)$")
 
     try:
         token = sys.argv[1]
+        year = int(sys.argv[2])
     except IndexError:
-        print("USAGE: python download.py [token]")
+        print("USAGE: python download.py [token] [year]")
         sys.exit(1)
 
+    dbx_prefix = f"/aisecurity/{year}-{year + 1}/config"
     dbx = dropbox.Dropbox(token)
     display_name = dbx.users_get_current_account().name.display_name
     print(f'[DEBUG] logged into account name: "{display_name}"')
+    print(f"[DEBUG] downloading from '{dbx_prefix}'")
 
     urls = list(get_files(dbx, dbx_prefix, ignore))
     for url in tqdm(urls):
