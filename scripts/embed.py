@@ -36,6 +36,6 @@ if __name__ == "__main__":
         full_overwrite=True,
         use_mean=args.mean,
         detector=detector,
-        verbose=False
+        verbose=False,
     )
     print(f"[DEBUG] faces not detected for {no_faces}")

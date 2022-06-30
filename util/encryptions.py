@@ -41,6 +41,7 @@ def maybe_load(func):
             with open(key_file, "rb") as key:
                 key = b"".join(key.readlines())
                 return func(key, *args, **kwargs)
+
     return _func
 
 
@@ -71,7 +72,7 @@ def get_key(key_bytes):
 
 @maybe_load
 def get_nonce(key_bytes, position):
-    return key_bytes[NUM_BITS:][position * NUM_BITS:(position + 1) * NUM_BITS]
+    return key_bytes[NUM_BITS:][position * NUM_BITS : (position + 1) * NUM_BITS]
 
 
 # ENCRYPT AND DECRYPT

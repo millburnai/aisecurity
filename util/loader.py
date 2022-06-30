@@ -109,11 +109,18 @@ def online_load(facenet, img_dir, people=None, **kwargs):
     return data, no_faces
 
 
-def dump_and_encrypt(data, metadata, dump_path,
-                     name_key_path, embedding_key_path,
-                     to_encrypt=ALL, mode="w+"):
-    encrypted_data = encrypt_data(data, name_key_path, embedding_key_path,
-                                  to_encrypt=to_encrypt)
+def dump_and_encrypt(
+    data,
+    metadata,
+    dump_path,
+    name_key_path,
+    embedding_key_path,
+    to_encrypt=ALL,
+    mode="w+",
+):
+    encrypted_data = encrypt_data(
+        data, name_key_path, embedding_key_path, to_encrypt=to_encrypt
+    )
 
     with open(dump_path, mode, encoding="utf-8") as dump_file:
         data = {"metadata": metadata, "data": encrypted_data}
@@ -131,7 +138,7 @@ def dump_and_embed(
     full_overwrite=False,
     to_encrypt=ALL,
     use_mean=False,
-    **kwargs
+    **kwargs,
 ):
     metadata = facenet.metadata
     metadata["to_encrypt"] = to_encrypt
@@ -152,8 +159,14 @@ def dump_and_embed(
         embeds = np.array(list(data.values()))
         metadata["mean"] = np.average(embeds, axis=(0, 1, 2))
 
-    dump_and_encrypt(data, metadata, dump_path, name_key_path,
-                     embedding_key_path, to_encrypt=to_encrypt)
+    dump_and_encrypt(
+        data,
+        metadata,
+        dump_path,
+        name_key_path,
+        embedding_key_path,
+        to_encrypt=to_encrypt,
+    )
     return no_faces
 
 

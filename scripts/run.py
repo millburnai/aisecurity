@@ -5,7 +5,7 @@ import sys
 sys.path.insert(1, "../")
 
 from facenet import FaceNet
-from util.wsocket import WebSocket, SocketError
+from util.network import WebSocket, SocketError
 from util.common import ON_CUDA, ON_JETSON
 
 
