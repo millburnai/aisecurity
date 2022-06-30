@@ -2,15 +2,18 @@
 """
 
 import functools
+import getpass
 import struct
 import sys
 
+import dropbox
+import dropbox.exceptions
 import numpy as np
 from Crypto.Cipher import AES  # noqa
 from Crypto.Random import get_random_bytes  # noqa
 
 sys.path.insert(1, "../")
-from util.common import NAME_KEY_PATH, EMBED_KEY_PATH  # noqa
+from util.common import KEYS_ID  # noqa
 
 NUM_BITS = 16
 ALL = 0
@@ -18,7 +21,7 @@ EMBEDS = 1
 NAMES = 2
 
 
-def require_permission(func):
+def file_check(func):
     @functools.wraps(func)
     def _func(*args, **kwargs):
         try:
@@ -29,8 +32,20 @@ def require_permission(func):
     return _func
 
 
+def maybe_load(func):
+    @functools.wraps(func)
+    def _func(key_file, *args, **kwargs):
+        if isinstance(key_file, bytes):
+            return func(key_file, *args, **kwargs)
+        else:
+            with open(key_file, "rb") as key:
+                key = b"".join(key.readlines())
+                return func(key, *args, **kwargs)
+    return _func
+
+
 # Generate encryption information
-@require_permission
+@file_check
 def generate_key(key_file) -> None:
     open(key_file, "w").close()
     with open(key_file, "wb") as keys:
@@ -38,7 +53,7 @@ def generate_key(key_file) -> None:
         keys.write(key)
 
 
-@require_permission
+@file_check
 def generate_cipher(key_file, alloc_mem):
     key = get_key(key_file)
     cipher = AES.new(key, AES.MODE_EAX)
@@ -49,19 +64,14 @@ def generate_cipher(key_file, alloc_mem):
 
 
 # RETRIEVALS
-@require_permission
-def get_key(key_file):
-    with open(key_file, "rb") as keys:
-        key = b"".join(keys.readlines())[:NUM_BITS]
-    return key
+@maybe_load
+def get_key(key_bytes):
+    return key_bytes[:NUM_BITS]
 
 
-@require_permission
-def get_nonce(key_file, position):
-    with open(key_file, "rb") as keys:
-        joined_nonces = b"".join(keys.readlines())[NUM_BITS:]
-        nonce = joined_nonces[position * NUM_BITS : (position + 1) * NUM_BITS]
-    return nonce
+@maybe_load
+def get_nonce(key_bytes, position):
+    return key_bytes[NUM_BITS:][position * NUM_BITS:(position + 1) * NUM_BITS]
 
 
 # ENCRYPT AND DECRYPT
@@ -79,15 +89,16 @@ def decrypt(cipher_text, position, key_file):
 
 def encrypt_data(
     data,
+    name_keys,
+    embedding_keys,
     to_encrypt=ALL,
-    decryptable: bool = True,
-    name_keys=NAME_KEY_PATH,
-    embedding_keys=EMBED_KEY_PATH,
+    decryptable=True,
 ):
     if decryptable:
         generate_key(name_keys)
         generate_key(embedding_keys)
 
+    # Backwards compatibility with local key paths
     encrypted = {}
     for person in data:
         assert (
@@ -112,32 +123,36 @@ def encrypt_data(
     return encrypted
 
 
-def decrypt_data(
-    data, to_encrypt=ALL, name_keys=NAME_KEY_PATH, embedding_keys=EMBED_KEY_PATH
-):
-    """Obviously, if the embedding sets
-    have differing lengths, the lengths
-    of the nonce groups associated with
-    those embeddings will be different.
+def decrypt_data(data, to_encrypt=ALL):
+    """Obviously, if the embedding sets have differing lengths, the lengths
+    of the nonce groups associated with those embeddings will be different.
 
-    However, the position of the name
-    nonce will not be affected by the
-    length of the nonce group because
-    it is stored in a different memory
-    buffer than the embedding nonces.
-    Therefore, the name nonce's position
-    in its memory buffer is just the
-    index of the name (nonce_pos).
+    However, the position of the name nonce will not be affected by the
+    length of the nonce group because it is stored in a different memory
+    buffer than the embedding nonces. Therefore, the name nonce's position
+    in its memory buffer is just the index of the name (nonce_pos).
 
-    Embedding nonces are more complicated.
-    We must take into account the lengths
-    of the nonce groups. Therefore, the
-    position of any specific embed (x) in
-    a set of embeddings is given by the
-    total length of all of the embeds in
-    all of the embeddings prior to
-    x (adj_nonce_pos).
+    Embedding nonces are more complicated. We must take into account the lengths
+    of the nonce groups. Therefore, the position of any specific embed (x) in
+    a set of embeddings is given by the total length of all of the embeds in
+    all of the embeddings prior to x (adj_nonce_pos).
     """
+    # Download key file
+    token = getpass.getpass("Enter token: ")
+    try:
+        dbx = dropbox.Dropbox(token)
+        name_key_id, embed_key_id = KEYS_ID
+
+        _, result = dbx.files_download(name_key_id)
+        name_keys = result.content
+
+        _, result = dbx.files_download(embed_key_id)
+        embedding_keys = result.content
+        print("[DEBUG] downloaded key files, decrypting now")
+
+    except dropbox.exceptions.DropboxException:
+        print("[DEBUG] authentification or download failed, exiting")
+        sys.exit(1)
 
     adj_nonce_pos = 0
     decrypted = {}

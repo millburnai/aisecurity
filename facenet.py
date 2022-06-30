@@ -24,8 +24,12 @@ try:
 except (ModuleNotFoundError, ImportError) as e:
     print(f"[DEBUG] '{e}'. Ignore if GPU is not set up")
 
+from util.common import DB_LOB, DEFAULT_MODEL, name_cleanup
 from util.detection import FaceDetector, is_looking
 from util.distance import DistMetric
+from util.pbar import ProgressBar
+from util.visuals import Camera, GraphicsRenderer
+from util.log import Logger
 from util.loader import (
     print_time,
     screen_data,
@@ -33,16 +37,6 @@ from util.loader import (
     retrieve_embeds,
     get_frozen_graph,
 )
-from util.common import (
-    DB_LOB,
-    DEFAULT_MODEL,
-    EMBED_KEY_PATH,
-    NAME_KEY_PATH,
-    name_cleanup,
-)
-from util.pbar import ProgressBar
-from util.visuals import Camera, GraphicsRenderer
-from util.log import Logger
 
 
 class FaceNet:
@@ -103,11 +97,7 @@ class FaceNet:
         self.classifier_type = classifier
 
         if data_path:
-            self.set_data(
-                *retrieve_embeds(
-                    data_path, name_keys=NAME_KEY_PATH, embedding_keys=EMBED_KEY_PATH
-                )
-            )
+            self.set_data(*retrieve_embeds(data_path))
         else:
             print("[DEBUG] data not set. Set it manually with set_data")
 

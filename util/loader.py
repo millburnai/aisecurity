@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 sys.path.insert(1, "../")
 from util.encryptions import ALL, NAMES, EMBEDS, encrypt_data, decrypt_data  # noqa
-from util.common import DB_LOB, NAME_KEY_PATH, EMBED_KEY_PATH  # noqa
+from util.common import DB_LOB, KEYS_ID  # noqa
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -109,8 +109,11 @@ def online_load(facenet, img_dir, people=None, **kwargs):
     return data, no_faces
 
 
-def dump_and_encrypt(data, metadata, dump_path, to_encrypt=ALL, mode="w+", **kwargs):
-    encrypted_data = encrypt_data(data, to_encrypt=to_encrypt, **kwargs)
+def dump_and_encrypt(data, metadata, dump_path,
+                     name_key_path, embedding_key_path,
+                     to_encrypt=ALL, mode="w+"):
+    encrypted_data = encrypt_data(data, name_key_path, embedding_key_path,
+                                  to_encrypt=to_encrypt)
 
     with open(dump_path, mode, encoding="utf-8") as dump_file:
         data = {"metadata": metadata, "data": encrypted_data}
@@ -122,43 +125,41 @@ def dump_and_embed(
     facenet,
     img_dir,
     dump_path,
+    name_key_path,
+    embedding_key_path,
     retrieve_path=None,
     full_overwrite=False,
     to_encrypt=ALL,
     use_mean=False,
-    load_kwargs=None,
-    encrypt_kwargs=None,
+    **kwargs
 ):
     metadata = facenet.metadata
     metadata["to_encrypt"] = to_encrypt
 
-    load_kwargs = load_kwargs or {}
-    encrypt_kwargs = encrypt_kwargs or {}
-
     if not full_overwrite:
         path = retrieve_path if retrieve_path else dump_path
-        old_embeds, old_metadata = retrieve_embeds(path, NAME_KEY_PATH, EMBED_KEY_PATH)
+        old_embeds, old_metadata = retrieve_embeds(path)
 
-        new_embeds, no_faces = online_load(facenet, img_dir, **load_kwargs)
+        new_embeds, no_faces = online_load(facenet, img_dir, **kwargs)
         data = {**old_embeds, **new_embeds}
 
         assert not old_metadata or metadata == old_metadata, "metadata inconsistent"
 
     else:
-        data, no_faces = online_load(facenet, img_dir, **load_kwargs)
+        data, no_faces = online_load(facenet, img_dir, **kwargs)
 
     if use_mean:
         embeds = np.array(list(data.values()))
         metadata["mean"] = np.average(embeds, axis=(0, 1, 2))
 
-    dump_and_encrypt(data, metadata, dump_path, to_encrypt=to_encrypt,
-                     **encrypt_kwargs)
+    dump_and_encrypt(data, metadata, dump_path, name_key_path,
+                     embedding_key_path, to_encrypt=to_encrypt)
     return no_faces
 
 
 @print_time("data retrieval time")
-def retrieve_embeds(path, name_keys, embedding_keys):
-    if path is None or name_keys is None or embedding_keys is None:
+def retrieve_embeds(path):
+    if path is None:
         return {}, {}
 
     with open(path, "r", encoding="utf-8") as json_file:
@@ -166,7 +167,5 @@ def retrieve_embeds(path, name_keys, embedding_keys):
         metadata = data["metadata"]
         encrypted_data = data["data"]
 
-    decrypted = decrypt_data(
-        encrypted_data, metadata["to_encrypt"], name_keys, embedding_keys
-    )
+    decrypted = decrypt_data(encrypted_data, metadata["to_encrypt"])
     return decrypted, metadata

@@ -16,10 +16,16 @@ with open(CONFIG_HOME + "/config.json", encoding="utf-8") as config_file:
 
 DB_LOB = CONFIG["database"].replace(REPLACE, CWD)
 
-NAME_KEY_PATH = CONFIG["name_keys"].replace(REPLACE, CWD)
-EMBED_KEY_PATH = CONFIG["embedding_keys"].replace(REPLACE, CWD)
+if "name keys" in CONFIG or "embedding_keys" in CONFIG:
+    raise ValueError(
+        "Using local key paths is deprecated and unsafe. Upgrade"
+        " by using KEYS_ID instead. Try fixing by downloading the "
+        "new config directory from 2022-2023."
+    )
 
+KEYS_ID = CONFIG["keys_id"]
 DEFAULT_MODEL = CONFIG["default_model"].replace(REPLACE, CWD)
+
 SERVER = CONFIG.get("server", {})
 WIFI = {
     "network": SERVER.get("network"),

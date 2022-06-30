@@ -16,10 +16,8 @@ if __name__ == "__main__":
     parser.add_argument("img_dir", help="image dir to embed")
     parser.add_argument("dump_path", help="dump path for embeddings")
     parser.add_argument("--mean", help="use mean or not", action="store_true")
-    parser.add_argument("--name_keys", help="name keys path",
-                        default=NAME_KEY_PATH)
-    parser.add_argument("--embed_keys", help="embed keys path",
-                        default=EMBED_KEY_PATH)
+    parser.add_argument("--name_keys", help="name keys path")
+    parser.add_argument("--embed_keys", help="embed keys path")
     args = parser.parse_args()
 
     facenet = FaceNet(data_path=None)
@@ -32,16 +30,12 @@ if __name__ == "__main__":
         facenet,
         args.img_dir,
         args.dump_path,
+        args.name_keys,
+        args.embed_keys,
         to_encrypt=ALL,
         full_overwrite=True,
         use_mean=args.mean,
-        load_kwargs=dict(
-            detector=detector,
-            verbose=False
-        ),
-        encrypt_kwargs=dict(
-            name_keys=args.name_keys,
-            embedding_keys=args.embed_keys
-        )
+        detector=detector,
+        verbose=False
     )
     print(f"[DEBUG] faces not detected for {no_faces}")
