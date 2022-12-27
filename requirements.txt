@@ -6,7 +6,7 @@ websocket
 tqdm
 dropbox
 testresources
-setuptools==49.6.0
+setuptools==65.5.1
 Cython
 numpy==1.22.0
 pycuda
